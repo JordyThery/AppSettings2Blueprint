@@ -40,9 +40,17 @@ final class LocalAppsModel {
         added.first { $0.path == path } ?? scanned.first { $0.path == path }
     }
 
+    /// Set when the folder list changes during a scan; that scan's results are
+    /// stale, so another scan follows as soon as it finishes.
+    private var needsRescan = false
+
     func scan() {
-        guard !isScanning else { return }
+        guard !isScanning else {
+            needsRescan = true
+            return
+        }
         isScanning = true
+        needsRescan = false
         let folders = folders
         Task {
             let results = await Task.detached(priority: .userInitiated) {
@@ -51,6 +59,7 @@ final class LocalAppsModel {
             scanned = results
             isScanning = false
             hasScanned = true
+            if needsRescan { scan() }
         }
     }
 
@@ -66,6 +75,7 @@ final class LocalAppsModel {
             added.insert(entry, at: 0)
             // Re-inspect: a dropped file may have changed since it was last read.
             inspections[entry.path] = nil
+            inspectionErrors[entry.path] = nil
             firstAccepted = firstAccepted ?? entry.path
         }
         if let firstAccepted { selectedPath = firstAccepted }

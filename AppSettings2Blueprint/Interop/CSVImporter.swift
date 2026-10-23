@@ -1,5 +1,7 @@
 import Foundation
 
+// Ported from cantscript/AppSettingsUtility (MIT) — reads the CSV layouts that
+// create_csv and export_local_csv in appSettingsUtility.sh write.
 /// Reads App Settings Utility CSV files. The layout is recognised from the header
 /// row, which must match one of the two column lists exactly and in order.
 nonisolated enum CSVImporter {
@@ -9,7 +11,8 @@ nonisolated enum CSVImporter {
     }
 
     static func importDocument(_ text: String) throws -> CSVDocument {
-        let records = try parse(text)
+        // Blank lines (often a trailing one left by an editor) are not rows.
+        let records = try parse(text).filter { $0 != [.null] }
         guard let header = records.first else { throw ImportError(message: "The file is empty.") }
         let names = header.map { $0.value ?? "" }
         guard let format = CSVFormat.allCases.first(where: { $0.columns == names }) else {

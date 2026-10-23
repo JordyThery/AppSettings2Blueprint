@@ -17,7 +17,10 @@ nonisolated extension JSONValue {
             if a.literal == b.literal { return true }
             guard let left = Decimal(string: a.literal, locale: Locale(identifier: "en_US_POSIX")),
                   let right = Decimal(string: b.literal, locale: Locale(identifier: "en_US_POSIX")) else { return false }
-            return left == right
+            guard left == right else { return false }
+            // Decimal holds 38 significant digits; differing literals longer than
+            // that could collide, so they count as unequal rather than equal.
+            return Self.significantDigits(a.literal) <= 38 && Self.significantDigits(b.literal) <= 38
         case let (.array(a), .array(b)):
             return a.count == b.count && zip(a, b).allSatisfy { $0.isSemanticallyEqual(to: $1) }
         case let (.object(a), .object(b)):
@@ -30,6 +33,12 @@ nonisolated extension JSONValue {
         default:
             return false
         }
+    }
+
+    /// Digits in the mantissa, without sign, point, exponent or leading zeros.
+    private static func significantDigits(_ literal: String) -> Int {
+        let mantissa = literal.prefix { $0 != "e" && $0 != "E" }
+        return mantissa.filter(\.isWholeNumber).drop { $0 == "0" }.count
     }
 }
 

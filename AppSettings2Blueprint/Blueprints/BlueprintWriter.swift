@@ -173,6 +173,14 @@ nonisolated struct BlueprintWriter: Sendable {
         } else {
             var changed = 0
             for (stepIndex, (sentStep, readStep)) in zip(sent, read).enumerated() {
+                // A step's own fields (name, activationPredicate, …) must come
+                // back as sent; a dropped predicate would change who gets the rules.
+                for member in sentStep.objectValue?.members ?? [] where member.key != "components" {
+                    let returned = readStep[member.key]
+                    if returned == nil || returned?.isSemanticallyEqual(to: member.value) == false {
+                        problems.append("Step \(stepIndex + 1)'s \(member.key) came back different from what was sent.")
+                    }
+                }
                 let sentComponents = sentStep["components"]?.arrayValue ?? []
                 let readComponents = readStep["components"]?.arrayValue ?? []
                 guard sentComponents.count == readComponents.count else {

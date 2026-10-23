@@ -60,7 +60,7 @@ struct UpdateView: View {
             .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
         case let .failed(message):
             VStack(alignment: .leading, spacing: 4) {
-                Text("Couldn't check for updates")
+                Text("Couldn't Check for Updates")
                     .font(.headline)
                 Text(message)
                     .foregroundStyle(.secondary)

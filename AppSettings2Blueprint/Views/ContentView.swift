@@ -36,7 +36,7 @@ struct ContentView: View {
                     } label: {
                         Label("Fetch by ID", systemImage: "number")
                     }
-                    .help("Fetch one Blueprint by ID")
+                    .help("Fetch one blueprint by ID")
                     .disabled(model.profileStore.selectedProfile == nil)
 
                     Button {
@@ -44,7 +44,7 @@ struct ContentView: View {
                     } label: {
                         Label("Refresh", systemImage: "arrow.clockwise")
                     }
-                    .help("List Blueprints")
+                    .help("List blueprints")
                     .disabled(model.isListing || model.profileStore.selectedProfile == nil)
                 }
 
@@ -211,6 +211,8 @@ private struct FetchByIDSheet: View {
     }
 
     private func fetch() {
+        // Return in the text field must obey the same conditions as the button.
+        guard !isFetching, !blueprintID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         isFetching = true
         errorMessage = nil
         Task {

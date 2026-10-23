@@ -21,13 +21,18 @@ nonisolated enum KeychainStore {
         ]
     }
 
-    static func secret(for profileID: UUID) -> String? {
+    /// Nil means no secret is stored; any other failure (denied access, locked
+    /// Keychain) throws, so it is not mistaken for a missing connection.
+    static func secret(for profileID: UUID) throws -> String? {
         var query = baseQuery(for: profileID)
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
         var result: AnyObject?
-        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
-              let data = result as? Data else { return nil }
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        if status == errSecItemNotFound { return nil }
+        guard status == errSecSuccess, let data = result as? Data else {
+            throw KeychainError(status: status)
+        }
         return String(data: data, encoding: .utf8)
     }
 

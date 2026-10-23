@@ -57,7 +57,11 @@ struct RuleBuilderView: View {
         .onAppear(perform: selectVisibleTab)
         .onChange(of: document.ruleSet.platform) { selectVisibleTab() }
         .confirmationDialog(
-            "Discard unsaved changes?",
+            // Switching platform keeps the entries; the other actions discard them.
+            {
+                if case .switchPlatform = pendingAction { return "Switch platform?" }
+                return "Discard unsaved changes?"
+            }(),
             isPresented: Binding(get: { pendingAction != nil }, set: { if !$0 { pendingAction = nil } }),
             presenting: pendingAction
         ) { action in
@@ -131,7 +135,7 @@ struct RuleBuilderView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-                    .help("Loaded from or last written to this Blueprint")
+                    .help("Loaded from or last written to this blueprint")
             }
             if document.isDirty {
                 Text("Edited")

@@ -112,7 +112,7 @@ private struct ProfileEditor: View {
 
     init(profile: ConnectionProfile) {
         _draft = State(initialValue: profile)
-        let stored = KeychainStore.secret(for: profile.id) ?? ""
+        let stored = (try? KeychainStore.secret(for: profile.id)) ?? ""
         _secret = State(initialValue: stored)
         _storedSecret = State(initialValue: stored)
     }

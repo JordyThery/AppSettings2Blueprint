@@ -4,6 +4,7 @@ import SwiftUI
 struct RequestLogView: View {
     @Environment(AppModel.self) private var model
     @State private var selection: RequestLogEntry.ID?
+    @State private var isConfirmingClear = false
 
     var body: some View {
         let entries = model.requestLog.entries
@@ -27,10 +28,18 @@ struct RequestLogView: View {
         }
         .toolbar {
             Button("Clear", systemImage: "trash") {
+                isConfirmingClear = true
+            }
+            .disabled(entries.isEmpty)
+        }
+        .confirmationDialog("Clear the request log?", isPresented: $isConfirmingClear) {
+            Button("Clear", role: .destructive) {
                 selection = nil
                 model.requestLog.clear()
             }
-            .disabled(entries.isEmpty)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("The log is kept in memory only and cannot be recovered.")
         }
         .navigationTitle("Request Log")
     }

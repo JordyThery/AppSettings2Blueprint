@@ -28,9 +28,20 @@ struct RequestAllowListTests {
         ("PATCH", "/blueprints/v1/blueprints/../x"),
         ("POST", "/blueprints/v1/blueprints//deploy"),
         ("GET", "blueprints/v1/blueprints"),
+        // Encoded traversal must be judged by the decoded segment.
+        ("PATCH", "/blueprints/v1/blueprints/..%2F..%2Fv1%2Fdevices"),
+        ("PATCH", "/blueprints/v1/blueprints/%2e%2e"),
+        ("POST", "/blueprints/v1/blueprints/a%2Fb/deploy"),
+        ("GET", "/blueprints/v1/%2e%2e/other"),
+        ("GET", "/blueprints/v1/%zz"),
     ])
     func refuses(method: String, path: String) {
         #expect(!RequestAllowList.isPermitted(method: method, path: path))
+    }
+
+    /// Percent-encoding that does not hide a separator stays permitted.
+    @Test func permitsHarmlessEncoding() {
+        #expect(RequestAllowList.isPermitted(method: "PATCH", path: "/blueprints/v1/blueprints/a%20b"))
     }
 }
 
@@ -156,6 +167,20 @@ struct PlatformAPIClientTests {
     }
 }
 
+}
+
+@Suite("Update version comparison")
+struct UpdateVersionTests {
+    @Test func comparesNumericComponents() {
+        #expect(UpdateChecker.isNewer("1.10", than: "1.9"))
+        #expect(!UpdateChecker.isNewer("1.0", than: "1.0.1"))
+        #expect(!UpdateChecker.isNewer("1.2", than: "1.2"))
+    }
+
+    @Test func suffixedTagsCompareByLeadingDigits() {
+        #expect(UpdateChecker.isNewer("1.2.1-hotfix", than: "1.2"))
+        #expect(!UpdateChecker.isNewer("1.2.0-beta", than: "1.2"))
+    }
 }
 
 /// Collects log entries delivered on the main actor.

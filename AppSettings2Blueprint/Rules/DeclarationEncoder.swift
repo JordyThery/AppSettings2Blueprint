@@ -23,18 +23,28 @@ nonisolated enum DeclarationEncoder {
         ]))
     }
 
-    /// One or two declarations, SYSTEM first.
+    /// One declaration per channel, SYSTEM first. Channels the platform does not
+    /// use are still written when they hold preserved content, so decoding and
+    /// re-encoding never drops a declaration.
     static func declarations(for ruleSet: RuleSet) -> [JSONValue] {
         channels(for: ruleSet).map { declaration(for: ruleSet, channel: $0) }
     }
 
     static func channels(for ruleSet: RuleSet) -> [String] {
-        guard ruleSet.platform == .macOS else { return [systemChannel] }
-        let system = allowed(for: ruleSet, channel: systemChannel) != nil
-            || !(ruleSet.preserved[systemChannel]?.isEmpty ?? true)
-        let user = !ruleSet.permissionDefaults.isEmpty || !(ruleSet.preserved[userChannel]?.isEmpty ?? true)
-        if system && user { return [systemChannel, userChannel] }
-        return user ? [userChannel] : [systemChannel]
+        var channels: [String]
+        if ruleSet.platform == .macOS {
+            let system = allowed(for: ruleSet, channel: systemChannel) != nil
+                || !(ruleSet.preserved[systemChannel]?.isEmpty ?? true)
+            let user = !ruleSet.permissionDefaults.isEmpty || !(ruleSet.preserved[userChannel]?.isEmpty ?? true)
+            channels = system && user ? [systemChannel, userChannel] : (user ? [userChannel] : [systemChannel])
+        } else {
+            channels = [systemChannel]
+        }
+        // Preserved declarations on any other channel pass through unchanged.
+        let others = ruleSet.preserved
+            .filter { !channels.contains($0.key) && !$0.value.isEmpty }
+            .keys.sorted()
+        return channels + others
     }
 
     static func declaration(for ruleSet: RuleSet, channel: String) -> JSONValue {

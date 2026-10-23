@@ -1,10 +1,13 @@
 import Foundation
 import Observation
 
-/// A blueprint the rule set belongs to.
+/// A blueprint the rule set belongs to, and the component it was loaded from,
+/// so a write targets that component and not another one.
 nonisolated struct LinkedBlueprint: Hashable, Sendable {
     let id: String
     let name: String
+    var stepIndex: Int?
+    var componentIndex: Int?
 }
 
 /// The rule set being edited: undo/redo, unsaved-changes tracking, local files
@@ -101,7 +104,10 @@ final class RuleSetDocument {
         }
         replace(
             with: decoded.ruleSet, fileURL: nil, notes: decoded.notes,
-            linkedBlueprint: LinkedBlueprint(id: detail.id, name: detail.overview.name)
+            linkedBlueprint: LinkedBlueprint(
+                id: detail.id, name: detail.overview.name,
+                stepIndex: location.stepIndex, componentIndex: location.componentIndex
+            )
         )
     }
 

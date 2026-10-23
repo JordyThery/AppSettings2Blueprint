@@ -24,10 +24,12 @@ nonisolated struct DeploymentMonitor: Sendable {
     var maxPolls = 45
     var sleep: @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
 
-    /// POST /blueprints/v1/blueprints/{id}/deploy. Returns the previous deployment's
-    /// start time, so polling can tell the new deployment apart from it.
+    /// POST /blueprints/v1/blueprints/{id}/deploy. Fetches the blueprint first and
+    /// returns the fresh deployment start time, so polling cannot mistake a
+    /// deployment started since the caller's copy was loaded for the new one.
     func deploy(_ detail: BlueprintDetail) async throws -> String? {
-        let previous = detail.overview.deploymentState?.lastDeploymentStarted
+        let latest = try await service.detail(id: detail.id)
+        let previous = latest.overview.deploymentState?.lastDeploymentStarted
         try await service.deploy(id: detail.id)
         return previous
     }

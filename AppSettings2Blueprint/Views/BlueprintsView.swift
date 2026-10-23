@@ -17,13 +17,13 @@ struct BlueprintsView: View {
                     ContentUnavailableView(
                         "No Blueprint Selected",
                         systemImage: "doc.text.magnifyingglass",
-                        description: Text("Select a Blueprint to see its raw JSON.")
+                        description: Text("Select a blueprint to see its raw JSON.")
                     )
                 }
             }
             .frame(minWidth: 360, maxWidth: .infinity, maxHeight: .infinity)
         }
-        .searchable(text: $model.searchText, placement: .toolbar, prompt: "Filter Blueprints")
+        .searchable(text: $model.searchText, placement: .toolbar, prompt: "Filter blueprints")
         .task {
             if model.listState == .idle && model.profileStore.selectedProfile != nil { model.refresh() }
         }
@@ -68,9 +68,15 @@ private struct BlueprintListView: View {
                 Text("Not loaded")
             case .listing:
                 ProgressView().controlSize(.small)
-                Text("Listing Blueprints…")
+                Text("Listing blueprints…")
             case .finished(let date):
-                Text("\(model.overviews.count) Blueprints · \(date.formatted(date: .omitted, time: .shortened))")
+                let total = model.overviews.count
+                let visible = model.visibleOverviews.count
+                if visible == total {
+                    Text("^[\(total) blueprint](inflect: true) · \(date.formatted(date: .omitted, time: .shortened))")
+                } else {
+                    Text("\(visible) of \(total) blueprints · \(date.formatted(date: .omitted, time: .shortened))")
+                }
             case .failed(let message):
                 Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
                 Text(message).lineLimit(2).help(message)
@@ -185,7 +191,7 @@ private struct AppSettingsSummary: View {
     private var content: some View {
         VStack(alignment: .leading, spacing: 4) {
             if locations.isEmpty {
-                Label("No com.apple.configuration.app.settings declaration in this Blueprint.", systemImage: "minus.circle")
+                Label("No com.apple.configuration.app.settings declaration in this blueprint.", systemImage: "minus.circle")
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(locations) { location in

@@ -10,7 +10,10 @@ final class DeployModel {
         case deploying
         case watching(DeploymentStatus?)
         case finished(DeploymentStatus)
+        /// The deploy POST itself failed; nothing was started.
         case failed(String)
+        /// The deployment was started, but following its status failed.
+        case watchFailed(String)
     }
 
     /// One scoped group, with its member count when the group list is loaded.
@@ -79,10 +82,28 @@ final class DeployModel {
         guard blockingReason == nil else { return }
         phase = .deploying
         watchTask = Task {
+            // The POST and the watch fail differently: before the POST succeeds
+            // nothing was started; after it, the deployment runs on in Jamf.
+            let monitor: DeploymentMonitor
+            let previous: String?
             do {
-                let monitor = DeploymentMonitor(service: try app.currentService())
-                let previous = try await monitor.deploy(detail)
-                phase = .watching(nil)
+                monitor = DeploymentMonitor(service: try app.currentService())
+                previous = try await monitor.deploy(detail)
+            } catch is CancellationError {
+                return
+            } catch let error as APIError {
+                if case .http(409, _, _) = error {
+                    phase = .failed("Jamf did not start the deployment: the blueprint is not valid for deployment.\n\n\(error.localizedDescription)")
+                } else {
+                    phase = .failed(error.localizedDescription)
+                }
+                return
+            } catch {
+                phase = .failed(error.localizedDescription)
+                return
+            }
+            phase = .watching(nil)
+            do {
                 let final = try await monitor.watch(id: detail.id, previousStart: previous) { status in
                     await MainActor.run { self.phase = .watching(status) }
                 }
@@ -93,14 +114,8 @@ final class DeployModel {
                 phase = .finished(final)
             } catch is CancellationError {
                 return
-            } catch let error as APIError {
-                if case .http(409, _, _) = error {
-                    phase = .failed("Jamf did not start the deployment: the blueprint is not valid for deployment.\n\n\(error.localizedDescription)")
-                } else {
-                    phase = .failed(error.localizedDescription)
-                }
             } catch {
-                phase = .failed(error.localizedDescription)
+                phase = .watchFailed(error.localizedDescription)
             }
         }
     }

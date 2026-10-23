@@ -166,7 +166,6 @@ struct MachOSlicesTests {
         defer { try? FileManager.default.removeItem(at: url) }
         let slices = MachOSlices.slices(at: url)
         #expect(slices.map(\.architecture) == ["x86_64", "arm64e", "arm64e.x1"])
-        #expect(MachOSlices.preferredOrder(slices).map(\.architecture) == ["arm64e", "arm64e.x1", "x86_64"])
     }
 
     @Test func readsThinLittleEndianHeader() throws {

@@ -40,20 +40,41 @@ struct DeployFlowView: View {
         case .finished(let status):
             StatusView(name: model.detail.overview.name, status: status, isFinal: true, close: close)
         case .failed(let message):
-            VStack(alignment: .leading, spacing: 12) {
-                Label("Deployment Not Started", systemImage: "xmark.octagon.fill")
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(.red)
-                Text(message)
-                    .textSelection(.enabled)
-                    .fixedSize(horizontal: false, vertical: true)
-                HStack {
-                    Spacer()
-                    Button("Close", action: close).keyboardShortcut(.defaultAction)
-                }
-            }
-            .padding(24)
+            DeployErrorView(
+                title: "Deployment Not Started", icon: "xmark.octagon.fill", color: .red,
+                message: message, close: close
+            )
+        case .watchFailed(let message):
+            DeployErrorView(
+                title: "Deployment Started, Status Unknown", icon: "exclamationmark.triangle.fill", color: .orange,
+                message: "The deployment was started, but checking its status failed. It continues in Jamf; check the blueprint later.\n\n\(message)",
+                close: close
+            )
         }
+    }
+}
+
+private struct DeployErrorView: View {
+    let title: String
+    let icon: String
+    let color: Color
+    let message: String
+    let close: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label(title, systemImage: icon)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(color)
+            Text(message)
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Spacer()
+                Button("Close", action: close).keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(24)
     }
 }
 
@@ -91,7 +112,7 @@ private struct ConfirmView: View {
                         if let count = group.memberCount {
                             Text("^[\(count) device](inflect: true)").monospacedDigit()
                         } else {
-                            Text("count unknown").foregroundStyle(.secondary)
+                            Text("Count unknown").foregroundStyle(.secondary)
                         }
                     }
                     .font(.callout)

@@ -7,6 +7,8 @@ struct MonospacedTextView: NSViewRepresentable {
     let text: String
     /// Set on the underlying NSTextView so UI tests can read its contents.
     var accessibilityIdentifier: String?
+    /// Off for live previews, so the scroll position survives each keystroke.
+    var scrollsToTopOnChange = true
 
     func makeNSView(context: Context) -> NSScrollView {
         let scrollView = NSTextView.scrollableTextView()
@@ -31,6 +33,6 @@ struct MonospacedTextView: NSViewRepresentable {
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         guard let textView = scrollView.documentView as? NSTextView, textView.string != text else { return }
         textView.string = text
-        textView.scrollToBeginningOfDocument(nil)
+        if scrollsToTopOnChange { textView.scrollToBeginningOfDocument(nil) }
     }
 }

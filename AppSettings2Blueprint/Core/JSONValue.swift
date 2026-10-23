@@ -32,15 +32,7 @@ nonisolated struct JSONNumber: Hashable, Sendable {
         literal = String(value)
     }
 
-    /// Returns nil for non-finite values, which JSON cannot represent.
-    init?(_ value: Double) {
-        guard value.isFinite else { return nil }
-        literal = "\(value)"
-    }
-
-    var isInteger: Bool { !literal.contains { $0 == "." || $0 == "e" || $0 == "E" } }
     var intValue: Int? { Int(literal) }
-    var doubleValue: Double? { Double(literal) }
 }
 
 /// An ordered JSON object.
@@ -108,18 +100,6 @@ nonisolated extension JSONValue {
     var objectValue: JSONObject? {
         if case .object(let value) = self { return value }
         return nil
-    }
-
-    /// A short, human-readable type name used in diagnostics and debug views.
-    var typeName: String {
-        switch self {
-        case .null: "null"
-        case .bool: "boolean"
-        case .number: "number"
-        case .string: "string"
-        case .array: "array"
-        case .object: "object"
-        }
     }
 
     subscript(key: String) -> JSONValue? {
@@ -200,28 +180,4 @@ nonisolated extension JSONValue {
         }
     }
 
-    /// Depth-first search for every object for which `predicate` returns true.
-    /// Returns each match with its path from `self`.
-    func findObjects(
-        where predicate: (JSONObject) -> Bool
-    ) -> [(path: [JSONPathComponent], object: JSONObject)] {
-        var results: [(path: [JSONPathComponent], object: JSONObject)] = []
-        func visit(_ value: JSONValue, path: [JSONPathComponent]) {
-            switch value {
-            case .object(let object):
-                if predicate(object) { results.append((path, object)) }
-                for member in object.members {
-                    visit(member.value, path: path + [.key(member.key)])
-                }
-            case .array(let array):
-                for (index, element) in array.enumerated() {
-                    visit(element, path: path + [.index(index)])
-                }
-            default:
-                break
-            }
-        }
-        visit(self, path: [])
-        return results
-    }
 }

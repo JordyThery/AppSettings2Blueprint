@@ -129,15 +129,22 @@ nonisolated enum CodeSignatureInspector {
             // No readable slice: report what the default code object says, without a state.
             slices.append(sliceSignature(code: wholeCode, architecture: "Unknown", isAppleSilicon: false, establishState: false))
         } else {
+            // One unreadable slice should not hide the readable ones.
+            var sliceErrors: [Error] = []
             for slice in machOSlices {
-                let code = try staticCode(for: url, slice: slice)
-                slices.append(sliceSignature(
-                    code: code,
-                    architecture: slice.architecture,
-                    isAppleSilicon: slice.isAppleSilicon,
-                    establishState: verification == .valid
-                ))
+                do {
+                    let code = try staticCode(for: url, slice: slice)
+                    slices.append(sliceSignature(
+                        code: code,
+                        architecture: slice.architecture,
+                        isAppleSilicon: slice.isAppleSilicon,
+                        establishState: verification == .valid
+                    ))
+                } catch {
+                    sliceErrors.append(error)
+                }
             }
+            if slices.isEmpty, let first = sliceErrors.first { throw first }
         }
 
         return InspectedBinary(

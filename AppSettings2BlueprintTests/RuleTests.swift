@@ -179,6 +179,20 @@ struct DeclarationCodingTests {
         #expect(DeclarationEncoder.channels(for: ruleSet) == ["USER"])
     }
 
+    /// A preserved declaration on a channel the platform does not use is still
+    /// written back; decode→encode never drops a declaration.
+    @Test func preservedForeignChannelsAreWrittenBack() {
+        var ruleSet = iOSRuleSet()
+        ruleSet.preserved["USER"] = PreservedDeclarationParts(
+            payload: PreservedJSON(JSONObject(["CustomKey": .bool(true)]))
+        )
+        #expect(DeclarationEncoder.channels(for: ruleSet) == ["SYSTEM", "USER"])
+        let declarations = DeclarationEncoder.declarations(for: ruleSet)
+        #expect(declarations.count == 2)
+        #expect(declarations[1]["channelType"]?.stringValue == "USER")
+        #expect(declarations[1]["payload"]?["CustomKey"]?.boolValue == true)
+    }
+
     @Test(arguments: [true, false])
     func encodingThenDecodingReturnsTheOriginal(mac: Bool) {
         let original = mac ? macRuleSet() : iOSRuleSet()

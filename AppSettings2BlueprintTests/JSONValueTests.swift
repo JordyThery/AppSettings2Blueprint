@@ -139,4 +139,13 @@ struct APIErrorTests {
         let headers = LogRedactor.headers(["Authorization": "Bearer abc"])
         #expect(headers.first?.1 == "Bearer <redacted>")
     }
+
+    /// A cookie's first chunk is the secret itself, so the whole value is redacted;
+    /// an Authorization value without a scheme is too.
+    @Test func redactsCookiesWhole() {
+        let cookie = LogRedactor.headers(["Set-Cookie": "AWSALB=secret-token; Path=/; HttpOnly"])
+        #expect(cookie.first?.1 == "<redacted>")
+        let schemeless = LogRedactor.headers(["Authorization": "rawtoken"])
+        #expect(schemeless.first?.1 == "<redacted>")
+    }
 }

@@ -13,10 +13,15 @@ nonisolated enum RequestAllowList {
     /// - POST /blueprints/v1/blueprints/{id}/deploy.
     /// No DELETE, no undeploy, no device-group writes.
     static func isPermitted(method: String, path: String) -> Bool {
+        guard path.hasPrefix("/") else { return false }
         let segments = path.split(separator: "/", omittingEmptySubsequences: false).dropFirst().map(String.init)
-        // Paths must be absolute, with no empty or dot segments that could change meaning.
-        guard path.hasPrefix("/"), !segments.contains(where: { $0.isEmpty || $0 == "." || $0 == ".." }) else {
-            return false
+        // Each segment is judged by its percent-decoded form: no empty or dot
+        // segments, and no encoded separators (%2F, %5C) that a server could
+        // decode before routing and so change which resource is addressed.
+        for segment in segments {
+            guard let decoded = segment.removingPercentEncoding,
+                  !decoded.isEmpty, decoded != ".", decoded != "..",
+                  !decoded.contains("/"), !decoded.contains("\\") else { return false }
         }
         let isBlueprints = segments.starts(with: blueprintsPath)
         switch method {
@@ -105,6 +110,10 @@ actor PlatformAPIClient {
         }
         guard var components = URLComponents(url: credentials.region.baseURL, resolvingAgainstBaseURL: false) else {
             throw APIError.invalidResponse("Invalid base URL")
+        }
+        // Characters `percentEncodedPath` rejects would trap, not throw; fail closed.
+        guard path.unicodeScalars.allSatisfy({ CharacterSet.urlPathAllowed.contains($0) || $0 == "%" }) else {
+            throw APIError.invalidResponse("The request path contains invalid characters.")
         }
         components.percentEncodedPath = path
         components.queryItems = query.isEmpty ? nil : query

@@ -42,7 +42,7 @@ struct BuiltInAppsView: View {
                 .pickerStyle(.segmented)
                 .fixedSize()
                 .labelsHidden()
-                Text("\(source.count) apps")
+                Text(query.isEmpty ? "^[\(source.count) apps](inflect: true)" : "\(apps.count) of \(source.count) apps")
                     .foregroundStyle(.secondary)
                 Spacer()
                 Button("Add to Rule Set", systemImage: "plus.circle") {
@@ -55,7 +55,8 @@ struct BuiltInAppsView: View {
                 }
                 .disabled(selection.isEmpty)
                 Button("Export CSV…", systemImage: "tablecells") {
-                    let rows = list.apps.filter { selection.contains($0.id) }.map(BundleIDLookupRow.init(appleApp:))
+                    // `apps`, like the other buttons, so a search filter hides the same rows everywhere.
+                    let rows = apps.filter { selection.contains($0.id) }.map(BundleIDLookupRow.init(appleApp:))
                     do { try CSVExport.save(.bundleIDLookup(rows)) } catch { errorMessage = error.localizedDescription }
                 }
                 .disabled(selection.isEmpty)

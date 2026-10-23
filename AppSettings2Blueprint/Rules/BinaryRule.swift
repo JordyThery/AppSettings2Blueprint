@@ -46,9 +46,10 @@ nonisolated struct BinaryRule: Codable, Hashable, Sendable, Identifiable {
         )
     }
 
-    /// The identifying fields only, for duplicate detection.
+    /// The identifying fields only, for duplicate detection. The CDHash compares
+    /// case-insensitively, so a pasted uppercase copy still counts as a duplicate.
     var matchKey: [String] {
-        [cdHash, teamID, signingID, pathPrefix, signingState].map(trimmed)
+        [trimmed(cdHash).lowercased()] + [teamID, signingID, pathPrefix, signingState].map(trimmed)
     }
 }
 

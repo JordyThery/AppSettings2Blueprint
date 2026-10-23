@@ -74,9 +74,17 @@ final class JamfWriteModel {
         return usesActivationPredicate && !text.isEmpty ? text : nil
     }
 
-    /// The placement to use: the one picked, else the locator's default.
+    /// The placement to use: the one picked, else the component the rule set was
+    /// loaded from, else the locator's default.
     func effectivePlacement(for detail: BlueprintDetail) -> Placement {
         if let placement { return placement }
+        if let linked = app.ruleSet.linkedBlueprint, linked.id == detail.id,
+           let step = linked.stepIndex, let component = linked.componentIndex,
+           detail.appSettingsLocations.contains(where: {
+               $0.isStrictComponent && $0.stepIndex == step && $0.componentIndex == component
+           }) {
+            return .replaceExisting(stepIndex: step, componentIndex: component)
+        }
         switch AppSettingsLocator.defaultTarget(in: detail.json) {
         case let .existingComponent(step, component): return .replaceExisting(stepIndex: step, componentIndex: component)
         case let .newComponent(step): return .appendToStep(step)
@@ -129,7 +137,8 @@ final class JamfWriteModel {
 
     // MARK: Actions
 
-    /// Steps 1–4 for an existing blueprint; a new blueprint goes straight to review.
+    /// Steps 1–4 for an existing blueprint. A new blueprint is created right away:
+    /// there is nothing on the server to diff against.
     func prepare() {
         guard blockingReason == nil else { return }
         phase = .preparing
@@ -137,7 +146,10 @@ final class JamfWriteModel {
             do {
                 switch mode {
                 case .existing:
-                    guard let loaded = selectedDetail else { return }
+                    guard let loaded = selectedDetail else {
+                        phase = .failed("The blueprint is no longer loaded. Close this sheet and reload the list.")
+                        return
+                    }
                     let writer = try makeWriter()
                     let prepared = try await writer.prepare(
                         loaded: loaded, declarations: declarations, target: target(for: effectivePlacement(for: loaded))
@@ -154,7 +166,7 @@ final class JamfWriteModel {
                         activationPredicate: predicate,
                         declarations: declarations
                     )
-                    finish(result)
+                    finish(result, componentPath: [.key("steps"), .index(0), .key("components"), .index(0)])
                 }
             } catch {
                 fail(error)
@@ -167,7 +179,7 @@ final class JamfWriteModel {
         phase = .writing
         Task {
             do {
-                finish(try await makeWriter().commit(prepared))
+                finish(try await makeWriter().commit(prepared), componentPath: prepared.edit.componentPath)
             } catch {
                 fail(error)
             }
@@ -182,9 +194,20 @@ final class JamfWriteModel {
         BlueprintWriter(service: try app.currentService())
     }
 
-    private func finish(_ result: WriteResult) {
+    private func finish(_ result: WriteResult, componentPath: [JSONPathComponent]) {
         app.storeDetail(result.detail)
-        app.ruleSet.linkedBlueprint = LinkedBlueprint(id: result.detail.id, name: result.detail.overview.name)
+        var stepIndex: Int?
+        var componentIndex: Int?
+        if componentPath.count >= 4,
+           case let .index(step) = componentPath[1],
+           case let .index(component) = componentPath[3] {
+            stepIndex = step
+            componentIndex = component
+        }
+        app.ruleSet.linkedBlueprint = LinkedBlueprint(
+            id: result.detail.id, name: result.detail.overview.name,
+            stepIndex: stepIndex, componentIndex: componentIndex
+        )
         app.ruleSet.markSaved()
         selectedBlueprintID = result.detail.id
         phase = .done(result)

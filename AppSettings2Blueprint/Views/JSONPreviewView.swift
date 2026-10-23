@@ -31,7 +31,7 @@ struct JSONPreviewView: View {
                     .padding(.bottom, 6)
             }
             Divider()
-            MonospacedTextView(text: text, accessibilityIdentifier: "componentJSON")
+            MonospacedTextView(text: text, accessibilityIdentifier: "componentJSON", scrollsToTopOnChange: false)
         }
     }
 }

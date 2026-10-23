@@ -61,7 +61,7 @@ nonisolated enum APIError: Error, LocalizedError, Sendable {
         case .missingCredentials:
             return "No complete connection is configured. Open Settings and add a region, Environment ID, Client ID and Client Secret."
         case .refused(let method, let path):
-            return "Blocked \(method) \(path): this app only reads blueprints and device groups, creates, updates and deploys blueprints. It never deletes or undeploys."
+            return "Blocked \(method) \(path). The app only sends GET requests, token requests, and blueprint create, update and deploy requests; it never deletes or undeploys."
         case .transport(let message):
             return "Network error: \(message)"
         case .invalidResponse(let message):

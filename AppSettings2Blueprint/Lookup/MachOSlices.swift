@@ -31,7 +31,9 @@ nonisolated enum MachOSlices {
     /// Returns the slices of the Mach-O file at `url`, in file order, or an empty
     /// array when the file is not a Mach-O executable.
     static func slices(at url: URL) -> [MachOSlice] {
-        guard let handle = try? FileHandle(forReadingFrom: url) else { return [] }
+        // A FIFO or device file would block the read; only regular files can be Mach-O.
+        guard (try? url.resourceValues(forKeys: [.isRegularFileKey]))?.isRegularFile == true,
+              let handle = try? FileHandle(forReadingFrom: url) else { return [] }
         defer { try? handle.close() }
         guard let header = try? handle.read(upToCount: 8), header.count == 8 else { return [] }
         let magic = bigEndian32(header, at: 0)
@@ -84,19 +86,6 @@ nonisolated enum MachOSlices {
             break
         }
         return "cputype \(cpuType) subtype \(subtype)"
-    }
-
-    /// Orders slices for the default view: arm64e first, then other Apple silicon
-    /// slices, then the rest, keeping file order within each group.
-    static func preferredOrder(_ slices: [MachOSlice]) -> [MachOSlice] {
-        func rank(_ slice: MachOSlice) -> Int {
-            if slice.architecture == "arm64e" { return 0 }
-            if slice.architecture == "arm64" { return 1 }
-            return slice.isAppleSilicon ? 2 : 3
-        }
-        return slices.enumerated()
-            .sorted { (rank($0.element), $0.offset) < (rank($1.element), $1.offset) }
-            .map(\.element)
     }
 
     private static func headerSubtype(_ handle: FileHandle, bigEndian: Bool) -> UInt32 {

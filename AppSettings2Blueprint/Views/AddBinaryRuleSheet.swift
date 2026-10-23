@@ -77,7 +77,7 @@ struct AddBinaryRuleSheet: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("\(option.title) — \(option.fields)\(option == .appFromDeveloper ? " (recommended)" : "")")
                                     .font(.callout.weight(.medium))
-                                Text(available ? option.tradeOff : "Unavailable: the signature has no \(option == .exactBuild ? "CDHash" : "TeamID or SigningID").")
+                                Text(available ? option.tradeOff : "Unavailable: the signature has no \(option.fields).")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                                     .fixedSize(horizontal: false, vertical: true)

@@ -12,8 +12,13 @@ nonisolated enum LogRedactor {
     static func headers(_ headers: [String: String]) -> [(String, String)] {
         headers.sorted { $0.key.lowercased() < $1.key.lowercased() }.map { key, value in
             if secretHeaders.contains(key.lowercased()) {
-                let scheme = value.split(separator: " ").first.map(String.init) ?? ""
-                return (key, scheme.isEmpty ? placeholder : "\(scheme) \(placeholder)")
+                // Only an Authorization scheme ("Bearer") is safe to show; a cookie's
+                // first chunk is the secret itself, so those are redacted whole.
+                let parts = value.split(separator: " ")
+                if key.lowercased() == "authorization", parts.count > 1, let scheme = parts.first {
+                    return (key, "\(scheme) \(placeholder)")
+                }
+                return (key, placeholder)
             }
             return (key, value)
         }

@@ -115,8 +115,10 @@ nonisolated enum RuleValidator {
         if !cdHash.isEmpty {
             if cdHash.count != cdHashLength {
                 error("CDHash must be exactly \(cdHashLength) characters (this one has \(cdHash.count)).")
-            } else if !cdHash.allSatisfy(\.isHexDigit) {
-                error("CDHash must be hexadecimal (0–9, a–f).")
+            } else if !cdHash.allSatisfy({ ("0"..."9").contains($0) || ("a"..."f").contains($0) }) {
+                // isHexDigit would also accept uppercase and fullwidth digits,
+                // which never match the lowercase hash the device computes.
+                error("CDHash must be lowercase hexadecimal (0–9, a–f).")
             }
         }
         let state = rule.signingState.trimmingCharacters(in: .whitespacesAndNewlines)

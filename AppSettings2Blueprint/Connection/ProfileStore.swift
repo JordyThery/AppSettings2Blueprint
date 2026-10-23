@@ -21,7 +21,12 @@ final class ProfileStore {
             profiles = []
         }
         let storedSelection = UserDefaults.standard.string(forKey: Self.selectedKey).flatMap(UUID.init)
-        selectedProfileID = storedSelection ?? profiles.first?.id
+        // A stored selection that no longer matches a profile would read as "no connection".
+        if let storedSelection, profiles.contains(where: { $0.id == storedSelection }) {
+            selectedProfileID = storedSelection
+        } else {
+            selectedProfileID = profiles.first?.id
+        }
     }
 
     var selectedProfile: ConnectionProfile? {
@@ -54,8 +59,10 @@ final class ProfileStore {
         persist()
     }
 
-    func credentials(for profile: ConnectionProfile) -> PlatformCredentials? {
-        guard profile.isComplete, let secret = KeychainStore.secret(for: profile.id), !secret.isEmpty else {
+    /// Nil when the profile is incomplete or has no stored secret; throws when the
+    /// Keychain cannot be read, which is a different problem than "not configured".
+    func credentials(for profile: ConnectionProfile) throws -> PlatformCredentials? {
+        guard profile.isComplete, let secret = try KeychainStore.secret(for: profile.id), !secret.isEmpty else {
             return nil
         }
         return PlatformCredentials(

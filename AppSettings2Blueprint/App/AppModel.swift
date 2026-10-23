@@ -42,6 +42,9 @@ final class AppModel {
 
     private var client: PlatformAPIClient?
     private var listTask: Task<Void, Never>?
+    /// Incremented on every profile switch. Async work compares it before storing
+    /// results, so a load started against the old tenant cannot repopulate the new one.
+    @ObservationIgnored private var connectionGeneration = 0
 
     init() {
         let logger = Logger(subsystem: "be.jordythery.appsettings2blueprint", category: "updates")
@@ -55,7 +58,7 @@ final class AppModel {
     /// Returns a service for the selected profile, rebuilding the client when credentials change.
     func currentService() throws -> BlueprintService {
         guard let profile = profileStore.selectedProfile,
-              let credentials = profileStore.credentials(for: profile) else {
+              let credentials = try profileStore.credentials(for: profile) else {
             throw APIError.missingCredentials
         }
         if let client, client.credentials == credentials {
@@ -75,6 +78,7 @@ final class AppModel {
 
     /// Called when the user switches profile: clears everything loaded from the old tenant.
     func connectionDidChange() {
+        connectionGeneration += 1
         listTask?.cancel()
         client = nil
         overviews = []
@@ -96,10 +100,14 @@ final class AppModel {
         deviceGroupsError = nil
         Task {
             defer { isLoadingDeviceGroups = false }
+            let generation = connectionGeneration
             do {
                 let service = try currentService()
-                deviceGroups = try await DeviceGroupsService(client: service.client).listAll()
+                let groups = try await DeviceGroupsService(client: service.client).listAll()
+                guard generation == connectionGeneration else { return }
+                deviceGroups = groups
             } catch {
+                guard generation == connectionGeneration else { return }
                 deviceGroupsError = error.localizedDescription
             }
         }
@@ -120,6 +128,7 @@ final class AppModel {
     /// yet, so App Settings in other blueprints can be found.
     func loadMissingDetails() async {
         guard let service = try? currentService() else { return }
+        let generation = connectionGeneration
         let missing = overviews.map(\.id).filter { details[$0] == nil }
         await withTaskGroup(of: BlueprintDetail?.self) { group in
             var pending = missing[...]
@@ -129,6 +138,10 @@ final class AppModel {
             }
             for _ in 0..<5 { enqueue() }
             for await detail in group {
+                guard generation == connectionGeneration else {
+                    group.cancelAll()
+                    return
+                }
                 if let detail { store(detail) }
                 enqueue()
             }
@@ -175,9 +188,13 @@ final class AppModel {
         detailErrors[id] = nil
         Task {
             defer { loadingDetailIDs.remove(id) }
+            let generation = connectionGeneration
             do {
-                store(try await currentService().detail(id: id))
+                let detail = try await currentService().detail(id: id)
+                guard generation == connectionGeneration else { return }
+                store(detail)
             } catch {
+                guard generation == connectionGeneration else { return }
                 detailErrors[id] = error.localizedDescription
             }
         }
@@ -187,7 +204,9 @@ final class AppModel {
     func fetchBlueprint(id: String) async throws {
         let trimmed = id.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
+        let generation = connectionGeneration
         let detail = try await currentService().detail(id: trimmed)
+        guard generation == connectionGeneration else { return }
         store(detail)
         selectedBlueprintID = detail.id
     }

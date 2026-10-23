@@ -99,7 +99,7 @@ struct RestoreBackupSheet: View {
                 model.storeDetail(result.detail)
                 backups = BackupStore.backups(for: detail.id)
                 message = result.isVerified
-                    ? ("Restored and verified. The blueprint shows Out of Date until deployed.", false)
+                    ? ("Restored and verified. Devices receive the restored state at the next deployment.", false)
                     : (result.problems.joined(separator: " "), true)
             } catch {
                 if case BlueprintWriter.WriteError.readOnly = error { model.readOnlyBlueprintIDs.insert(detail.id) }

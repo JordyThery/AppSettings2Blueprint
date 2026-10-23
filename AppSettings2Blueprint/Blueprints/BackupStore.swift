@@ -74,7 +74,12 @@ nonisolated enum BackupStore {
                     size: values?.fileSize ?? 0
                 )
             }
-            .sorted { $0.url.lastPathComponent > $1.url.lastPathComponent }
+            // Numeric comparison of the name without ".json", so a same-millisecond
+            // "-2" counter sorts after its base name instead of before it.
+            .sorted {
+                $0.url.deletingPathExtension().lastPathComponent
+                    .compare($1.url.deletingPathExtension().lastPathComponent, options: .numeric) == .orderedDescending
+            }
     }
 
     static func load(_ backup: BlueprintBackup) throws -> BlueprintDetail {

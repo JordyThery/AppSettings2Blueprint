@@ -170,8 +170,11 @@ nonisolated extension AppSettingsLocator {
             )
 
         case let .newComponent(stepIndex):
-            guard steps.indices.contains(stepIndex), var components = steps[stepIndex]["components"]?.arrayValue else {
+            guard steps.indices.contains(stepIndex) else {
                 throw PlacementError(message: "Step \(stepIndex + 1) does not exist.")
+            }
+            guard var components = steps[stepIndex]["components"]?.arrayValue else {
+                throw PlacementError(message: "Step \(stepIndex + 1) has no components array to append to.")
             }
             guard components.count < maxComponentsPerStep else {
                 throw PlacementError(message: "Step \(stepIndex + 1) already has \(components.count) components, the most a step can hold. Choose another step or a new step.")

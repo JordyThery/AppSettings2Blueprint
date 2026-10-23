@@ -41,7 +41,7 @@ struct LocalAppsView: View {
         } isTargeted: { isDropTargeted = $0 }
         .searchable(text: $model.searchText, placement: .toolbar, prompt: "Filter apps")
         .alert(
-            "Not an app or executable",
+            "Not an App or Executable",
             isPresented: Binding(get: { !model.rejectedDrops.isEmpty }, set: { if !$0 { model.rejectedDrops = [] } })
         ) {
             Button("OK") { model.rejectedDrops = [] }

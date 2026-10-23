@@ -113,6 +113,16 @@ struct JSONSemanticsTests {
         #expect(!a.isSemanticallyEqual(to: try JSONValue(string: #"{"a":"1","b":[1,{"x":true,"y":null}]}"#)))
     }
 
+    /// Decimal holds 38 significant digits; differing longer literals must not
+    /// collide into "equal", or a verification difference would go unnoticed.
+    @Test func numbersBeyondDecimalPrecisionCompareByLiteral() throws {
+        let digits = String(repeating: "9", count: 45)
+        let a = JSONValue.number(JSONNumber(literal: digits + "1"))
+        let b = JSONValue.number(JSONNumber(literal: digits + "2"))
+        #expect(!a.isSemanticallyEqual(to: b))
+        #expect(a.isSemanticallyEqual(to: a))
+    }
+
     @Test func alignmentFollowsTheReferenceOrder() throws {
         let value = try JSONValue(string: #"{"kind":"C","type":"t","payload":{"b":1,"a":2},"extra":0}"#)
         let reference = try JSONValue(string: #"{"type":"t","payload":{"a":0,"b":0},"kind":"C"}"#)
@@ -371,9 +381,11 @@ extension MockNetworkTests {
                     return .json(200, #"{"succeeded":0,"failed":0,"pending":0}"#)
                 case ("GET", Self.path):
                     switch gets.next() {
-                    // The previous deployment is still the latest at first: not the one we started.
-                    case 1: return .json(200, appSettingsBlueprintJSON)
-                    case 2: return .json(200, blueprint(state: "DEPLOYED", started: "2026-10-23T09:00:00Z", job: "DEPLOYING"))
+                    // GET 1 is deploy()'s own fresh fetch of the previous start time.
+                    // On the first poll the previous deployment is still the latest:
+                    // not the one we started.
+                    case 1, 2: return .json(200, appSettingsBlueprintJSON)
+                    case 3: return .json(200, blueprint(state: "DEPLOYED", started: "2026-10-23T09:00:00Z", job: "DEPLOYING"))
                     default: return .json(200, blueprint(state: "DEPLOYED", started: "2026-10-23T09:00:00Z", job: "SUCCEEDED"))
                     }
                 default:
@@ -411,6 +423,8 @@ extension MockNetworkTests {
         @Test func invalidBlueprintIsReportedNotRetried() async {
             MockURLProtocol.install { request in
                 if request.path == "/auth/token" { return Self.token }
+                // deploy() fetches the blueprint before the POST; only the POST fails.
+                if request.method == "GET" { return .json(200, appSettingsBlueprintJSON) }
                 return .json(409, #"{"httpStatus":409,"errors":[{"code":"INVALID_BLUEPRINT","description":"Not valid for deployment"}]}"#)
             }
             let detail = try! BlueprintDetail(data: Data(appSettingsBlueprintJSON.utf8))

@@ -126,14 +126,6 @@ nonisolated struct BlueprintDetail: Identifiable, Sendable {
         scope?["deviceGroups"]?.arrayValue?.compactMap(\.stringValue) ?? []
     }
 
-    /// Human-readable scope for confirmations.
-    var scopeDescription: String {
-        let groups = scopeDeviceGroups
-        guard !groups.isEmpty else { return "No device groups are in scope." }
-        let shown = groups.prefix(5).joined(separator: "\n")
-        let more = groups.count > 5 ? "\n…and \(groups.count - 5) more" : ""
-        return "\(groups.count) device group\(groups.count == 1 ? "" : "s"):\n\(shown)\(more)"
-    }
 }
 
 /// Date parsing for the API's ISO 8601 timestamps, with or without fractional seconds.

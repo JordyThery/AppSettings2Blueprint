@@ -34,10 +34,6 @@ nonisolated enum AppStorePlatform: String, CaseIterable, Identifiable, Hashable,
         }
     }
 
-    init?(label: String) {
-        guard let match = Self.allCases.first(where: { $0.label == label }) else { return nil }
-        self = match
-    }
 }
 
 /// What to search: one platform, or all three at once.
@@ -143,7 +139,7 @@ nonisolated struct AppStoreDetail: Hashable, Sendable {
               detail["bundleId"]?.stringValue != nil else { return nil }
         // The first offer that has both a display version and an external version ID.
         let offer = detail["offers"]?.arrayValue?.first {
-            $0["version"]?["display"]?.stringValue != nil && $0["version"]?["externalId"].map(Self.text) != nil
+            $0["version"]?["display"]?.stringValue != nil && $0["version"]?["externalId"].flatMap(Self.text) != nil
         }
         seller = detail["softwareInfo"]?["seller"]?.stringValue
         version = offer?["version"]?["display"]?.stringValue
