@@ -178,9 +178,9 @@ class AppSettingsUITestCase: XCTestCase {
         tap(row, timeout: 15)
     }
 
-    /// The rule set row shows the rule set's name.
-    func openRuleSet(named name: String = "Untitled Rule Set") {
-        openSidebar(name)
+    /// The rule set row is a static "Editor" destination; the document name is its subtitle.
+    func openRuleSet() {
+        openSidebar("Editor")
         XCTAssertTrue(app.textViews["componentJSON"].waitForExistence(timeout: 10), "The rule builder did not open")
     }
 

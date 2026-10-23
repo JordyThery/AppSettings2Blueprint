@@ -34,7 +34,9 @@ struct SidebarView: View {
     }
 }
 
-/// The rule set's name, with an edited dot and an error count.
+/// A static "Editor" destination. The open document's name appears beneath it,
+/// with an edited dot and an error count, so the row reads as navigation and the
+/// name as document state.
 private struct RuleSetSidebarRow: View {
     @Environment(AppModel.self) private var model
 
@@ -42,20 +44,28 @@ private struct RuleSetSidebarRow: View {
         let document = model.ruleSet
         let errors = document.issues.filter { $0.severity == .error }.count
         Label {
-            HStack(spacing: 4) {
-                Text(document.ruleSet.name).lineLimit(1)
-                if document.isDirty {
-                    Circle().fill(.secondary).frame(width: 6, height: 6)
-                        .help("Unsaved changes")
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(spacing: 4) {
+                    Text("Editor")
+                    Spacer()
+                    if errors > 0 {
+                        Text("\(errors)")
+                            .font(.caption2.weight(.bold))
+                            .padding(.horizontal, 5)
+                            .background(.red.opacity(0.2), in: Capsule())
+                            .foregroundStyle(.red)
+                            .help("\(errors) error\(errors == 1 ? "" : "s")")
+                    }
                 }
-                Spacer()
-                if errors > 0 {
-                    Text("\(errors)")
-                        .font(.caption2.weight(.bold))
-                        .padding(.horizontal, 5)
-                        .background(.red.opacity(0.2), in: Capsule())
-                        .foregroundStyle(.red)
-                        .help("\(errors) error\(errors == 1 ? "" : "s")")
+                HStack(spacing: 4) {
+                    Text(document.ruleSet.name)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    if document.isDirty {
+                        Circle().fill(.secondary).frame(width: 6, height: 6)
+                            .help("Unsaved changes")
+                    }
                 }
             }
         } icon: {
