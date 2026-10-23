@@ -54,13 +54,13 @@ On macOS, Apple accepts binary rules only in the system channel and Privacy only
 
 ## Jamf School
 
-Jamf School environments work through the same Platform API: create the API integration for the Jamf School platform environment and connect as above. Writing to existing Blueprints and deploying work as with Jamf Pro. The Platform API does not list Jamf School device groups, so the app recognises a Jamf School connection and leaves scope to Jamf School: create and scope Blueprints there, and the deploy confirmation shows group IDs instead of names and device counts.
+Jamf School environments work through the same Platform API: create the API integration for the Jamf School platform environment with the `blueprints` permissions above, and connect as usual. Writing to existing Blueprints and deploying work as with Jamf Pro. The Platform API does not list Jamf School device groups, so the app recognises a Jamf School connection and leaves scope to Jamf School: create and scope Blueprints there, and the deploy confirmation shows group IDs instead of names and device counts.
 
 ## Saving safely
 
 The Blueprints API applies updates as a JSON merge-patch, which replaces arrays wholesale, so a careless write could delete parts of a Blueprint. The app guards against this:
 
-- Every write sends the complete `steps` array, with everything outside the App Settings component exactly as received — key order and number formatting preserved.
+- Every rule set write sends the complete `steps` array, with everything outside the App Settings component exactly as received — key order and number formatting preserved.
 - The Blueprint is fetched again before the review and just before the PATCH; if it changed on the server, nothing is written.
 - The full Blueprint is backed up first, to `~/Library/Application Support/AppSettings2Blueprint/Backups/<blueprint ID>/`. Backups are never overwritten and **Backups…** restores them.
 - Every write is verified against a read-back of the Blueprint.
