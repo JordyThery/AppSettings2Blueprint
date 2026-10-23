@@ -17,6 +17,8 @@ final class AppModel {
     let requestLog = RequestLog()
     let updates: UpdateChecker
     let localApps = LocalAppsModel()
+    let appStore = AppStoreModel()
+    let builtInApps: Result<AppleBuiltInApps, Error> = Result { try AppleBuiltInApps.load() }
 
     private(set) var overviews: [BlueprintOverview] = []
     private(set) var details: [String: BlueprintDetail] = [:]

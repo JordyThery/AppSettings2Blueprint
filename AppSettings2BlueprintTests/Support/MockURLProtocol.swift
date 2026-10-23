@@ -1,4 +1,5 @@
 import Foundation
+import Testing
 @testable import AppSettings2Blueprint
 
 /// A captured request, with the body read out of `httpBodyStream`.
@@ -35,6 +36,11 @@ struct MockResponse: Sendable {
         )
     }
 }
+
+/// Parent of every suite that uses MockURLProtocol. Its handler is global, so all
+/// nested suites run one at a time, never alongside each other.
+@Suite(.serialized)
+struct MockNetworkTests {}
 
 /// Routes every request on a session to a test-provided handler.
 ///

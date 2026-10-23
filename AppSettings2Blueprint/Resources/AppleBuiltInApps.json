@@ -1,0 +1,393 @@
+{
+  "source": "cantscript/AppSettingsUtility (MIT)",
+  "sourceScript": "appSettingsUtility.sh at commit 5a4d7fa: apple_preinstalled_data (all apps) and apple_builtin_data (builtIn subset)",
+  "copyright": "Copyright (c) 2026 Anthony Darlow",
+  "appleSource": "https://support.apple.com/en-gb/guide/deployment/depece748c41/web",
+  "verified": "2026-09-11",
+  "builtInCheckedAgainst": [
+    "https://www.apple.com/iphone-17/specs/",
+    "https://www.apple.com/ipad-pro/specs/"
+  ],
+  "notes": [
+    "Covers iPhone and iPad apps; not all are preinstalled on every device.",
+    "Playground is Image Playground and requires a compatible Apple Intelligence device and settings.",
+    "Availability varies by device, OS version and region; this is not an inventory of any device."
+  ],
+  "apps": [
+    {
+      "name": "App Store",
+      "bundleId": "com.apple.AppStore",
+      "builtIn": true
+    },
+    {
+      "name": "App Store Connect",
+      "bundleId": "com.apple.AppStoreConnect",
+      "builtIn": false
+    },
+    {
+      "name": "Apple Business",
+      "bundleId": "com.apple.business-essentials",
+      "builtIn": false
+    },
+    {
+      "name": "Apple Configurator",
+      "bundleId": "com.apple.ios.configurator",
+      "builtIn": false
+    },
+    {
+      "name": "Apple Store",
+      "bundleId": "com.apple.store.Jolly",
+      "builtIn": true
+    },
+    {
+      "name": "Apple Vision Pro",
+      "bundleId": "com.apple.visionproapp",
+      "builtIn": false
+    },
+    {
+      "name": "Barcode Scanner",
+      "bundleId": "com.apple.BarcodeScanner",
+      "builtIn": false
+    },
+    {
+      "name": "Books",
+      "bundleId": "com.apple.iBooks",
+      "builtIn": true
+    },
+    {
+      "name": "Calculator",
+      "bundleId": "com.apple.calculator",
+      "builtIn": true
+    },
+    {
+      "name": "Calendar",
+      "bundleId": "com.apple.mobilecal",
+      "builtIn": true
+    },
+    {
+      "name": "Camera",
+      "bundleId": "com.apple.camera",
+      "builtIn": true
+    },
+    {
+      "name": "Classical",
+      "bundleId": "com.apple.music.classical",
+      "builtIn": false
+    },
+    {
+      "name": "Classroom",
+      "bundleId": "com.apple.classroom",
+      "builtIn": false
+    },
+    {
+      "name": "Clips",
+      "bundleId": "com.apple.clips",
+      "builtIn": false
+    },
+    {
+      "name": "Clock",
+      "bundleId": "com.apple.mobiletimer",
+      "builtIn": true
+    },
+    {
+      "name": "Compass",
+      "bundleId": "com.apple.compass",
+      "builtIn": true
+    },
+    {
+      "name": "Contacts",
+      "bundleId": "com.apple.MobileAddressBook",
+      "builtIn": true
+    },
+    {
+      "name": "Developer",
+      "bundleId": "developer.apple.wwdc-Release",
+      "builtIn": false
+    },
+    {
+      "name": "FaceTime",
+      "bundleId": "com.apple.facetime",
+      "builtIn": true
+    },
+    {
+      "name": "Files",
+      "bundleId": "com.apple.DocumentsApp",
+      "builtIn": true
+    },
+    {
+      "name": "Final Cut Camera",
+      "bundleId": "com.apple.FinalCutApp.companion",
+      "builtIn": false
+    },
+    {
+      "name": "Final Cut Pro",
+      "bundleId": "com.apple.FinalCutApp",
+      "builtIn": false
+    },
+    {
+      "name": "Find My",
+      "bundleId": "com.apple.findmy",
+      "builtIn": true
+    },
+    {
+      "name": "Fitness",
+      "bundleId": "com.apple.Fitness",
+      "builtIn": true
+    },
+    {
+      "name": "Freeform",
+      "bundleId": "com.apple.freeform",
+      "builtIn": true
+    },
+    {
+      "name": "Games",
+      "bundleId": "com.apple.games",
+      "builtIn": true
+    },
+    {
+      "name": "GarageBand",
+      "bundleId": "com.apple.mobilegarageband",
+      "builtIn": true
+    },
+    {
+      "name": "Health",
+      "bundleId": "com.apple.Health",
+      "builtIn": true
+    },
+    {
+      "name": "Home",
+      "bundleId": "com.apple.Home",
+      "builtIn": true
+    },
+    {
+      "name": "iCloud Drive",
+      "bundleId": "com.apple.iCloudDriveApp",
+      "builtIn": false
+    },
+    {
+      "name": "iMovie",
+      "bundleId": "com.apple.iMovie",
+      "builtIn": true
+    },
+    {
+      "name": "Invites",
+      "bundleId": "com.apple.rsvp",
+      "builtIn": true
+    },
+    {
+      "name": "iTunes Store",
+      "bundleId": "com.apple.MobileStore",
+      "builtIn": true
+    },
+    {
+      "name": "Journal",
+      "bundleId": "com.apple.journal",
+      "builtIn": true
+    },
+    {
+      "name": "Keynote",
+      "bundleId": "com.apple.Keynote",
+      "builtIn": true
+    },
+    {
+      "name": "Logic Pro",
+      "bundleId": "com.apple.mobilelogic",
+      "builtIn": false
+    },
+    {
+      "name": "Logic Remote",
+      "bundleId": "com.apple.musicapps.remote",
+      "builtIn": false
+    },
+    {
+      "name": "Magnifier",
+      "bundleId": "com.apple.Magnifier",
+      "builtIn": true
+    },
+    {
+      "name": "Mail",
+      "bundleId": "com.apple.mobilemail",
+      "builtIn": true
+    },
+    {
+      "name": "Maps",
+      "bundleId": "com.apple.Maps",
+      "builtIn": true
+    },
+    {
+      "name": "Measure",
+      "bundleId": "com.apple.measure",
+      "builtIn": true
+    },
+    {
+      "name": "Messages",
+      "bundleId": "com.apple.MobileSMS",
+      "builtIn": true
+    },
+    {
+      "name": "Music",
+      "bundleId": "com.apple.Music",
+      "builtIn": true
+    },
+    {
+      "name": "News",
+      "bundleId": "com.apple.news",
+      "builtIn": true
+    },
+    {
+      "name": "Notes",
+      "bundleId": "com.apple.mobilenotes",
+      "builtIn": true
+    },
+    {
+      "name": "Numbers",
+      "bundleId": "com.apple.Numbers",
+      "builtIn": true
+    },
+    {
+      "name": "Pages",
+      "bundleId": "com.apple.Pages",
+      "builtIn": true
+    },
+    {
+      "name": "Passwords",
+      "bundleId": "com.apple.Passwords",
+      "builtIn": true
+    },
+    {
+      "name": "Phone",
+      "bundleId": "com.apple.mobilephone",
+      "builtIn": true
+    },
+    {
+      "name": "Photo Booth",
+      "bundleId": "com.apple.Photo-Booth",
+      "builtIn": true
+    },
+    {
+      "name": "Photomator",
+      "bundleId": "com.pixelmatorteam.pixelmator.touch.x.photo",
+      "builtIn": false
+    },
+    {
+      "name": "Photos",
+      "bundleId": "com.apple.mobileslideshow",
+      "builtIn": true
+    },
+    {
+      "name": "Pixelmator Classic iOS",
+      "bundleId": "com.pixelmatorteam.pixelmator.touch",
+      "builtIn": false
+    },
+    {
+      "name": "Playground",
+      "bundleId": "com.apple.GenerativePlaygroundApp",
+      "builtIn": true
+    },
+    {
+      "name": "Podcasts",
+      "bundleId": "com.apple.podcasts",
+      "builtIn": true
+    },
+    {
+      "name": "Preview",
+      "bundleId": "com.apple.Preview",
+      "builtIn": true
+    },
+    {
+      "name": "Reality Composer",
+      "bundleId": "com.apple.RealityComposer",
+      "builtIn": false
+    },
+    {
+      "name": "Reminders",
+      "bundleId": "com.apple.reminders",
+      "builtIn": true
+    },
+    {
+      "name": "Research",
+      "bundleId": "com.apple.Research",
+      "builtIn": false
+    },
+    {
+      "name": "Safari",
+      "bundleId": "com.apple.mobilesafari",
+      "builtIn": true
+    },
+    {
+      "name": "Schoolwork",
+      "bundleId": "com.apple.schoolwork.ClassKitApp",
+      "builtIn": false
+    },
+    {
+      "name": "Settings",
+      "bundleId": "com.apple.Preferences",
+      "builtIn": true
+    },
+    {
+      "name": "Shazam",
+      "bundleId": "com.shazam.Shazam",
+      "builtIn": false
+    },
+    {
+      "name": "Shortcuts",
+      "bundleId": "com.apple.shortcuts",
+      "builtIn": true
+    },
+    {
+      "name": "Sports",
+      "bundleId": "com.apple.sports",
+      "builtIn": false
+    },
+    {
+      "name": "Stocks",
+      "bundleId": "com.apple.stocks",
+      "builtIn": true
+    },
+    {
+      "name": "Swift Playground",
+      "bundleId": "com.apple.Playgrounds",
+      "builtIn": true
+    },
+    {
+      "name": "TestFlight",
+      "bundleId": "com.apple.TestFlight",
+      "builtIn": false
+    },
+    {
+      "name": "Tips",
+      "bundleId": "com.apple.tips",
+      "builtIn": true
+    },
+    {
+      "name": "Translate",
+      "bundleId": "com.apple.Translate",
+      "builtIn": true
+    },
+    {
+      "name": "TV",
+      "bundleId": "com.apple.tv",
+      "builtIn": true
+    },
+    {
+      "name": "Voice Memos",
+      "bundleId": "com.apple.VoiceMemos",
+      "builtIn": true
+    },
+    {
+      "name": "Wallet",
+      "bundleId": "com.apple.Passbook",
+      "builtIn": true
+    },
+    {
+      "name": "Watch",
+      "bundleId": "com.apple.Bridge",
+      "builtIn": true
+    },
+    {
+      "name": "Weather",
+      "bundleId": "com.apple.weather",
+      "builtIn": true
+    }
+  ]
+}

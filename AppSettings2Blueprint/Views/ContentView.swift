@@ -67,9 +67,9 @@ struct ContentView: View {
         case .blueprints:
             BlueprintsView()
         case .appStore:
-            ComingLaterView(title: "App Store Lookup", systemImage: "bag", milestone: 3)
+            AppStoreSearchView()
         case .builtInApps:
-            ComingLaterView(title: "Apple Built-in Apps", systemImage: "apple.logo", milestone: 3)
+            BuiltInAppsView()
         case .localApps:
             LocalAppsView()
         case .ruleSet:

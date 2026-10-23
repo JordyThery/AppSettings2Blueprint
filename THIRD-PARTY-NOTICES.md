@@ -17,9 +17,14 @@ in Swift. Every ported function starts with a comment naming its source function
 | --- | --- | --- |
 | Scan folders and the stop-at-.app walk | `scan_local_apps` | `Lookup/LocalAppScanner.swift` |
 | Per-slice signing fields, SigningState requirement strings, the `*APPLE*` team placeholder, the composed `Bundle-ID {Designated-Requirement}` identifier, suggested PathPrefix | `inspect_local_app` | `Lookup/CodeSignatureInspector.swift` |
+| App Store search endpoint and per-platform entities | `search_entity`, `platform_entity`, `platform_display_name` | `Lookup/AppStoreClient.swift` |
+| Search result fields | `normalise_results` | `Lookup/AppStoreClient.swift` |
+| Merging results by App Store ID with every platform label | `merge_results` | `Lookup/AppStoreClient.swift` |
+| MDM lockup detail endpoint and offer selection | `load_app_details` | `Lookup/AppStoreClient.swift` |
+| Storefront presets (GB, US, CA, AU, DE, FR) | `change_store` | `App/AppStoreModel.swift` |
+| The embedded Apple app list (75 apps) and its 53-app built-in subset, with Apple's source URL and the 11 September 2026 verification date | `apple_preinstalled_data`, `apple_builtin_data` | `Resources/AppleBuiltInApps.json`, `Lookup/AppleBuiltInApps.swift` |
 
-The App Store endpoints, the embedded Apple app list and the CSV column layouts
-will be listed here as they are ported.
+The CSV column layouts will be listed here when CSV import and export are ported.
 
 ### Licence
 

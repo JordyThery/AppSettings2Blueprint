@@ -34,8 +34,8 @@ struct RequestAllowListTests {
     }
 }
 
-/// Uses the global MockURLProtocol handler, so these run one at a time.
-@Suite("Platform API client", .serialized)
+extension MockNetworkTests {
+@Suite("Platform API client")
 struct PlatformAPIClientTests {
     private let credentials = PlatformCredentials(region: .eu, environmentID: "env-1", clientID: "id", clientSecret: "s3cr3t")
     private static let token = MockResponse.json(200, #"{"access_token":"tok","expires_in":900}"#)
@@ -154,6 +154,8 @@ struct PlatformAPIClientTests {
         #expect(!text.contains("\"tok\""))
         #expect(!text.contains("Bearer tok"))
     }
+}
+
 }
 
 /// Collects log entries delivered on the main actor.
