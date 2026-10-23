@@ -117,6 +117,7 @@ private struct BlueprintDetailPane: View {
     let blueprintID: String
     @State private var isShowingBackups = false
     @State private var isDeploying = false
+    @State private var isEditingScope = false
 
     var body: some View {
         if let detail = model.details[blueprintID] {
@@ -127,6 +128,11 @@ private struct BlueprintDetailPane: View {
                         .disabled(model.loadingDetailIDs.contains(blueprintID))
                     Button("Backups…", systemImage: "clock.arrow.circlepath") { isShowingBackups = true }
                         .help("Backups written before each change; restore one")
+                    if !model.isJamfSchool {
+                        Button("Edit Scope…", systemImage: "person.3") { isEditingScope = true }
+                            .help(model.isReadOnly(detail) ? "The blueprint is assigned to a division and is read-only" : "Choose the device groups this blueprint is scoped to")
+                            .disabled(model.isReadOnly(detail))
+                    }
                     Button("Deploy…", systemImage: "paperplane") { isDeploying = true }
                         .help(detail.scopeDeviceGroups.isEmpty ? "The blueprint has no device groups in scope" : "Deploy this blueprint to its scope, after a confirmation")
                         .disabled(detail.scopeDeviceGroups.isEmpty)
@@ -143,6 +149,9 @@ private struct BlueprintDetailPane: View {
             }
             .sheet(isPresented: $isDeploying) {
                 DeployConfirmationSheet(app: model, detail: detail)
+            }
+            .sheet(isPresented: $isEditingScope) {
+                EditScopeSheet(app: model, detail: detail)
             }
         } else if let error = model.detailErrors[blueprintID] {
             ContentUnavailableView {

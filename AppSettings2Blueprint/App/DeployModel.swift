@@ -40,7 +40,7 @@ final class DeployModel {
     var groups: [GroupRow] {
         detail.scopeDeviceGroups.map { id in
             let group = app.deviceGroups.first { $0.id == id }
-            return GroupRow(id: id, name: group?.name ?? id, memberCount: group?.memberCount)
+            return GroupRow(id: id, name: app.groupName(id), memberCount: group?.memberCount)
         }
     }
 

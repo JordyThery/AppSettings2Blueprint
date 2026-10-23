@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1
+
+- **Edit Scope** for Jamf Pro: change an existing Blueprint's device groups. Only the scope is sent, after a concurrency check and a backup, and the read-back is verified. Removing groups from a deployed Blueprint needs an extra confirmation. Also the way to scope an unscoped Blueprint before writing to it.
+- **Jamf School**: recognised automatically. Writing to existing Blueprints and deploying work as with Jamf Pro; because the Platform API does not list Jamf School device groups, new Blueprints and scope changes are left to Jamf School, and the deploy confirmation shows group IDs.
+- **Shared iPad**: an iOS rule set can be written to the user channel, as Apple requires on Shared iPad. Loading such a declaration from a Blueprint turns the option on.
+- The Blueprint header shows the scope.
+
 ## 1.0
 
 First release.

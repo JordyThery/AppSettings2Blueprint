@@ -179,6 +179,47 @@ struct DeclarationCodingTests {
         #expect(DeclarationEncoder.channels(for: ruleSet) == ["USER"])
     }
 
+    /// Shared iPad writes the same iOS declaration on the USER channel.
+    @Test func sharedIPadUsesTheUserChannel() {
+        var ruleSet = iOSRuleSet()
+        ruleSet.isSharedIPad = true
+        #expect(DeclarationEncoder.channels(for: ruleSet) == ["USER"])
+        let declarations = DeclarationEncoder.declarations(for: ruleSet)
+        #expect(declarations.count == 1)
+        #expect(declarations[0]["channelType"]?.stringValue == "USER")
+        #expect(declarations[0]["payload"]?["Allowed"]?["DeniedApps"]?.arrayValue?.count == 2)
+        #expect(declarations[0]["payload"]?["Privacy"]?["PermissionDefaults"] != nil)
+    }
+
+    @Test func sharedIPadDecodesAsIOSAndRoundTrips() {
+        var original = iOSRuleSet()
+        original.isSharedIPad = true
+        let encoded = DeclarationEncoder.declarations(for: original)
+        let decoded = DeclarationDecoder.decode(declarations: encoded, name: original.name)
+        #expect(decoded.notes.isEmpty)
+        #expect(decoded.ruleSet.platform == .iOS)
+        #expect(decoded.ruleSet.isSharedIPad)
+        #expect(DeclarationEncoder.declarations(for: decoded.ruleSet) == encoded)
+    }
+
+    /// Shared iPad only applies to iOS; switching to macOS ignores the flag.
+    @Test func sharedIPadIsIgnoredOnMacOS() {
+        var ruleSet = macRuleSet()
+        ruleSet.sharedIPad = true
+        #expect(!ruleSet.isSharedIPad)
+        #expect(DeclarationEncoder.channels(for: ruleSet) == ["SYSTEM", "USER"])
+    }
+
+    /// Rule set files saved before 1.1 have no sharedIPad key and still open.
+    @Test func ruleSetFilesWithoutSharedIPadStillDecode() throws {
+        var data = try JSONEncoder().encode(iOSRuleSet())
+        var object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        object.removeValue(forKey: "sharedIPad")
+        data = try JSONSerialization.data(withJSONObject: object)
+        let decoded = try JSONDecoder().decode(RuleSet.self, from: data)
+        #expect(!decoded.isSharedIPad)
+    }
+
     /// A preserved declaration on a channel the platform does not use is still
     /// written back; decode→encode never drops a declaration.
     @Test func preservedForeignChannelsAreWrittenBack() {

@@ -64,8 +64,9 @@ struct RawJSONView: View {
     }
 }
 
-/// Name, state and timestamps of a blueprint.
+/// Name, state, scope and timestamps of a blueprint.
 struct BlueprintHeader: View {
+    @Environment(AppModel.self) private var model
     let detail: BlueprintDetail
 
     var body: some View {
@@ -80,6 +81,11 @@ struct BlueprintHeader: View {
                     DeploymentStateBadge(state: state)
                 }
             }
+            let groups = detail.scopeDeviceGroups
+            Text(groups.isEmpty ? "No device groups in scope" : "Scope: \(groups.map(model.groupName).joined(separator: ", "))")
+                .font(.caption)
+                .foregroundStyle(groups.isEmpty ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
+                .lineLimit(2)
             if let updated = detail.overview.updated {
                 Text("Updated \(detail.overview.updatedDate?.formatted(date: .abbreviated, time: .standard) ?? updated)")
                     .font(.caption)

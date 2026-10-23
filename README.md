@@ -34,9 +34,9 @@ In [Jamf Account](https://account.jamf.com), create an API integration scoped to
 | --- | --- | --- |
 | `blueprints` | Read | Listing Blueprints, verifying writes, following deployments |
 | `blueprints` | Create | Writing a rule set to a new Blueprint |
-| `blueprints` | Update | Writing to an existing Blueprint; restoring a backup |
+| `blueprints` | Update | Writing to an existing Blueprint; editing scope; restoring a backup |
 | `blueprints` | Deploy | Deploying a Blueprint |
-| `device-groups` | Read | Scoping new Blueprints; group names and device counts before a deploy |
+| `device-groups` | Read | Choosing scope; group names and device counts before a deploy |
 
 The Lookup section needs no Jamf permissions and no macOS privacy permission: the app is not sandboxed and reads `/Applications`, `/System/Applications`, `/System/Cryptexes/App/System/Applications`, optionally `~/Applications`, and any app you drop on it.
 
@@ -48,9 +48,13 @@ The Lookup section needs no Jamf permissions and no macOS privacy permission: th
 2. Collect identifiers under **Lookup** and add them to the rule set.
 3. Build the rules in the **Editor**; the JSON preview shows the declarations that will be written.
 4. Click **Write to Jamf…**, choose a new or an existing Blueprint, review the diff and write.
-5. Deploy from the write sheet or from **Jamf → Blueprints → Deploy…**.
+5. Deploy from the write sheet or from **Jamf → Blueprints → Deploy…**. **Edit Scope…** in the same place changes a Blueprint's device groups.
 
-On macOS, Apple accepts binary rules only in the system channel and Privacy only in the user channel, so a macOS rule set is written as up to two declarations in the same component.
+On macOS, Apple accepts binary rules only in the system channel and Privacy only in the user channel, so a macOS rule set is written as up to two declarations in the same component. For Shared iPad, tick **Shared iPad** in the editor: the iOS declaration is then written to the user channel, as Apple requires.
+
+## Jamf School
+
+Jamf School environments work through the same Platform API: create the API integration for the Jamf School platform environment and connect as above. Writing to existing Blueprints and deploying work as with Jamf Pro. The Platform API does not list Jamf School device groups, so the app recognises a Jamf School connection and leaves scope to Jamf School: create and scope Blueprints there, and the deploy confirmation shows group IDs instead of names and device counts.
 
 ## Saving safely
 
@@ -61,6 +65,7 @@ The Blueprints API applies updates as a JSON merge-patch, which replaces arrays 
 - The full Blueprint is backed up first, to `~/Library/Application Support/AppSettings2Blueprint/Backups/<blueprint ID>/`. Backups are never overwritten and **Backups…** restores them.
 - Every write is verified against a read-back of the Blueprint.
 - `divisionId` is never sent; division-assigned Blueprints are read-only.
+- **Edit Scope…** sends only the scope, after the same checks and backup, and verifies that the steps are unchanged. Removing groups from a deployed Blueprint needs an extra confirmation.
 - Writing never deploys. Deploying needs a confirmation listing the device groups and device count, and a second one for a macOS allow list without `AlwaysAllowManagedApps` or the Apple-signed baseline.
 - The HTTP layer refuses everything except GET, `POST /auth/token`, Blueprint create, update and deploy. No DELETE, no undeploy; deploy is retried on 429 only.
 
@@ -81,10 +86,9 @@ Lookups never include Jamf data or credentials. Client secrets are stored in the
 
 ## Known limitations
 
-- **A Blueprint needs a scope before it can be changed.** The API rejects a PATCH to a Blueprint without device groups, even one that only sends steps. The app refuses such writes before sending anything; add a device group in Jamf first.
-- **Not Deployed versus Out of Date.** After a write, a never-deployed Blueprint stays *Not Deployed*; *Out of Date* only appears once it has been deployed.
+- **A Blueprint needs a scope before its steps can be changed.** The API rejects a steps PATCH to a Blueprint without device groups. The app refuses such writes before sending anything; set the scope with **Edit Scope…** first (in Jamf School, set it there).
+- **Not Deployed versus Out of Date.** After a write, a never-deployed Blueprint stays *Not Deployed*; *Out of Date* only appears once it has been deployed. Any scope change to a deployed Blueprint also marks it *Out of Date*.
 - **Embedded helpers are not inspected.** The local scan stops at the first `.app` bundle; drop helpers, XPC services or login items on the app to inspect them individually.
-- **Shared iPad is not supported.** On Shared iPad the declaration uses the USER channel; iOS and iPadOS rule sets are written to the SYSTEM channel only.
 
 ## Building
 

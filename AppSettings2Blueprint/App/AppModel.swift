@@ -32,6 +32,13 @@ final class AppModel {
     private(set) var deviceGroups: [PlatformGroup] = []
     private(set) var deviceGroupsError: String?
     private(set) var isLoadingDeviceGroups = false
+    /// True when the connection's environment has no platform device groups: the
+    /// Device Groups API answers 404 TENANT_NOT_FOUND, which is what a Jamf School
+    /// environment returns. Blueprints can still be written and deployed, but
+    /// scope cannot be chosen in the app.
+    private(set) var isJamfSchool = false
+
+    static let tenantNotFoundCode = "TENANT_NOT_FOUND"
 
     var searchText = ""
     var selectedBlueprintID: String? {
@@ -90,6 +97,7 @@ final class AppModel {
         readOnlyBlueprintIDs = []
         deviceGroups = []
         deviceGroupsError = nil
+        isJamfSchool = false
     }
 
     // MARK: Device groups
@@ -106,6 +114,10 @@ final class AppModel {
                 let groups = try await DeviceGroupsService(client: service.client).listAll()
                 guard generation == connectionGeneration else { return }
                 deviceGroups = groups
+                isJamfSchool = false
+            } catch let error as APIError where error.hasErrorCode(Self.tenantNotFoundCode) {
+                guard generation == connectionGeneration else { return }
+                isJamfSchool = true
             } catch {
                 guard generation == connectionGeneration else { return }
                 deviceGroupsError = error.localizedDescription
@@ -114,7 +126,8 @@ final class AppModel {
     }
 
     func groupName(_ id: String) -> String {
-        deviceGroups.first { $0.id == id }?.name ?? id
+        if let name = deviceGroups.first(where: { $0.id == id })?.name { return name }
+        return isJamfSchool ? "Group \(id)" : id
     }
 
     // MARK: Blueprints
@@ -173,6 +186,8 @@ final class AppModel {
                 details = details.filter { ids.contains($0.key) }
                 detailErrors = [:]
                 listState = .finished(Date())
+                // Also tells whether this is a Jamf School environment.
+                if deviceGroups.isEmpty && !isJamfSchool { loadDeviceGroups() }
             } catch is CancellationError {
                 return
             } catch {

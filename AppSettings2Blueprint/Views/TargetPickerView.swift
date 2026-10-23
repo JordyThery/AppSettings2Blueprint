@@ -42,7 +42,7 @@ struct TargetPickerView: View {
         }
         .frame(width: 820, height: 620)
         .task {
-            if model.app.deviceGroups.isEmpty { model.app.loadDeviceGroups() }
+            if model.app.deviceGroups.isEmpty && !model.app.isJamfSchool { model.app.loadDeviceGroups() }
             if model.app.overviews.isEmpty { model.app.refresh() }
             await model.app.loadMissingDetails()
         }
@@ -65,12 +65,18 @@ private struct ChooseTargetView: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Picker("Target", selection: $model.mode) {
-                    ForEach(JamfWriteModel.Mode.allCases) { Text($0.rawValue).tag($0) }
+                if model.canCreateBlueprints {
+                    Picker("Target", selection: $model.mode) {
+                        ForEach(JamfWriteModel.Mode.allCases) { Text($0.rawValue).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .fixedSize()
+                    .labelsHidden()
                 }
-                .pickerStyle(.segmented)
-                .fixedSize()
-                .labelsHidden()
+            }
+
+            if !model.canCreateBlueprints {
+                Banner(style: .info, text: "Jamf School: the API does not list Jamf School device groups, so new blueprints can't be scoped here. Create the blueprint in Jamf School, then write to it.")
             }
 
             switch model.mode {
@@ -99,6 +105,11 @@ private struct ChooseTargetView: View {
             }
         }
         .padding(16)
+        // Jamf School is recognised once the device group list answers, which can
+        // be after the sheet opened in New Blueprint mode.
+        .onChange(of: app.isJamfSchool, initial: true) { _, isSchool in
+            if isSchool { model.mode = .existing }
+        }
     }
 }
 
@@ -162,7 +173,9 @@ private struct PlacementView: View {
                     Banner(style: .error, text: "This blueprint is assigned to a division. The API does not allow changing it, so it is shown read-only.")
                 }
                 if detail.scopeDeviceGroups.isEmpty {
-                    Banner(style: .error, text: "This blueprint has no device groups in scope. The Platform API rejects changes to it (400 NotBlank: scopeId) until it has one. Add a device group to its scope in Jamf, then reload.")
+                    Banner(style: .error, text: model.app.isJamfSchool
+                        ? "This blueprint has no device groups in scope. The Platform API rejects changes to it (400 NotBlank: scopeId) until it has one. Set its scope in Jamf School, then reload."
+                        : "This blueprint has no device groups in scope. The Platform API rejects changes to it (400 NotBlank: scopeId) until it has one. Set it with Edit Scope… in Jamf → Blueprints, then reload.")
                 }
 
                 Text("Placement").font(.subheadline.weight(.semibold))

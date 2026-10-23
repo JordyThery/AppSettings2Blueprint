@@ -16,7 +16,7 @@ struct DeployConfirmationSheet: View {
             dismiss()
         })
         .frame(width: 560)
-        .task { if model.app.deviceGroups.isEmpty { model.app.loadDeviceGroups() } }
+        .task { if model.app.deviceGroups.isEmpty && !model.app.isJamfSchool { model.app.loadDeviceGroups() } }
     }
 }
 
@@ -111,11 +111,17 @@ private struct ConfirmView: View {
                         Spacer()
                         if let count = group.memberCount {
                             Text("^[\(count) device](inflect: true)").monospacedDigit()
-                        } else {
+                        } else if !model.app.isJamfSchool {
                             Text("Count unknown").foregroundStyle(.secondary)
                         }
                     }
                     .font(.callout)
+                }
+                if model.app.isJamfSchool && !model.groups.isEmpty {
+                    Text("Jamf School: the API does not provide device group names or member counts. Check the groups in Jamf School before deploying.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .padding(10)

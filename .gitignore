@@ -1,5 +1,5 @@
-# Local screenshots of API credentials
-Platform API - *.png
+# Screenshots in the repo root (often of API credentials); README images live in docs/
+/*.png
 
 # Per-user Xcode state
 xcuserdata/

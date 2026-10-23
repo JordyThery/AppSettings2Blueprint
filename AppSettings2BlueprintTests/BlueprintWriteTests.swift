@@ -260,6 +260,74 @@ extension MockNetworkTests {
             #expect(!patched)
         }
 
+        @Test func scopeChangePatchesOnlyScopeAndVerifies() async throws {
+            let state = ServerState(appSettingsBlueprintJSON)
+            MockURLProtocol.install { request in
+                if request.path == "/auth/token" { return Self.token }
+                switch (request.method, request.path) {
+                case ("GET", Self.path): return .json(200, state.text)
+                case ("PATCH", Self.path):
+                    state.applyPatch(request.body)
+                    return MockResponse(status: 204, body: Data())
+                default: return .json(404, "{}")
+                }
+            }
+            let backups = BackupRecorder()
+            let groups = ["11111111-2222-4333-8444-555555555555", "99999999-2222-4333-8444-555555555555"]
+            let result = try await makeWriter(backups: backups).changeScope(loaded: loaded, deviceGroups: groups)
+            #expect(result.isVerified, "\(result.problems)")
+            #expect(backups.count == 1)
+            #expect(result.previousGroups == ["11111111-2222-4333-8444-555555555555"])
+            #expect(result.detail.scopeDeviceGroups == groups)
+            let patch = try #require(apiRequests().first { $0.method == "PATCH" })
+            #expect(patch.header("Content-Type") == "application/merge-patch+json")
+            #expect(patch.bodyString == #"{"scope":{"deviceGroups":["11111111-2222-4333-8444-555555555555","99999999-2222-4333-8444-555555555555"]}}"#)
+        }
+
+        /// Unlike a steps write, a scope change is how an unscoped blueprint gets a scope.
+        @Test func scopeChangeWorksOnUnscopedBlueprint() async throws {
+            let unscoped = appSettingsBlueprintJSON.replacingOccurrences(of: #""scope":{"deviceGroups":["11111111-2222-4333-8444-555555555555"]}"#, with: #""scope":null"#)
+            let state = ServerState(unscoped)
+            MockURLProtocol.install { request in
+                if request.path == "/auth/token" { return Self.token }
+                if request.method == "PATCH" {
+                    state.applyPatch(request.body)
+                    return MockResponse(status: 204, body: Data())
+                }
+                return .json(200, state.text)
+            }
+            let detail = try BlueprintDetail(data: Data(unscoped.utf8))
+            let result = try await makeWriter().changeScope(loaded: detail, deviceGroups: ["g-1"])
+            #expect(result.isVerified, "\(result.problems)")
+            #expect(result.previousGroups.isEmpty)
+            #expect(result.detail.scopeDeviceGroups == ["g-1"])
+        }
+
+        @Test func emptyScopeIsRefusedBeforeAnyRequest() async throws {
+            MockURLProtocol.install { $0.path == "/auth/token" ? Self.token : .json(200, appSettingsBlueprintJSON) }
+            let backups = BackupRecorder()
+            do {
+                _ = try await makeWriter(backups: backups).changeScope(loaded: loaded, deviceGroups: [])
+                Issue.record("Expected an empty-scope error")
+            } catch let error as BlueprintWriter.WriteError {
+                guard case .emptyScope = error else { Issue.record("Wrong error \(error)"); return }
+            }
+            #expect(backups.count == 0)
+            #expect(apiRequests().isEmpty)
+        }
+
+        @Test func scopeChangeStopsWhenBlueprintChanged() async throws {
+            let changed = appSettingsBlueprintJSON.replacingOccurrences(of: "2026-10-02T09:30:00.222222Z", with: "2026-10-03T10:00:00Z")
+            MockURLProtocol.install { $0.path == "/auth/token" ? Self.token : .json(200, changed) }
+            let backups = BackupRecorder()
+            await #expect(throws: BlueprintWriter.WriteError.self) {
+                try await makeWriter(backups: backups).changeScope(loaded: loaded, deviceGroups: ["g-1"])
+            }
+            #expect(backups.count == 0)
+            let patched = apiRequests().contains { $0.method == "PATCH" }
+            #expect(!patched)
+        }
+
         @Test func createPostsNameScopeAndStepsOnly() async throws {
             let created = appSettingsBlueprintJSON
             MockURLProtocol.install { request in
@@ -311,8 +379,10 @@ private final class ServerState: @unchecked Sendable {
 
     func applyPatch(_ body: Data) {
         lock.withLock {
-            guard let patch = try? JSONValue(data: body), let steps = patch["steps"] else { return }
-            json.setValue(steps, at: [.key("steps")])
+            guard let patch = try? JSONValue(data: body) else { return }
+            if let steps = patch["steps"] { json.setValue(steps, at: [.key("steps")]) }
+            if let scope = patch["scope"] { json.setValue(scope, at: [.key("scope")]) }
+            guard patch["steps"] != nil || patch["scope"] != nil else { return }
             json.setValue(.string("2026-10-23T08:00:00Z"), at: [.key("updated")])
             json.setValue(.object(JSONObject(["state": .string("OUT_OF_DATE")])), at: [.key("deploymentState")])
         }

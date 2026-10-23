@@ -22,6 +22,7 @@ nonisolated enum DeclarationDecoder {
         var hasMacKeys = false
         var privacyChannels = Set<String>()
         var binaryChannels = Set<String>()
+        var appListChannels = Set<String>()
 
         for declaration in declarations where declaration["type"]?.stringValue == DeclarationEncoder.declarationType {
             let channel = declaration["channelType"]?.stringValue ?? DeclarationEncoder.systemChannel
@@ -37,8 +38,10 @@ nonisolated enum DeclarationDecoder {
                 switch (member.key, member.value) {
                 case ("Allowed", .object(let allowed)):
                     let before = ruleSet.allowedBinaries.count + ruleSet.deniedBinaries.count
+                    let appsBefore = ruleSet.allowedApps.count + ruleSet.deniedApps.count
                     decodeAllowed(allowed, into: &ruleSet, parts: &parts, hasIOSKeys: &hasIOSKeys, hasMacKeys: &hasMacKeys)
                     if ruleSet.allowedBinaries.count + ruleSet.deniedBinaries.count > before { binaryChannels.insert(channel) }
+                    if ruleSet.allowedApps.count + ruleSet.deniedApps.count > appsBefore { appListChannels.insert(channel) }
                 case ("Privacy", .object(let privacy)):
                     let before = ruleSet.permissionDefaults.count
                     decodePrivacy(privacy, into: &ruleSet, parts: &parts, hasMacKeys: &hasMacKeys)
@@ -47,20 +50,35 @@ nonisolated enum DeclarationDecoder {
                     parts.payload.object.members.append(member)
                 }
             }
-            if channel == DeclarationEncoder.userChannel { hasMacKeys = true }
             ruleSet.preserved[channel] = parts.isEmpty ? nil : parts
         }
 
+        let userChannel = DeclarationEncoder.userChannel
         if let platform {
             ruleSet.platform = platform
         } else if hasIOSKeys && hasMacKeys {
             ruleSet.platform = (ruleSet.allowedBinaries.isEmpty && ruleSet.deniedBinaries.isEmpty) ? .iOS : .macOS
             notes.append("The declaration mixes iOS-only and macOS-only keys. It is opened as \(ruleSet.platform.displayName); fix the keys the editor marks before saving.")
-        } else {
+        } else if hasMacKeys || hasIOSKeys {
             ruleSet.platform = hasMacKeys ? .macOS : .iOS
+        } else {
+            // Neither app lists nor binaries: a USER declaration is most likely
+            // macOS privacy defaults.
+            ruleSet.platform = seenChannels.contains(userChannel) ? .macOS : .iOS
         }
 
-        let expectedPrivacyChannel = ruleSet.platform == .macOS ? DeclarationEncoder.userChannel : DeclarationEncoder.systemChannel
+        // iOS content on the user channel is a Shared iPad declaration.
+        if ruleSet.platform == .iOS {
+            let iOSChannels = appListChannels.union(privacyChannels)
+            if iOSChannels.contains(userChannel) {
+                ruleSet.isSharedIPad = true
+                if iOSChannels.contains(DeclarationEncoder.systemChannel) {
+                    notes.append("App lists or permission defaults were found on both the SYSTEM and USER channels. The rule set is opened for Shared iPad and will be written to the USER declaration.")
+                }
+            }
+        }
+
+        let expectedPrivacyChannel = ruleSet.platform == .macOS ? userChannel : DeclarationEncoder.iOSChannel(for: ruleSet)
         if privacyChannels.contains(where: { $0 != expectedPrivacyChannel }) {
             notes.append("Permission defaults were found on a channel other than \(expectedPrivacyChannel). They will be written to the \(expectedPrivacyChannel) declaration.")
         }

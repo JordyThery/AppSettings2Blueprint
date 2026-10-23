@@ -101,6 +101,23 @@ nonisolated struct BlueprintService: Sendable {
         )
     }
 
+    /// PATCH /v1/blueprints/{id} with `{"scope": {"deviceGroups": [...]}}` only.
+    /// `deviceGroups` is the complete new list (merge-patch replaces arrays) and
+    /// must not be empty; the API requires at least one group.
+    func patchScope(id: String, deviceGroups: [String]) async throws {
+        guard !deviceGroups.isEmpty else {
+            throw APIError.invalidResponse("Refusing to PATCH: a blueprint scope needs at least one device group.")
+        }
+        let scope = JSONObject(["deviceGroups": .array(deviceGroups.map(JSONValue.string))])
+        let body = JSONValue.object(JSONObject(["scope": .object(scope)])).serialized()
+        _ = try await client.send(
+            method: "PATCH",
+            path: "\(basePath)/\(Self.escape(id))",
+            body: body,
+            contentType: "application/merge-patch+json"
+        )
+    }
+
     /// POST /v1/blueprints with name, description, scope and steps. Expects 201
     /// `{id, href}`. Only retried on 429, so a blueprint is never created twice.
     /// divisionId is never sent.

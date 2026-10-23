@@ -2,7 +2,8 @@ import Foundation
 
 /// Builds the exact JSON written to Jamf from a rule set.
 ///
-/// - iOS / iPadOS: one SYSTEM declaration with Allowed and Privacy.
+/// - iOS / iPadOS: one SYSTEM declaration with Allowed and Privacy; on Shared
+///   iPad, the same declaration on the USER channel, as Apple's schema requires.
 /// - macOS: a SYSTEM declaration for Allowed (binaries) and a USER declaration for
 ///   Privacy, because Apple's schema allows binaries only on the system channel
 ///   and privacy defaults only on the user channel.
@@ -38,13 +39,18 @@ nonisolated enum DeclarationEncoder {
             let user = !ruleSet.permissionDefaults.isEmpty || !(ruleSet.preserved[userChannel]?.isEmpty ?? true)
             channels = system && user ? [systemChannel, userChannel] : (user ? [userChannel] : [systemChannel])
         } else {
-            channels = [systemChannel]
+            channels = [iOSChannel(for: ruleSet)]
         }
         // Preserved declarations on any other channel pass through unchanged.
         let others = ruleSet.preserved
             .filter { !channels.contains($0.key) && !$0.value.isEmpty }
             .keys.sorted()
         return channels + others
+    }
+
+    /// The channel an iOS / iPadOS rule set is written to.
+    static func iOSChannel(for ruleSet: RuleSet) -> String {
+        ruleSet.isSharedIPad ? userChannel : systemChannel
     }
 
     static func declaration(for ruleSet: RuleSet, channel: String) -> JSONValue {
@@ -76,7 +82,7 @@ nonisolated enum DeclarationEncoder {
         var allowed = JSONObject()
         switch ruleSet.platform {
         case .iOS:
-            guard channel == systemChannel else { break }
+            guard channel == iOSChannel(for: ruleSet) else { break }
             let allowedApps = ruleSet.allowedApps.map(\.bundleID).map(trim).filter { !$0.isEmpty }
             let deniedApps = ruleSet.deniedApps.map(\.bundleID).map(trim).filter { !$0.isEmpty }
             if !allowedApps.isEmpty { allowed["AllowedApps"] = .array(allowedApps.map(JSONValue.string)) }
@@ -113,7 +119,7 @@ nonisolated enum DeclarationEncoder {
     // MARK: Privacy
 
     private static func privacy(for ruleSet: RuleSet, channel: String) -> JSONObject? {
-        let privacyChannel = ruleSet.platform == .macOS ? userChannel : systemChannel
+        let privacyChannel = ruleSet.platform == .macOS ? userChannel : iOSChannel(for: ruleSet)
         var privacy = JSONObject()
         if channel == privacyChannel, !ruleSet.permissionDefaults.isEmpty {
             var defaults = JSONObject()

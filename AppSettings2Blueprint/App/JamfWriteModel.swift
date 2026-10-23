@@ -53,8 +53,12 @@ final class JamfWriteModel {
         selectedBlueprintID = document.linkedBlueprint?.id
         newName = document.ruleSet.name
         activationPredicate = Self.suggestedPredicate(for: document.ruleSet.platform)
-        if document.linkedBlueprint == nil { mode = app.overviews.isEmpty ? .new : .existing }
+        if document.linkedBlueprint == nil && !app.isJamfSchool { mode = app.overviews.isEmpty ? .new : .existing }
     }
+
+    /// A new blueprint needs device groups, which a Jamf School environment does
+    /// not list; there, only existing blueprints can be written.
+    var canCreateBlueprints: Bool { !app.isJamfSchool }
 
     /// One Blueprint per platform is the default; a predicate lets one blueprint
     /// hold both an iPadOS and a macOS rule set.
@@ -107,7 +111,11 @@ final class JamfWriteModel {
         case .existing:
             guard let detail = selectedDetail else { return "Choose a blueprint." }
             if app.isReadOnly(detail) { return "This blueprint is assigned to a division and is read-only." }
-            if detail.scopeDeviceGroups.isEmpty { return "This blueprint has no device groups in scope; the API rejects changes until it has one. Set its scope in Jamf first." }
+            if detail.scopeDeviceGroups.isEmpty {
+                return app.isJamfSchool
+                    ? "This blueprint has no device groups in scope; the API rejects changes until it has one. Set its scope in Jamf School first."
+                    : "This blueprint has no device groups in scope; the API rejects changes until it has one. Set it with Edit Scope… first."
+            }
             if case let .appendToStep(step) = effectivePlacement(for: detail),
                let count = detail.steps?[step]?["components"]?.arrayValue?.count,
                count >= AppSettingsLocator.maxComponentsPerStep {
@@ -115,6 +123,7 @@ final class JamfWriteModel {
             }
             return nil
         case .new:
+            if !canCreateBlueprints { return "Create the blueprint in Jamf School, then write to it here." }
             if newName.trimmingCharacters(in: .whitespaces).isEmpty { return "Enter a name." }
             if selectedGroupIDs.isEmpty { return "Choose at least one device group." }
             return nil

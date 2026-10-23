@@ -34,6 +34,17 @@ nonisolated struct WriteResult: Sendable {
     var isVerified: Bool { problems.isEmpty }
 }
 
+/// What the read-back after a scope change showed.
+nonisolated struct ScopeChangeResult: Sendable {
+    let detail: BlueprintDetail
+    let previousGroups: [String]
+    let backupURL: URL
+    /// Empty when the scope came back as sent and the steps are unchanged.
+    let problems: [String]
+
+    var isVerified: Bool { problems.isEmpty }
+}
+
 /// Writes a rule set into a blueprint: re-GET and compare, back up, build the new
 /// steps, review, PATCH `{"steps": [...]}` only, GET again and verify. Or creates
 /// a new blueprint with POST. Never sends divisionId; never deletes or undeploys.
@@ -42,6 +53,7 @@ nonisolated struct BlueprintWriter: Sendable {
         case changedOnServer(name: String, loaded: String?, now: String?)
         case readOnly(name: String)
         case noScope(name: String)
+        case emptyScope
         case notAnArray
 
         var errorDescription: String? {
@@ -52,6 +64,8 @@ nonisolated struct BlueprintWriter: Sendable {
                 "“\(name)” has no device groups in scope. The Platform API rejects changes to a blueprint without a scope (400 NotBlank: scopeId), even ones that only send steps. Add a device group to its scope in Jamf, then try again. Nothing was written."
             case let .readOnly(name):
                 "“\(name)” is assigned to a division and cannot be changed through the API. Nothing was written."
+            case .emptyScope:
+                "A blueprint's scope needs at least one device group. Nothing was written."
             case .notAnArray:
                 "The new steps are not an array; refusing to send a partial PATCH."
             }
@@ -116,6 +130,35 @@ nonisolated struct BlueprintWriter: Sendable {
             detail: readBack, readBackComponent: nil,
             problems: same ? [] : ["The steps the server returned differ from the backup's steps."],
             created: false
+        )
+    }
+
+    // MARK: Scope
+
+    /// Changes a blueprint's device groups: concurrency check, backup, PATCH
+    /// `{"scope": …}` only, GET and verify that the scope matches and the steps
+    /// are untouched. Unlike a steps write, this works on an unscoped blueprint.
+    func changeScope(loaded: BlueprintDetail, deviceGroups: [String]) async throws -> ScopeChangeResult {
+        guard !deviceGroups.isEmpty else { throw WriteError.emptyScope }
+        let latest = try await service.detail(id: loaded.id)
+        try checkUnchanged(loaded: loaded, latest: latest)
+        if latest.isDivisionLocked { throw WriteError.readOnly(name: latest.overview.name) }
+        let backupURL = try backup(latest)
+        do {
+            try await service.patchScope(id: loaded.id, deviceGroups: deviceGroups)
+        } catch let error as APIError where error.hasErrorCode(Self.divisionErrorCode) {
+            throw WriteError.readOnly(name: latest.overview.name)
+        }
+        let readBack = try await service.detail(id: loaded.id)
+        var problems: [String] = []
+        if Set(readBack.scopeDeviceGroups) != Set(deviceGroups) {
+            problems.append("The scope the server returned (\(readBack.scopeDeviceGroups.joined(separator: ", "))) differs from what was sent (\(deviceGroups.joined(separator: ", "))).")
+        }
+        if !(readBack.steps ?? .null).isSemanticallyEqual(to: latest.steps ?? .null) {
+            problems.append("The blueprint's steps changed, although only the scope was sent. Compare with the backup.")
+        }
+        return ScopeChangeResult(
+            detail: readBack, previousGroups: latest.scopeDeviceGroups, backupURL: backupURL, problems: problems
         )
     }
 

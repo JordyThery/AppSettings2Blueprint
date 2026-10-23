@@ -140,6 +140,13 @@ struct APIErrorTests {
         #expect(headers.first?.1 == "Bearer <redacted>")
     }
 
+    /// The Device Groups API's answer for a Jamf School environment (verified live).
+    @Test func recognisesJamfSchoolTenantNotFound() {
+        let body = #"{"httpStatus":404,"traceId":"t","errors":[{"code":"TENANT_NOT_FOUND","description":"No tenant found for environment 'e'."}]}"#
+        let error = APIError.http(status: 404, details: PlatformErrorDetails(data: Data(body.utf8)), body: body)
+        #expect(error.hasErrorCode(AppModel.tenantNotFoundCode))
+    }
+
     /// A cookie's first chunk is the secret itself, so the whole value is redacted;
     /// an Authorization value without a scheme is too.
     @Test func redactsCookiesWhole() {

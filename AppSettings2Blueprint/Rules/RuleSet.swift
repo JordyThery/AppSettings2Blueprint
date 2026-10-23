@@ -67,6 +67,13 @@ nonisolated struct RuleSet: Codable, Hashable, Sendable {
     var platform: RulePlatform = .iOS
 
     // iOS / iPadOS
+    /// Shared iPad: Apple only accepts the declaration on the user channel there.
+    /// Optional so rule set files saved before 1.1 still open; nil means false.
+    var sharedIPad: Bool?
+    var isSharedIPad: Bool {
+        get { platform == .iOS && sharedIPad == true }
+        set { sharedIPad = newValue ? true : nil }
+    }
     var appListMode: AppListMode = .deny
     var allowedApps: [AppRule] = []
     var deniedApps: [AppRule] = []

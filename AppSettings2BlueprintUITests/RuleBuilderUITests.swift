@@ -108,6 +108,23 @@ final class RuleBuilderUITests: AppSettingsUITestCase {
         XCTAssertFalse(app.popUpButtons["Accessibility"].exists, "Accessibility is offered on iOS")
     }
 
+    /// Shared iPad moves the iOS declaration to the USER channel, and back.
+    func testSharedIPadUsesUserChannel() {
+        openRuleSet()
+        type("com.apple.news\n", into: app.textFields["newBundleID"])
+        waitForJSON { $0.contains(#""channelType": "SYSTEM""#) }
+        let sharedIPad = app.checkBoxes["Shared iPad"]
+        tap(sharedIPad)
+        waitForJSON { $0.contains(#""channelType": "USER""#) && $0.contains("com.apple.news") && !$0.contains("SYSTEM") }
+        tap(sharedIPad)
+        waitForJSON { $0.contains(#""channelType": "SYSTEM""#) }
+        // Shared iPad applies to iOS only.
+        tap(app.radioButtons["macOS"])
+        let switchButton = dialogButton("Switch to macOS")
+        if switchButton.waitForExistence(timeout: 3) { switchButton.click() }
+        XCTAssertFalse(sharedIPad.waitForExistence(timeout: 2), "Shared iPad is offered on macOS")
+    }
+
     /// Adding iOS apps to a non-empty macOS rule set is refused, not mixed in.
     func testPlatformGuard() {
         openRuleSet()

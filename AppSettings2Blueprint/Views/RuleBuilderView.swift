@@ -123,6 +123,14 @@ struct RuleBuilderView: View {
             .fixedSize()
             .labelsHidden()
             .help("The device family this rule set targets. iOS-only and macOS-only keys never mix.")
+            if document.ruleSet.platform == .iOS {
+                Toggle("Shared iPad", isOn: Binding(
+                    get: { document.ruleSet.isSharedIPad },
+                    set: { value in document.update("Change Shared iPad") { $0.isSharedIPad = value } }
+                ))
+                .toggleStyle(.checkbox)
+                .help("On Shared iPad, Apple only accepts App Settings on the user channel. When on, the declaration is written as USER instead of SYSTEM.")
+            }
             if let url = document.fileURL {
                 Text(url.lastPathComponent)
                     .font(.caption)
