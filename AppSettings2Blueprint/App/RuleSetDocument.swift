@@ -1,6 +1,12 @@
 import Foundation
 import Observation
 
+/// A blueprint the rule set belongs to.
+nonisolated struct LinkedBlueprint: Hashable, Sendable {
+    let id: String
+    let name: String
+}
+
 /// The rule set being edited: undo/redo, unsaved-changes tracking, local files
 /// and additions from the lookups.
 @Observable
@@ -24,6 +30,8 @@ final class RuleSetDocument {
     /// The state last saved to (or opened from) a file, or written to Jamf.
     private(set) var savedRuleSet = RuleSet()
     private(set) var fileURL: URL?
+    /// The blueprint this rule set was loaded from or last written to.
+    var linkedBlueprint: LinkedBlueprint?
     /// Points the decoder raised when a rule set was loaded.
     var loadNotes: [String] = []
     /// A short confirmation, e.g. "Added 3 apps".
@@ -59,10 +67,11 @@ final class RuleSetDocument {
     }
 
     /// Replaces the whole document without an undo step (new, open, load from Jamf).
-    func replace(with ruleSet: RuleSet, fileURL: URL?, notes: [String] = []) {
+    func replace(with ruleSet: RuleSet, fileURL: URL?, notes: [String] = [], linkedBlueprint: LinkedBlueprint? = nil) {
         self.ruleSet = ruleSet
         savedRuleSet = ruleSet
         self.fileURL = fileURL
+        self.linkedBlueprint = linkedBlueprint
         loadNotes = notes
         statusMessage = nil
         undoManager?.removeAllActions(withTarget: self)
@@ -75,6 +84,25 @@ final class RuleSetDocument {
     /// Marks the current state as saved, e.g. after writing it to Jamf.
     func markSaved() {
         savedRuleSet = ruleSet
+    }
+
+    // MARK: Jamf
+
+    /// Loads the App Settings declarations of one com.jamf.ddm-strict component.
+    func load(from detail: BlueprintDetail, location: AppSettingsLocation) {
+        let declarations = detail.json.value(at: location.componentPath + [.key("configuration"), .key("declarations")])?
+            .arrayValue ?? []
+        var decoded = DeclarationDecoder.decode(declarations: declarations, name: detail.overview.name)
+        let others = detail.appSettingsLocations.filter {
+            $0.stepIndex != location.stepIndex || $0.componentIndex != location.componentIndex
+        }
+        if !others.isEmpty {
+            decoded.notes.append("This blueprint has \(others.count) more App Settings declaration\(others.count == 1 ? "" : "s") in other components. Only step \(location.stepIndex + 1), component \(location.componentIndex + 1) was loaded, and only it is replaced when you write.")
+        }
+        replace(
+            with: decoded.ruleSet, fileURL: nil, notes: decoded.notes,
+            linkedBlueprint: LinkedBlueprint(id: detail.id, name: detail.overview.name)
+        )
     }
 
     // MARK: Files

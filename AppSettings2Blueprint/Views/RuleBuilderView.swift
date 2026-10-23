@@ -12,6 +12,7 @@ struct RuleBuilderView: View {
     @State private var pendingAction: PendingAction?
     @State private var csvImport: IdentifiedCSV?
     @State private var errorMessage: String?
+    @State private var isWritingToJamf = false
 
     enum PendingAction: Identifiable {
         case new(RulePlatform)
@@ -79,6 +80,9 @@ struct RuleBuilderView: View {
                 Text("The rule set has changes that are not saved to a file or written to Jamf.")
             }
         }
+        .sheet(isPresented: $isWritingToJamf) {
+            TargetPickerView(app: model)
+        }
         .sheet(item: $csvImport) { item in
             CSVImportSheet(document: item.document)
         }
@@ -122,6 +126,13 @@ struct RuleBuilderView: View {
                     .lineLimit(1)
                     .help(url.path(percentEncoded: false))
             }
+            if let linked = document.linkedBlueprint {
+                Label(linked.name, systemImage: "square.stack.3d.up")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .help("Loaded from or last written to this Blueprint")
+            }
             if document.isDirty {
                 Text("Edited")
                     .font(.caption)
@@ -144,6 +155,11 @@ struct RuleBuilderView: View {
                 .help(document.hasErrors ? "Fix the errors below before saving" : "Save the rule set as an .appsettings.json file")
             Button("Import CSV…", systemImage: "tablecells", action: importCSV)
                 .help("Import an App Settings Utility CSV (BundleID-Lookup or Local-Mac-Apps)")
+            Button("Write to Jamf…", systemImage: "square.and.arrow.up.on.square") { isWritingToJamf = true }
+                .disabled(document.hasErrors || model.profileStore.selectedProfile == nil)
+                .help(model.profileStore.selectedProfile == nil
+                      ? "Add a Jamf connection in Settings first"
+                      : (document.hasErrors ? "Fix the errors below first" : "Write this rule set to a new or existing Blueprint"))
             Toggle(isOn: $showsPreview) {
                 Label("JSON Preview", systemImage: "curlybraces")
             }

@@ -101,6 +101,30 @@ nonisolated struct BlueprintService: Sendable {
         )
     }
 
+    /// POST /v1/blueprints with name, description, scope and steps. Expects 201
+    /// `{id, href}`. Only retried on 429, so a blueprint is never created twice.
+    /// divisionId is never sent.
+    func create(name: String, description: String?, deviceGroups: [String], steps: [JSONValue]) async throws -> String {
+        guard !deviceGroups.isEmpty else {
+            throw APIError.invalidResponse("Refusing to create: a blueprint needs at least one device group.")
+        }
+        var body = JSONObject(["name": .string(name)])
+        if let description, !description.isEmpty { body["description"] = .string(description) }
+        body["scope"] = .object(JSONObject(["deviceGroups": .array(deviceGroups.map(JSONValue.string))]))
+        body["steps"] = .array(steps)
+        let response = try await client.send(
+            method: "POST",
+            path: basePath,
+            body: JSONValue.object(body).serialized(),
+            contentType: "application/json",
+            retryPolicy: .rateLimitOnly
+        )
+        guard let json = try? JSONValue(data: response.data), let id = json["id"]?.stringValue else {
+            throw APIError.invalidResponse("The create response has no blueprint id.")
+        }
+        return id
+    }
+
     /// POST /v1/blueprints/{id}/deploy. Expects 202. Only retried on 429, so a
     /// deployment is never started twice.
     func deploy(id: String) async throws {

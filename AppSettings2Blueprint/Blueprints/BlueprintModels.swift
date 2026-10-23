@@ -93,6 +93,13 @@ nonisolated struct BlueprintDetail: Identifiable, Sendable {
 
     var containsAppSettings: Bool { !appSettingsLocations.isEmpty }
 
+    /// A blueprint assigned to a division cannot be changed through the API
+    /// (PATCH answers 409 DIVISION_PATCH_NOT_ALLOWED); it is shown read-only.
+    var isDivisionLocked: Bool {
+        guard let division = json["divisionId"] else { return false }
+        return division != .null
+    }
+
     /// Device group IDs from `scope.deviceGroups`.
     var scopeDeviceGroups: [String] {
         scope?["deviceGroups"]?.arrayValue?.compactMap(\.stringValue) ?? []

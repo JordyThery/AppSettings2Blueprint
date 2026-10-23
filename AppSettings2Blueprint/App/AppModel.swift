@@ -27,6 +27,12 @@ final class AppModel {
     private(set) var loadingDetailIDs: Set<String> = []
     private(set) var listState: ListState = .idle
 
+    /// Blueprints that answered 409 DIVISION_PATCH_NOT_ALLOWED this session.
+    var readOnlyBlueprintIDs: Set<String> = []
+    private(set) var deviceGroups: [PlatformGroup] = []
+    private(set) var deviceGroupsError: String?
+    private(set) var isLoadingDeviceGroups = false
+
     var searchText = ""
     var selectedBlueprintID: String? {
         didSet {
@@ -77,9 +83,62 @@ final class AppModel {
         loadingDetailIDs = []
         selectedBlueprintID = nil
         listState = .idle
+        readOnlyBlueprintIDs = []
+        deviceGroups = []
+        deviceGroupsError = nil
+    }
+
+    // MARK: Device groups
+
+    func loadDeviceGroups() {
+        guard !isLoadingDeviceGroups else { return }
+        isLoadingDeviceGroups = true
+        deviceGroupsError = nil
+        Task {
+            defer { isLoadingDeviceGroups = false }
+            do {
+                let service = try currentService()
+                deviceGroups = try await DeviceGroupsService(client: service.client).listAll()
+            } catch {
+                deviceGroupsError = error.localizedDescription
+            }
+        }
+    }
+
+    func groupName(_ id: String) -> String {
+        deviceGroups.first { $0.id == id }?.name ?? id
     }
 
     // MARK: Blueprints
+
+    /// Whether the blueprint may be written: not division-locked and not refused before.
+    func isReadOnly(_ detail: BlueprintDetail) -> Bool {
+        detail.isDivisionLocked || readOnlyBlueprintIDs.contains(detail.id)
+    }
+
+    /// Fetches every listed blueprint's detail (five at a time) that is not loaded
+    /// yet, so App Settings in other blueprints can be found.
+    func loadMissingDetails() async {
+        guard let service = try? currentService() else { return }
+        let missing = overviews.map(\.id).filter { details[$0] == nil }
+        await withTaskGroup(of: BlueprintDetail?.self) { group in
+            var pending = missing[...]
+            func enqueue() {
+                guard let id = pending.popFirst() else { return }
+                group.addTask { try? await service.detail(id: id) }
+            }
+            for _ in 0..<5 { enqueue() }
+            for await detail in group {
+                if let detail { store(detail) }
+                enqueue()
+            }
+        }
+    }
+
+    /// Records a blueprint fetched elsewhere (writes, read-backs).
+    func storeDetail(_ detail: BlueprintDetail) {
+        store(detail)
+    }
 
     /// Lists every Blueprint (overview fields only; the list has no steps).
     func refresh() {

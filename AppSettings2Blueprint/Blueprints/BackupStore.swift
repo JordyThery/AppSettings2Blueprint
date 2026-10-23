@@ -23,9 +23,9 @@ nonisolated enum BackupStore {
             .appending(path: "Backups", directoryHint: .isDirectory)
     }
 
-    static func directory(for blueprintID: String) -> URL {
+    static func directory(for blueprintID: String, root: URL = rootURL) -> URL {
         let safe = blueprintID.replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: ":", with: "_")
-        return rootURL.appending(path: safe, directoryHint: .isDirectory)
+        return root.appending(path: safe, directoryHint: .isDirectory)
     }
 
     /// File names sort chronologically and contain no colons: `2026-10-07T14-03-11.123Z.json`.
@@ -37,8 +37,8 @@ nonisolated enum BackupStore {
 
     /// Writes the exact bytes of `detail` as received from the server.
     @discardableResult
-    static func write(_ detail: BlueprintDetail, date: Date = Date()) throws -> URL {
-        let directory = directory(for: detail.id)
+    static func write(_ detail: BlueprintDetail, date: Date = Date(), root: URL = rootURL) throws -> URL {
+        let directory = directory(for: detail.id, root: root)
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             var url = directory.appending(path: "\(date.formatted(fileNameFormat)).json")
@@ -47,7 +47,9 @@ nonisolated enum BackupStore {
                 url = directory.appending(path: "\(date.formatted(fileNameFormat))-\(counter).json")
                 counter += 1
             }
-            try detail.rawData.write(to: url, options: [.atomic, .withoutOverwriting])
+            // `.withoutOverwriting` creates the file exclusively, so an existing
+            // backup is never replaced. Foundation rejects it combined with `.atomic`.
+            try detail.rawData.write(to: url, options: .withoutOverwriting)
             return url
         } catch {
             throw BackupError(message: "Could not write backup to \(directory.path(percentEncoded: false)): \(error.localizedDescription)")

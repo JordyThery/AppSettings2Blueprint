@@ -109,6 +109,7 @@ private struct BlueprintRow: View {
 private struct BlueprintDetailPane: View {
     @Environment(AppModel.self) private var model
     let blueprintID: String
+    @State private var isShowingBackups = false
 
     var body: some View {
         if let detail = model.details[blueprintID] {
@@ -117,13 +118,18 @@ private struct BlueprintDetailPane: View {
                     BlueprintHeader(detail: detail)
                     Button("Reload", systemImage: "arrow.clockwise") { model.loadDetail(id: blueprintID) }
                         .disabled(model.loadingDetailIDs.contains(blueprintID))
+                    Button("Backups…", systemImage: "clock.arrow.circlepath") { isShowingBackups = true }
+                        .help("Backups written before each change; restore one")
                 }
                 .padding(10)
-                AppSettingsSummary(locations: detail.appSettingsLocations)
+                AppSettingsSummary(detail: detail)
                     .padding(.horizontal, 10)
                     .padding(.bottom, 8)
                 Divider()
                 RawJSONView(detail: detail)
+            }
+            .sheet(isPresented: $isShowingBackups) {
+                RestoreBackupSheet(detail: detail)
             }
         } else if let error = model.detailErrors[blueprintID] {
             ContentUnavailableView {
@@ -140,11 +146,36 @@ private struct BlueprintDetailPane: View {
     }
 }
 
-/// Lists where App Settings declarations were found, with their component and channel.
+/// Lists where App Settings declarations were found, with their component and
+/// channel, and loads an editable one into the rule set.
 private struct AppSettingsSummary: View {
-    let locations: [AppSettingsLocation]
+    @Environment(AppModel.self) private var model
+    let detail: BlueprintDetail
+    @State private var pendingLoad: AppSettingsLocation?
+
+    private var locations: [AppSettingsLocation] { detail.appSettingsLocations }
 
     var body: some View {
+        content
+            .confirmationDialog(
+                "Replace the current rule set?",
+                isPresented: Binding(get: { pendingLoad != nil }, set: { if !$0 { pendingLoad = nil } }),
+                presenting: pendingLoad
+            ) { location in
+                Button("Discard and Load", role: .destructive) { load(location) }
+                Button("Cancel", role: .cancel) {}
+            } message: { _ in
+                Text("The rule set has unsaved changes.")
+            }
+    }
+
+    private func load(_ location: AppSettingsLocation) {
+        model.ruleSet.load(from: detail, location: location)
+        model.ruleSet.statusMessage = "Loaded the App Settings of “\(detail.overview.name)” into the rule set."
+    }
+
+    @ViewBuilder
+    private var content: some View {
         VStack(alignment: .leading, spacing: 4) {
             if locations.isEmpty {
                 Label("No com.apple.configuration.app.settings declaration in this Blueprint.", systemImage: "minus.circle")
@@ -158,6 +189,17 @@ private struct AppSettingsSummary: View {
                             .font(.caption.monospaced())
                             .textSelection(.enabled)
                         Spacer()
+                        if location.isStrictComponent {
+                            Button("Load into Editor") {
+                                if model.ruleSet.isDirty { pendingLoad = location } else { load(location) }
+                            }
+                            .controlSize(.small)
+                            .help("Edit this component's App Settings in the rule builder")
+                        } else {
+                            Text("Not editable (\(location.componentIdentifier))")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                     Text("component \(location.componentIdentifier.isEmpty ? "(no identifier)" : location.componentIdentifier) · channelType \(location.channelType ?? "(missing)") · kind \(location.kind ?? "(missing)")\(location.stepName.map { " · step “\($0)”" } ?? "")")
                         .font(.caption)
