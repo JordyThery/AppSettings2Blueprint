@@ -10,31 +10,21 @@
 ![macOS 15+](https://img.shields.io/badge/macOS-15%2B-blue)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-## Credits
-
-Identifier discovery is based on Anthony Darlow's **App Settings Utility**:
-
-- Repository: [cantscript/AppSettingsUtility](https://github.com/cantscript/AppSettingsUtility)
-- Blog post: [Stop Hunting for Bundle IDs & CDHashes](https://cantscript.com/posts/stop-hunting-for-bundle-ids--cdhashes/)
-
-The App Store endpoints, the SigningState requirement strings, the composed-identifier format, the scan folders, the CSV columns and the embedded Apple app list all come from his script. [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) lists what was ported and carries his MIT licence, which is also shown in **About AppSettings2Blueprint → Acknowledgements**.
-
 ## What it does
 
-Apple's `com.apple.configuration.app.settings` declaration (iOS, iPadOS, macOS, tvOS and visionOS 27 and later) allows and denies apps, allows and denies Mac binaries, and sets privacy permission defaults. Writing one takes Bundle IDs, CDHashes, Team IDs, signing IDs and designated requirements, collected from several places. AppSettings2Blueprint brings that work into one app:
+Apple's `com.apple.configuration.app.settings` declaration (iOS, iPadOS, macOS, tvOS and visionOS 27 and later) allows and denies apps and Mac binaries and sets privacy permission defaults. Writing one takes bundle IDs, CDHashes, Team IDs and designated requirements, collected from several places. AppSettings2Blueprint brings that into one app:
 
-1. **Find identifiers**
-   - App Store apps: Bundle IDs, for AllowedApps and DeniedApps.
-   - Apple built-in apps: Bundle IDs, from Apple's published list.
-   - Local Mac apps: CDHash, TeamID, SigningID, PathPrefix and SigningState for each architecture slice, for AllowedBinaries and DeniedBinaries, plus the composed `Bundle-ID {Designated-Requirement}` identifier for Privacy.PermissionDefaults.
-2. **Build rules** in a validated editor with a live JSON preview. Save rule sets locally and import or export App Settings Utility's CSV files.
-3. **Write to Jamf**: create a new Blueprint or update an existing one through the Jamf Platform API, then deploy it after an explicit confirmation.
+1. **Find identifiers** — App Store and Apple built-in bundle IDs; for local Mac apps the CDHash, TeamID, SigningID, PathPrefix and SigningState per architecture slice, plus the composed `Bundle-ID {Designated-Requirement}` identifier for privacy defaults.
+2. **Build rules** in a validated editor with a live JSON preview. Rule sets save as JSON files and interoperate with App Settings Utility's CSV formats.
+3. **Write to Jamf** — create or update a Blueprint through the Jamf Platform API, then deploy it after an explicit confirmation.
 
-It is not a policy advisor. It shows what each identifier matches; you decide what to allow or deny.
+It is not a policy advisor: it shows what each identifier matches; you decide what to allow or deny.
+
+![The rule builder with a deny list and the live JSON preview](docs/screenshot-ruleset.png)
 
 ## Installation
 
-Download the latest notarized build from [Releases](https://github.com/JordyThery/AppSettings2Blueprint/releases/latest), unzip it, and move **AppSettings2Blueprint.app** to `/Applications`. Requires **macOS 15 or later**. The app checks for new releases once a day and offers the download; use **Check for Updates…** in the app menu to check right away.
+Download the latest notarized build from [Releases](https://github.com/JordyThery/AppSettings2Blueprint/releases/latest), unzip it, and move **AppSettings2Blueprint.app** to `/Applications`. Requires **macOS 15 or later**. The app checks for new releases once a day; **Check for Updates…** in the app menu checks right away.
 
 ## Permissions
 
@@ -42,35 +32,37 @@ In [Jamf Account](https://account.jamf.com), create an API integration scoped to
 
 | Capability | Actions | Needed for |
 | --- | --- | --- |
-| `blueprints` | Read | Listing Blueprints, loading their App Settings, verifying writes and following deployments |
+| `blueprints` | Read | Listing Blueprints, verifying writes, following deployments |
 | `blueprints` | Create | Writing a rule set to a new Blueprint |
-| `blueprints` | Update | Writing a rule set to an existing Blueprint, and restoring a backup |
+| `blueprints` | Update | Writing to an existing Blueprint; restoring a backup |
 | `blueprints` | Deploy | Deploying a Blueprint |
-| `device-groups` | Read | Choosing the scope of a new Blueprint, and showing group names and device counts before a deploy |
+| `device-groups` | Read | Scoping new Blueprints; group names and device counts before a deploy |
 
-The Lookup section needs no Jamf permissions at all. Reading local apps needs no macOS privacy permission either: the app is not sandboxed and reads `/Applications`, `/System/Applications`, `/System/Cryptexes/App/System/Applications` (Safari's location), optionally `~/Applications`, and any app you drop on it.
+The Lookup section needs no Jamf permissions and no macOS privacy permission: the app is not sandboxed and reads `/Applications`, `/System/Applications`, `/System/Cryptexes/App/System/Applications`, optionally `~/Applications`, and any app you drop on it.
+
+![A local app inspection showing per-slice signing details](docs/screenshot-localapps.png)
 
 ## Getting started
 
-1. Open **Settings** (⌘,), add a connection, enter the region, **Environment ID**, **Client ID** and **Client Secret**, and click **Test Connection**. The API has no endpoint to look up the Environment ID, so you enter it yourself.
+1. Open **Settings** (⌘,), add a connection with the region, **Environment ID**, **Client ID** and **Client Secret**, and click **Test Connection**. The API has no endpoint to look up the Environment ID, so you enter it yourself.
 2. Collect identifiers under **Lookup** and add them to the rule set.
-3. Build the rules under **Rule Set**: the "iOS / iPadOS: Apps", "macOS: Binaries" and "Privacy: Permission Defaults" tabs. The JSON preview shows the declarations that will be written.
-4. Click **Write to Jamf…**, choose a new or an existing Blueprint, review the diff and write it.
+3. Build the rules in the **Editor**; the JSON preview shows the declarations that will be written.
+4. Click **Write to Jamf…**, choose a new or an existing Blueprint, review the diff and write.
 5. Deploy from the write sheet or from **Jamf → Blueprints → Deploy…**.
 
-On macOS, Apple only accepts the binary rules in the system channel and Privacy in the user channel, so a macOS rule set is written as up to two declarations in the same component: a SYSTEM declaration with the binaries and a USER declaration with the permission defaults. A rule set that uses only one side gets only that declaration.
+On macOS, Apple accepts binary rules only in the system channel and Privacy only in the user channel, so a macOS rule set is written as up to two declarations in the same component.
 
 ## Saving safely
 
-The Blueprints API applies updates as a JSON merge-patch, which replaces arrays wholesale. A careless write could therefore delete parts of a Blueprint. The app guards against this:
+The Blueprints API applies updates as a JSON merge-patch, which replaces arrays wholesale, so a careless write could delete parts of a Blueprint. The app guards against this:
 
-- **Nothing outside the App Settings component changes.** Every write sends the complete `steps` array, with every other step and component exactly as it was received: key order and number formatting are preserved, not re-canonicalised.
-- **Concurrent changes are caught.** The Blueprint is fetched again before the review and once more just before the PATCH. If it changed on the server, nothing is written.
-- **Every write is backed up first.** The full Blueprint is written to `~/Library/Application Support/AppSettings2Blueprint/Backups/<blueprint ID>/`, and **Backups…** puts a backup's steps back. Backups are never overwritten.
-- **Every write is verified.** The app reads the Blueprint back and compares the App Settings component and every other component with what it sent.
-- **Division-locked Blueprints are left alone.** `divisionId` is never sent, and Blueprints assigned to a division are read-only.
-- **Writing never deploys.** Deploying needs a confirmation that shows the Blueprint, its device groups and the device count. A macOS allow list without `AlwaysAllowManagedApps` or the Apple-signed baseline needs a second confirmation.
-- **The HTTP layer refuses everything else.** Only GET, `POST /auth/token`, `POST /blueprints` (create), `PATCH /blueprints/{id}` and `POST /blueprints/{id}/deploy` reach the network. There is no DELETE and no undeploy anywhere in the app. Deploy is retried on 429 only.
+- Every write sends the complete `steps` array, with everything outside the App Settings component exactly as received — key order and number formatting preserved.
+- The Blueprint is fetched again before the review and just before the PATCH; if it changed on the server, nothing is written.
+- The full Blueprint is backed up first, to `~/Library/Application Support/AppSettings2Blueprint/Backups/<blueprint ID>/`. Backups are never overwritten and **Backups…** restores them.
+- Every write is verified against a read-back of the Blueprint.
+- `divisionId` is never sent; division-assigned Blueprints are read-only.
+- Writing never deploys. Deploying needs a confirmation listing the device groups and device count, and a second one for a macOS allow list without `AlwaysAllowManagedApps` or the Apple-signed baseline.
+- The HTTP layer refuses everything except GET, `POST /auth/token`, Blueprint create, update and deploy. No DELETE, no undeploy; deploy is retried on 429 only.
 
 ## Network
 
@@ -78,38 +70,34 @@ The app contacts only these hosts:
 
 | Host | When | What is sent |
 | --- | --- | --- |
-| `{region}.api.jamfcloud.com` | Jamf sections, and Test Connection | Your connection's credentials and the Blueprint requests above |
+| `{region}.api.jamfcloud.com` | Jamf sections, Test Connection | Your connection's credentials and the Blueprint requests above |
 | `itunes.apple.com` | App Store search | The search term, storefront and platform |
 | `uclient-api.itunes.apple.com` | App Store app details | The App Store ID and storefront |
 | `is1`–`is5-ssl.mzstatic.com` | App Store search results | Requests for app icons, from the URLs Apple returns |
-| `api.github.com` | Once a day, and on **Check for Updates…** | A request for the latest release. Turn the daily check off in **About** |
-| `github.com`, `objects.githubusercontent.com` | Only when you click **Download** in the update sheet | A request for the release zip |
+| `api.github.com` | Once a day, and on **Check for Updates…** | A request for the latest release; turn the daily check off in **About** |
+| `github.com`, `objects.githubusercontent.com` | Only on **Download** in the update sheet | A request for the release zip |
 
-Lookups never include Jamf data or credentials.
-
-## Security
-
-- **Credentials** stay on your Mac. Client secrets are stored in the keychain; the other connection settings are stored in user defaults.
-- **Request log**: kept in memory only, with tokens and secrets redacted.
-- **Backups** contain the Blueprint's JSON and no credentials. They are stored unencrypted in your user Library.
-- **No sandbox**: the app is not sandboxed so it can read apps anywhere on disk. It runs with the Hardened Runtime and is signed with a Developer ID and notarized.
+Lookups never include Jamf data or credentials. Client secrets are stored in the keychain; the request log is kept in memory with secrets redacted; backups contain only Blueprint JSON. The app runs with the Hardened Runtime and is Developer ID signed and notarized.
 
 ## Known limitations
 
-- **A Blueprint needs a scope before it can be changed.** The Platform API rejects a PATCH to a Blueprint without device groups (400 NotBlank: scopeId), even one that only sends steps. The app refuses such writes before backing up or sending anything; add a device group in Jamf first.
-- **Not Deployed versus Out of Date.** After a write, a Blueprint that has never been deployed stays *Not Deployed*. *Out of Date* only appears for a Blueprint that has been deployed before.
-- **Embedded helpers are not inspected.** The local scan stops at the first `.app` bundle, as App Settings Utility does, so helpers, XPC services and login items inside an app are not listed. Drop them on the app to inspect them one by one.
-- **Shared iPad is not supported.** On Shared iPad the declaration uses the USER channel; the app writes iOS and iPadOS rule sets to the SYSTEM channel only.
-- **Undo is per keystroke** in text fields.
-- **The App Store detail endpoint is undocumented.** `uclient-api.itunes.apple.com` may change without notice. Search still works without it; only the extra details are missing.
-- **The Blueprints API is in beta.** Its behaviour can change; the app's verification step reports any difference between what it sent and what the server returned.
+- **A Blueprint needs a scope before it can be changed.** The API rejects a PATCH to a Blueprint without device groups, even one that only sends steps. The app refuses such writes before sending anything; add a device group in Jamf first.
+- **Not Deployed versus Out of Date.** After a write, a never-deployed Blueprint stays *Not Deployed*; *Out of Date* only appears once it has been deployed.
+- **Embedded helpers are not inspected.** The local scan stops at the first `.app` bundle; drop helpers, XPC services or login items on the app to inspect them individually.
+- **Shared iPad is not supported.** On Shared iPad the declaration uses the USER channel; iOS and iPadOS rule sets are written to the SYSTEM channel only.
 
 ## Building
 
-Open `AppSettings2Blueprint.xcodeproj` in Xcode 27 or later and build the `AppSettings2Blueprint` scheme (⌘R). The app has no dependencies and uses only Apple frameworks.
+Open `AppSettings2Blueprint.xcodeproj` in Xcode 27 or later and build the `AppSettings2Blueprint` scheme (⌘R). No dependencies; Apple frameworks only. Unit tests (Swift Testing) run with ⌘U; UI tests with `Scripts/run-ui-tests.sh`, which writes a failing test's UI hierarchy to `/tmp/as2b-uidump.txt` and exports screenshots to `/tmp/as2b-uitest-attachments`.
 
-- **Unit tests** (Swift Testing): ⌘U, or the `AppSettings2Blueprint` scheme's test action.
-- **UI tests** (XCUITest): `Scripts/run-ui-tests.sh`. It builds into a throwaway DerivedData folder, writes the UI hierarchy of a failing test to `/tmp/as2b-uidump.txt`, and exports the run's screenshots to `/tmp/as2b-uitest-attachments`.
+## Credits
+
+Identifier discovery is based on Anthony Darlow's **App Settings Utility**:
+
+- Repository: [cantscript/AppSettingsUtility](https://github.com/cantscript/AppSettingsUtility)
+- Blog post: [Stop Hunting for Bundle IDs & CDHashes](https://cantscript.com/posts/stop-hunting-for-bundle-ids--cdhashes/)
+
+The App Store endpoints, the SigningState requirement strings, the composed-identifier format, the scan folders, the CSV columns and the embedded Apple app list come from his script. [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) lists what was ported and carries his MIT licence, also shown in **About → Acknowledgements**.
 
 ## Support
 
