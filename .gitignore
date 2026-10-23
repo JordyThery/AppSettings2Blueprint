@@ -1,0 +1,6 @@
+# Local screenshots of API credentials
+Platform API - *.png
+
+# Per-user Xcode state
+xcuserdata/
+.DS_Store
