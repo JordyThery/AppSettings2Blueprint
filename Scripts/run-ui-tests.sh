@@ -25,12 +25,12 @@ if (( STATUS != 0 )); then
     # The failing test's accessibility tree, printed by the test case's tearDown.
     sed -n '/UIDUMP-BEGIN/,/UIDUMP-END/p' "$WORK/test.log" | head -400 > "$WORK/uidump.txt"
     if [[ -s "$WORK/uidump.txt" ]]; then cp "$WORK/uidump.txt" /tmp/as2b-uidump.txt; echo "UI tree of the failure: /tmp/as2b-uidump.txt"; fi
-    # Failure screenshots are attachments in the result bundle.
-    RESULT="$(ls -td "$WORK"/DerivedData/Logs/Test/*.xcresult 2>/dev/null | head -1)"
-    if [[ -n "$RESULT" ]]; then
-        rm -rf /tmp/as2b-uitest-attachments
-        xcrun xcresulttool export attachments --path "$RESULT" --output-path /tmp/as2b-uitest-attachments >/dev/null 2>&1 \
-            && echo "Failure screenshots: /tmp/as2b-uitest-attachments"
-    fi
+fi
+# Screenshots (failures, and the ones tests keep on purpose) are attachments in the result bundle.
+RESULT="$(ls -td "$WORK"/DerivedData/Logs/Test/*.xcresult 2>/dev/null | head -1)"
+rm -rf /tmp/as2b-uitest-attachments
+if [[ -n "$RESULT" ]] && xcrun xcresulttool export attachments --path "$RESULT" --output-path /tmp/as2b-uitest-attachments >/dev/null 2>&1 \
+    && [[ -n "$(ls -A /tmp/as2b-uitest-attachments 2>/dev/null)" ]]; then
+    echo "Screenshots: /tmp/as2b-uitest-attachments"
 fi
 exit $STATUS

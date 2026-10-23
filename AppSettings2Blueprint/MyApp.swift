@@ -4,7 +4,7 @@ import SwiftUI
     @State private var model = AppModel()
 
     var body: some Scene {
-        Window("AppSettings2Blueprint", id: "main") {
+        Window("AppSettings2Blueprint", id: WindowID.main) {
             ContentView()
                 .environment(model)
                 .environment(model.updates)
@@ -19,7 +19,7 @@ import SwiftUI
         Window("About AppSettings2Blueprint", id: WindowID.about) {
             AboutView()
                 .environment(model.updates)
-                .frame(width: 560, height: 520)
+                .frame(width: 600, height: 640)
         }
         .windowResizability(.contentSize)
 
@@ -37,6 +37,7 @@ import SwiftUI
 }
 
 enum WindowID {
+    static let main = "main"
     static let about = "about"
     static let requestLog = "request-log"
 }
@@ -50,7 +51,11 @@ private struct AppCommands: Commands {
             Button("About AppSettings2Blueprint") { openWindow(id: WindowID.about) }
         }
         CommandGroup(after: .appInfo) {
-            Button("Check for Updates…") { model.updates.checkManually() }
+            Button("Check for Updates…") {
+                // The update sheet is presented on the main window.
+                openWindow(id: WindowID.main)
+                model.updates.checkManually()
+            }
         }
         CommandGroup(after: .toolbar) {
             Button("Refresh Blueprints") { model.refresh() }
