@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Top-level destinations: Lookup | Rule Set | Jamf.
-enum SidebarItem: Hashable {
+enum SidebarItem: String, Hashable {
     case appStore
     case builtInApps
     case localApps
@@ -23,13 +23,43 @@ struct SidebarView: View {
                     .tag(SidebarItem.localApps)
             }
             Section("Rule Set") {
-                Label("App Settings", systemImage: "checklist")
+                RuleSetSidebarRow()
                     .tag(SidebarItem.ruleSet)
             }
             Section("Jamf") {
                 Label("Blueprints", systemImage: "square.stack.3d.up")
                     .tag(SidebarItem.blueprints)
             }
+        }
+    }
+}
+
+/// The rule set's name, with an edited dot and an error count.
+private struct RuleSetSidebarRow: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        let document = model.ruleSet
+        let errors = document.issues.filter { $0.severity == .error }.count
+        Label {
+            HStack(spacing: 4) {
+                Text(document.ruleSet.name).lineLimit(1)
+                if document.isDirty {
+                    Circle().fill(.secondary).frame(width: 6, height: 6)
+                        .help("Unsaved changes")
+                }
+                Spacer()
+                if errors > 0 {
+                    Text("\(errors)")
+                        .font(.caption2.weight(.bold))
+                        .padding(.horizontal, 5)
+                        .background(.red.opacity(0.2), in: Capsule())
+                        .foregroundStyle(.red)
+                        .help("\(errors) error\(errors == 1 ? "" : "s")")
+                }
+            }
+        } icon: {
+            Image(systemName: "checklist")
         }
     }
 }

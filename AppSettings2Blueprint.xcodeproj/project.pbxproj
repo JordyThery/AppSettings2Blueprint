@@ -6,8 +6,19 @@
 	objectVersion = 90;
 	objects = {
 
+/* Begin PBXContainerItemProxy section */
+		08F2914D308B1A77000D598A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 000000000000000000000000 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 000000000000000100000000;
+			remoteInfo = AppSettings2Blueprint;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		000000000000000000000120 /* AppSettings2Blueprint.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AppSettings2Blueprint.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		08BC74AD308B2CFD00996D94 /* AppSettings2BlueprintUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AppSettings2BlueprintUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		08F29146308B1A77000D598A /* AppSettings2BlueprintTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AppSettings2BlueprintTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -15,6 +26,11 @@
 		000000000000000000000010 /* AppSettings2Blueprint */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = AppSettings2Blueprint;
+			sourceTree = "<group>";
+		};
+		08BC74AE308B2CFD00996D94 /* AppSettings2BlueprintUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = AppSettings2BlueprintUITests;
 			sourceTree = "<group>";
 		};
 		08F29147308B1A77000D598A /* AppSettings2BlueprintTests */ = {
@@ -26,6 +42,11 @@
 
 /* Begin PBXFrameworksBuildPhase section */
 		000000000000000130000000 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
+		08BC74AA308B2CFD00996D94 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
 			);
@@ -43,6 +64,7 @@
 			children = (
 				000000000000000000000010 /* AppSettings2Blueprint */,
 				08F29147308B1A77000D598A /* AppSettings2BlueprintTests */,
+				08BC74AE308B2CFD00996D94 /* AppSettings2BlueprintUITests */,
 				000000000000000000000020 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -52,6 +74,7 @@
 			children = (
 				000000000000000000000120 /* AppSettings2Blueprint.app */,
 				08F29146308B1A77000D598A /* AppSettings2BlueprintTests.xctest */,
+				08BC74AD308B2CFD00996D94 /* AppSettings2BlueprintUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -77,6 +100,24 @@
 			productReference = 000000000000000000000120 /* AppSettings2Blueprint.app */;
 			productType = "com.apple.product-type.application";
 		};
+		08BC74AC308B2CFD00996D94 /* AppSettings2BlueprintUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 08BC74B1308B2CFD00996D94 /* Build configuration list for PBXNativeTarget "AppSettings2BlueprintUITests" */;
+			buildPhases = (
+				08BC74A9308B2CFD00996D94 /* Sources */,
+				08BC74AA308B2CFD00996D94 /* Frameworks */,
+				08BC74AB308B2CFD00996D94 /* Resources */,
+			);
+			buildRules = (
+			);
+			fileSystemSynchronizedGroups = (
+				08BC74AE308B2CFD00996D94 /* AppSettings2BlueprintUITests */,
+			);
+			name = AppSettings2BlueprintUITests;
+			productName = AppSettings2BlueprintUITests;
+			productReference = 08BC74AD308B2CFD00996D94 /* AppSettings2BlueprintUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		08F29145308B1A77000D598A /* AppSettings2BlueprintTests */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 08F2914A308B1A77000D598A /* Build configuration list for PBXNativeTarget "AppSettings2BlueprintTests" */;
@@ -86,6 +127,9 @@
 				08F29144308B1A77000D598A /* Resources */,
 			);
 			buildRules = (
+			);
+			dependencies = (
+				08F2914E308B1A77000D598A /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				08F29147308B1A77000D598A /* AppSettings2BlueprintTests */,
@@ -108,6 +152,9 @@
 					000000000000000100000000 = {
 						CreatedOnToolsVersion = 26.3;
 					};
+					08BC74AC308B2CFD00996D94 = {
+						CreatedOnToolsVersion = 27.1;
+					};
 					08F29145308B1A77000D598A = {
 						CreatedOnToolsVersion = 27.1;
 					};
@@ -129,12 +176,18 @@
 			targets = (
 				000000000000000100000000 /* AppSettings2Blueprint */,
 				08F29145308B1A77000D598A /* AppSettings2BlueprintTests */,
+				08BC74AC308B2CFD00996D94 /* AppSettings2BlueprintUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		000000000000000140000000 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+		08BC74AB308B2CFD00996D94 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
 			);
@@ -152,12 +205,25 @@
 			files = (
 			);
 		};
+		08BC74A9308B2CFD00996D94 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
 		08F29142308B1A77000D598A /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			files = (
 			);
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		08F2914E308B1A77000D598A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 000000000000000100000000 /* AppSettings2Blueprint */;
+			targetProxy = 08F2914D308B1A77000D598A /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		000000000000000011000000 /* Debug configuration for PBXProject "AppSettings2Blueprint" */ = {
@@ -374,6 +440,48 @@
 			};
 			name = Release;
 		};
+		08BC74B2308B2CFD00996D94 /* Debug configuration for PBXNativeTarget "AppSettings2BlueprintUITests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = K3LQ9NPBMG;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = be.jordythery.appsettings2blueprint.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		08BC74B3308B2CFD00996D94 /* Release configuration for PBXNativeTarget "AppSettings2BlueprintUITests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = K3LQ9NPBMG;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = be.jordythery.appsettings2blueprint.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 		08F2914B308B1A77000D598A /* Debug configuration for PBXNativeTarget "AppSettings2BlueprintTests" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -436,6 +544,14 @@
 			buildConfigurations = (
 				000000000000000111000000 /* Debug configuration for PBXNativeTarget "AppSettings2Blueprint" */,
 				000000000000000112000000 /* Release configuration for PBXNativeTarget "AppSettings2Blueprint" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		08BC74B1308B2CFD00996D94 /* Build configuration list for PBXNativeTarget "AppSettings2BlueprintUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				08BC74B2308B2CFD00996D94 /* Debug configuration for PBXNativeTarget "AppSettings2BlueprintUITests" */,
+				08BC74B3308B2CFD00996D94 /* Release configuration for PBXNativeTarget "AppSettings2BlueprintUITests" */,
 			);
 			defaultConfigurationName = Release;
 		};

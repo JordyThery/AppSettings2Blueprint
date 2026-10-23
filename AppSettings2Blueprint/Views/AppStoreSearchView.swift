@@ -100,6 +100,7 @@ private struct ResultsTable: View {
                     .foregroundStyle(.secondary)
                 TextField("Filter by developer", text: $model.developerFilter)
                     .textFieldStyle(.plain)
+                SelectionActions()
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
@@ -115,7 +116,7 @@ private struct ResultsTable: View {
                 TableColumn("Developer") { app in Text(app.developer ?? "Unavailable") }
                     .width(min: 100, ideal: 150)
                 TableColumn("Platforms") { app in PlatformBadges(platforms: app.platformBadges) }
-                    .width(min: 90, ideal: 130)
+                    .width(min: 140, ideal: 160)
                 TableColumn("Bundle ID") { app in
                     Text(app.bundleID ?? "Unavailable")
                         .font(.body.monospaced())
@@ -125,10 +126,15 @@ private struct ResultsTable: View {
                 TableColumn("App Store ID") { app in
                     Text(String(app.appStoreID)).font(.body.monospaced())
                 }
-                .width(min: 80, ideal: 100)
+                .width(min: 100, ideal: 115)
             }
             .contextMenu(forSelectionType: AppStoreApp.ID.self) { ids in
-                let bundleIDs = model.results.filter { ids.contains($0.id) }.compactMap(\.bundleID)
+                let apps = model.results.filter { ids.contains($0.id) }
+                let bundleIDs = apps.compactMap(\.bundleID)
+                Button(bundleIDs.count > 1 ? "Add \(bundleIDs.count) Apps to Rule Set" : "Add to Rule Set") {
+                    app.ruleSet.addApps(apps.compactMap { app in app.bundleID.map { ($0, app.name) } })
+                }
+                .disabled(bundleIDs.isEmpty)
                 Button(bundleIDs.count > 1 ? "Copy \(bundleIDs.count) Bundle IDs" : "Copy Bundle ID") {
                     copy(bundleIDs.joined(separator: "\n"))
                 }
@@ -142,6 +148,38 @@ private struct ResultsTable: View {
                 }
             }
         }
+    }
+}
+
+/// Add-to-rule-set and CSV export for the selected results.
+private struct SelectionActions: View {
+    @Environment(AppModel.self) private var app
+    @State private var errorMessage: String?
+
+    var body: some View {
+        let model = app.appStore
+        let selected = model.selectedApps
+        let withBundleID = selected.filter { $0.bundleID != nil }
+        HStack(spacing: 8) {
+            Button("Add to Rule Set\(withBundleID.count > 1 ? " (\(withBundleID.count))" : "")", systemImage: "plus.circle") {
+                app.ruleSet.addApps(withBundleID.compactMap { app in app.bundleID.map { ($0, app.name) } })
+            }
+            .disabled(withBundleID.isEmpty)
+            .help("Add the selected bundle IDs to the iOS / iPadOS app list; duplicates are skipped")
+            Button("Export CSV…", systemImage: "tablecells") {
+                let rows = selected.map { app -> BundleIDLookupRow in
+                    let detail: AppStoreDetail? = if case .loaded(let detail) = model.detailState(for: app) { detail } else { nil }
+                    return BundleIDLookupRow(app: app, detail: detail)
+                }
+                do { try CSVExport.save(.bundleIDLookup(rows)) } catch { errorMessage = error.localizedDescription }
+            }
+            .disabled(selected.isEmpty)
+            .help("Save the selected results as an App Settings Utility BundleID-Lookup CSV")
+        }
+        .controlSize(.small)
+        .alert("Couldn't Export", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
+            Button("OK") { errorMessage = nil }
+        } message: { Text(errorMessage ?? "") }
     }
 }
 
@@ -192,6 +230,11 @@ private struct AppStoreDetailPane: View {
                             .font(.title3.weight(.semibold))
                             .textSelection(.enabled)
                         PlatformBadges(platforms: app.platformBadges)
+                    }
+                }
+                if let bundleID = app.bundleID {
+                    Button("Add to Rule Set", systemImage: "plus.circle") {
+                        model.ruleSet.addApps([(bundleID, app.name)])
                     }
                 }
                 CompactValueRow(label: "Bundle ID", value: app.bundleID, copyable: true)
@@ -284,6 +327,7 @@ struct PlatformBadges: View {
             ForEach(platforms) { platform in
                 Text(platform.shortName)
                     .font(.caption2.weight(.semibold))
+                    .fixedSize()
                     .padding(.horizontal, 5)
                     .padding(.vertical, 1)
                     .background(.tint.opacity(0.15), in: Capsule())

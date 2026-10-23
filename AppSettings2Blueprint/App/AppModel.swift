@@ -18,6 +18,7 @@ final class AppModel {
     let updates: UpdateChecker
     let localApps = LocalAppsModel()
     let appStore = AppStoreModel()
+    let ruleSet = RuleSetDocument()
     let builtInApps: Result<AppleBuiltInApps, Error> = Result { try AppleBuiltInApps.load() }
 
     private(set) var overviews: [BlueprintOverview] = []

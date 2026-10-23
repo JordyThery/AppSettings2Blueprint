@@ -6,7 +6,11 @@ struct ContentView: View {
     @Environment(AppModel.self) private var model
     @Environment(UpdateChecker.self) private var updates
     @Environment(\.openWindow) private var openWindow
-    @State private var selection: SidebarItem? = .blueprints
+    @Environment(\.undoManager) private var undoManager
+    /// Restored from the last launch once; changes are saved as they happen.
+    @State private var selection: SidebarItem? = UserDefaults.standard.string(forKey: ContentView.selectionKey)
+        .flatMap(SidebarItem.init(rawValue:)) ?? .blueprints
+    private static let selectionKey = "sidebarSelection"
     @State private var isShowingFetchByID = false
 
     var body: some View {
@@ -16,6 +20,9 @@ struct ContentView: View {
                 .navigationSplitViewColumnWidth(min: 200, ideal: 220)
         } detail: {
             detail
+                .overlay(alignment: .bottom) {
+                    RuleSetStatusToast(selection: $selection)
+                }
         }
         .navigationTitle("AppSettings2Blueprint")
         .toolbar {
@@ -59,6 +66,11 @@ struct ContentView: View {
             model.connectionDidChange()
             if selection == .blueprints && model.profileStore.selectedProfile != nil { model.refresh() }
         }
+        // Rule set edits from any view share the window's undo history.
+        .onAppear { model.ruleSet.undoManager = undoManager }
+        .onChange(of: undoManager) { model.ruleSet.undoManager = undoManager }
+        .onChange(of: selection) { UserDefaults.standard.set(selection?.rawValue, forKey: Self.selectionKey) }
+        .background(WindowEditedMarker(isEdited: model.ruleSet.isDirty))
     }
 
     @ViewBuilder
@@ -73,21 +85,65 @@ struct ContentView: View {
         case .localApps:
             LocalAppsView()
         case .ruleSet:
-            ComingLaterView(title: "Rule Set", systemImage: "checklist", milestone: 4)
+            RuleBuilderView()
         case nil:
             ContentUnavailableView("Select an Item", systemImage: "sidebar.left")
         }
     }
 }
 
-/// Placeholder for destinations built in a later milestone.
-private struct ComingLaterView: View {
-    let title: String
-    let systemImage: String
-    let milestone: Int
+/// Sets the window's "edited" dot in the close button.
+private struct WindowEditedMarker: NSViewRepresentable {
+    let isEdited: Bool
+
+    func makeNSView(context: Context) -> NSView { NSView() }
+
+    func updateNSView(_ view: NSView, context: Context) {
+        let edited = isEdited
+        DispatchQueue.main.async {
+            view.window?.isDocumentEdited = edited
+        }
+    }
+}
+
+/// A short confirmation after something was added to the rule set from a lookup,
+/// with a shortcut to the editor.
+private struct RuleSetStatusToast: View {
+    @Environment(AppModel.self) private var model
+    @Binding var selection: SidebarItem?
 
     var body: some View {
-        ContentUnavailableView(title, systemImage: systemImage, description: Text("Arrives in milestone \(milestone)."))
+        if let message = model.ruleSet.statusMessage {
+            HStack(spacing: 10) {
+                Image(systemName: "checklist")
+                Text(message)
+                    .lineLimit(2)
+                if selection != .ruleSet {
+                    Button("Show Rule Set") {
+                        selection = .ruleSet
+                        model.ruleSet.statusMessage = nil
+                    }
+                }
+                Button {
+                    model.ruleSet.statusMessage = nil
+                } label: {
+                    Image(systemName: "xmark")
+                }
+                .buttonStyle(.borderless)
+            }
+            .font(.callout)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(.regularMaterial, in: Capsule())
+            .shadow(radius: 4, y: 2)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("ruleSetStatus")
+            .padding(.bottom, 16)
+            .task(id: message) {
+                try? await Task.sleep(for: .seconds(6))
+                if model.ruleSet.statusMessage == message { model.ruleSet.statusMessage = nil }
+            }
+        }
     }
 }
 

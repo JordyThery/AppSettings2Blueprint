@@ -29,6 +29,8 @@ struct InspectorView: View {
 private struct InspectionDetail: View {
     @Environment(AppModel.self) private var app
     let inspection: InspectedBinary
+    @State private var addingToAllowList: Bool?
+    @State private var errorMessage: String?
 
     var body: some View {
         @Bindable var model = app.localApps
@@ -36,6 +38,7 @@ private struct InspectionDetail: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 header
+                actions
 
                 GroupBox {
                     VStack(alignment: .leading, spacing: 8) {
@@ -83,6 +86,43 @@ private struct InspectionDetail: View {
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+    }
+
+    /// Adds this app to the rule set, or exports it in App Settings Utility's layout.
+    private var actions: some View {
+        HStack(spacing: 8) {
+            Button("Add to AllowedBinaries…", systemImage: "checkmark.shield") { addingToAllowList = true }
+            Button("Add to DeniedBinaries…", systemImage: "nosign") { addingToAllowList = false }
+            Button("Add Permission Defaults", systemImage: "hand.raised") {
+                if let identifier = inspection.composedIdentifier {
+                    app.ruleSet.addPermissionDefault(identifier: identifier, name: inspection.name, platform: .macOS)
+                }
+            }
+            .disabled(inspection.composedIdentifier == nil)
+            .help(inspection.composedIdentifier == nil
+                  ? "Needs a bundle ID and a designated requirement to build the composed identifier"
+                  : "Add a Privacy.PermissionDefaults entry keyed by the composed identifier")
+            Spacer()
+            Button("Export CSV…", systemImage: "tablecells") {
+                do { try CSVExport.save(.localMacApps(LocalMacAppRow.rows(for: inspection))) } catch { errorMessage = error.localizedDescription }
+            }
+            .help("Save every slice as an App Settings Utility Local-Mac-Apps CSV")
+        }
+        .controlSize(.small)
+        .sheet(item: Binding(
+            get: { addingToAllowList.map { AddTarget(toAllowList: $0) } },
+            set: { addingToAllowList = $0?.toAllowList }
+        )) { target in
+            AddBinaryRuleSheet(binary: inspection, toAllowList: target.toAllowList)
+        }
+        .alert("Couldn't Export", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
+            Button("OK") { errorMessage = nil }
+        } message: { Text(errorMessage ?? "") }
+    }
+
+    private struct AddTarget: Identifiable {
+        let toAllowList: Bool
+        var id: Bool { toAllowList }
     }
 
     private var header: some View {

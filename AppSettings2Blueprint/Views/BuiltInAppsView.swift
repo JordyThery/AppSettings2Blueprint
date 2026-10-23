@@ -13,6 +13,7 @@ struct BuiltInAppsView: View {
     @State private var choice: ListChoice = .builtIn
     @State private var searchText = ""
     @State private var selection: Set<AppleBuiltInApps.App.ID> = []
+    @State private var errorMessage: String?
 
     var body: some View {
         switch model.builtInApps {
@@ -44,10 +45,21 @@ struct BuiltInAppsView: View {
                 Text("\(source.count) apps")
                     .foregroundStyle(.secondary)
                 Spacer()
+                Button("Add to Rule Set", systemImage: "plus.circle") {
+                    model.ruleSet.addApps(apps.filter { selection.contains($0.id) }.map { ($0.bundleId, $0.name) })
+                }
+                .disabled(selection.isEmpty)
+                .help("Add the selected bundle IDs to the iOS / iPadOS app list; duplicates are skipped")
                 Button("Copy Bundle IDs", systemImage: "doc.on.doc") {
                     copy(apps.filter { selection.contains($0.id) }.map(\.bundleId))
                 }
                 .disabled(selection.isEmpty)
+                Button("Export CSV…", systemImage: "tablecells") {
+                    let rows = list.apps.filter { selection.contains($0.id) }.map(BundleIDLookupRow.init(appleApp:))
+                    do { try CSVExport.save(.bundleIDLookup(rows)) } catch { errorMessage = error.localizedDescription }
+                }
+                .disabled(selection.isEmpty)
+                .help("Save the selected apps as an App Settings Utility BundleID-Lookup CSV")
             }
             .padding(10)
             Divider()
@@ -74,6 +86,9 @@ struct BuiltInAppsView: View {
                 .width(60)
             }
             .contextMenu(forSelectionType: AppleBuiltInApps.App.ID.self) { ids in
+                Button(ids.count > 1 ? "Add \(ids.count) Apps to Rule Set" : "Add to Rule Set") {
+                    model.ruleSet.addApps(apps.filter { ids.contains($0.id) }.map { ($0.bundleId, $0.name) })
+                }
                 Button(ids.count > 1 ? "Copy \(ids.count) Bundle IDs" : "Copy Bundle ID") {
                     copy(apps.filter { ids.contains($0.id) }.map(\.bundleId))
                 }
@@ -87,6 +102,9 @@ struct BuiltInAppsView: View {
         }
         .searchable(text: $searchText, placement: .toolbar, prompt: "Filter Apple apps")
         .onChange(of: choice) { selection = [] }
+        .alert("Couldn't Export", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
+            Button("OK") { errorMessage = nil }
+        } message: { Text(errorMessage ?? "") }
     }
 
     private func copy(_ bundleIDs: [String]) {

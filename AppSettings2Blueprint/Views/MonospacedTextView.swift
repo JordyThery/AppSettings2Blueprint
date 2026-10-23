@@ -5,6 +5,8 @@ import SwiftUI
 /// multi-megabyte JSON more efficiently than a SwiftUI `Text`.
 struct MonospacedTextView: NSViewRepresentable {
     let text: String
+    /// Set on the underlying NSTextView so UI tests can read its contents.
+    var accessibilityIdentifier: String?
 
     func makeNSView(context: Context) -> NSScrollView {
         let scrollView = NSTextView.scrollableTextView()
@@ -22,6 +24,7 @@ struct MonospacedTextView: NSViewRepresentable {
         textView.isHorizontallyResizable = false
         textView.textContainer?.widthTracksTextView = true
         textView.string = text
+        if let accessibilityIdentifier { textView.setAccessibilityIdentifier(accessibilityIdentifier) }
         return scrollView
     }
 
