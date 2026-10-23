@@ -135,13 +135,17 @@ nonisolated struct BlueprintService: Sendable {
         )
     }
 
-    /// GET /v1/blueprints/{id}/report, kept as raw JSON.
-    func report(id: String) async throws -> JSONValue {
-        let response = try await client.send(method: "GET", path: "\(basePath)/\(Self.escape(id))/report")
+    /// GET /v1/blueprints/{id}/report. Returns nil while no report exists (404).
+    func report(id: String) async throws -> BlueprintStatusReport? {
         do {
-            return try JSONValue(data: response.data)
-        } catch {
-            throw APIError.invalidResponse("The status report is not valid JSON: \(error.localizedDescription)")
+            let response = try await client.send(method: "GET", path: "\(basePath)/\(Self.escape(id))/report")
+            guard let json = try? JSONValue(data: response.data) else {
+                throw APIError.invalidResponse("The status report is not valid JSON.")
+            }
+            return BlueprintStatusReport(json: json)
+        } catch let error as APIError {
+            if case .http(404, _, _) = error { return nil }
+            throw error
         }
     }
 

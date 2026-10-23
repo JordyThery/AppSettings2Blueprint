@@ -39,6 +39,27 @@ nonisolated struct DeploymentState: Hashable, Sendable {
     }
 }
 
+/// `GET /blueprints/v1/blueprints/{id}/report`: device counts per state.
+nonisolated struct BlueprintStatusReport: Hashable, Sendable {
+    var succeeded: Int
+    var failed: Int
+    var pending: Int
+
+    var total: Int { succeeded + failed + pending }
+
+    init(succeeded: Int, failed: Int, pending: Int) {
+        self.succeeded = succeeded
+        self.failed = failed
+        self.pending = pending
+    }
+
+    init(json: JSONValue) {
+        succeeded = json["succeeded"]?.numberValue?.intValue ?? 0
+        failed = json["failed"]?.numberValue?.intValue ?? 0
+        pending = json["pending"]?.numberValue?.intValue ?? 0
+    }
+}
+
 /// Fields shared by the list overview and the detail response. Parsed leniently:
 /// only `id` is required.
 nonisolated struct BlueprintOverview: Identifiable, Hashable, Sendable {

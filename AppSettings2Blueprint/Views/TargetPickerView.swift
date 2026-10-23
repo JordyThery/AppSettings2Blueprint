@@ -5,6 +5,8 @@ import SwiftUI
 struct TargetPickerView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var model: JamfWriteModel
+    /// Set when "Deploy…" is chosen after a successful write.
+    @State private var deployModel: DeployModel?
 
     init(app: AppModel) {
         _model = State(initialValue: JamfWriteModel(app: app))
@@ -12,6 +14,12 @@ struct TargetPickerView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            if let deployModel {
+                DeployFlowView(model: deployModel, close: {
+                    deployModel.stopWatching()
+                    dismiss()
+                })
+            } else {
             switch model.phase {
             case .choosing:
                 ChooseTargetView(model: model, cancel: { dismiss() })
@@ -24,9 +32,12 @@ struct TargetPickerView: View {
             case .writing:
                 ProgressPane(text: "Writing to Jamf and reading the blueprint back…")
             case .done(let result):
-                WriteResultView(result: result, done: { dismiss() })
+                WriteResultView(result: result, done: { dismiss() }, deploy: {
+                    deployModel = DeployModel(app: model.app, detail: result.detail)
+                })
             case .failed(let message):
                 FailureView(message: message, back: { model.backToChoosing() }, cancel: { dismiss() })
+            }
             }
         }
         .frame(width: 820, height: 620)
@@ -286,6 +297,7 @@ private struct ProgressPane: View {
 private struct WriteResultView: View {
     let result: WriteResult
     let done: () -> Void
+    let deploy: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -314,6 +326,9 @@ private struct WriteResultView: View {
             HStack {
                 Text(result.detail.id).font(.caption.monospaced()).foregroundStyle(.tertiary).textSelection(.enabled)
                 Spacer()
+                Button("Deploy…", action: deploy)
+                    .disabled(result.detail.scopeDeviceGroups.isEmpty)
+                    .help("Deploy the blueprint to its scope, after a confirmation")
                 Button("Done", action: done).keyboardShortcut(.defaultAction)
             }
         }

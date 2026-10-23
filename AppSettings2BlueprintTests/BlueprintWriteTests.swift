@@ -333,3 +333,130 @@ struct BackupStoreTests {
         #expect(first.deletingLastPathComponent().lastPathComponent == detail.id)
     }
 }
+
+extension MockNetworkTests {
+    @Suite("Deployment")
+    struct DeploymentTests {
+        private static let id = "0a1b2c3d-4444-4444-8444-0123456789ab"
+        private static let path = "/blueprints/v1/blueprints/\(id)"
+        private static let token = MockResponse.json(200, #"{"access_token":"tok","expires_in":900}"#)
+        private static let previousStart = "2026-10-02T09:30:00.111111Z"
+
+        private func blueprint(state: String, started: String, job: String) -> String {
+            appSettingsBlueprintJSON.replacingOccurrences(
+                of: #""deploymentState":{"state":"DEPLOYED","lastDeployment":{"started":"2026-10-02T09:30:00.111111Z","state":"SUCCEEDED"}}"#,
+                with: #""deploymentState":{"state":"\#(state)","lastDeployment":{"started":"\#(started)","state":"\#(job)"}}"#
+            )
+        }
+
+        private func makeMonitor(maxPolls: Int = 10) -> DeploymentMonitor {
+            let client = PlatformAPIClient(
+                credentials: PlatformCredentials(region: .eu, environmentID: "env", clientID: "id", clientSecret: "secret"),
+                session: MockURLProtocol.makeSession(), sleep: { _ in }, log: { _ in }
+            )
+            var monitor = DeploymentMonitor(service: BlueprintService(client: client))
+            monitor.sleep = { _ in }
+            monitor.maxPolls = maxPolls
+            return monitor
+        }
+
+        @Test func followsTheNewDeploymentUntilItSucceeds() async throws {
+            let gets = Counter()
+            MockURLProtocol.install { request in
+                if request.path == "/auth/token" { return Self.token }
+                switch (request.method, request.path) {
+                case ("POST", Self.path + "/deploy"):
+                    return MockResponse(status: 202, body: Data())
+                case ("GET", Self.path + "/report"):
+                    return .json(200, #"{"succeeded":0,"failed":0,"pending":0}"#)
+                case ("GET", Self.path):
+                    switch gets.next() {
+                    // The previous deployment is still the latest at first: not the one we started.
+                    case 1: return .json(200, appSettingsBlueprintJSON)
+                    case 2: return .json(200, blueprint(state: "DEPLOYED", started: "2026-10-23T09:00:00Z", job: "DEPLOYING"))
+                    default: return .json(200, blueprint(state: "DEPLOYED", started: "2026-10-23T09:00:00Z", job: "SUCCEEDED"))
+                    }
+                default:
+                    return .json(404, "{}")
+                }
+            }
+            let monitor = makeMonitor()
+            let detail = try BlueprintDetail(data: Data(appSettingsBlueprintJSON.utf8))
+            let previous = try await monitor.deploy(detail)
+            #expect(previous == Self.previousStart)
+            let updates = StatusRecorder()
+            let final = try await monitor.watch(id: Self.id, previousStart: previous) { updates.record($0) }
+            #expect(final.didSucceed)
+            #expect(final.jobStarted == "2026-10-23T09:00:00Z")
+            #expect(final.report == BlueprintStatusReport(succeeded: 0, failed: 0, pending: 0))
+            #expect(updates.jobStates == [nil, "DEPLOYING", "SUCCEEDED"])
+            let posts = MockURLProtocol.requests.filter { $0.method == "POST" && $0.path != "/auth/token" }
+            #expect(posts.map(\.path) == [Self.path + "/deploy"])
+        }
+
+        @Test func stopsPollingAtTheLimit() async throws {
+            MockURLProtocol.install { request in
+                if request.path == "/auth/token" { return Self.token }
+                if request.path.hasSuffix("/report") { return .json(404, #"{"httpStatus":404,"errors":[]}"#) }
+                return .json(200, blueprint(state: "DEPLOYED", started: "2026-10-23T09:00:00Z", job: "PENDING"))
+            }
+            let final = try await makeMonitor(maxPolls: 3).watch(id: Self.id, previousStart: Self.previousStart) { _ in }
+            #expect(!final.isFinished)
+            #expect(final.jobState == "PENDING")
+            #expect(final.report == nil, "A 404 report means no report yet")
+            let detailGets = MockURLProtocol.requests.filter { $0.method == "GET" && $0.path == Self.path }
+            #expect(detailGets.count == 3)
+        }
+
+        @Test func invalidBlueprintIsReportedNotRetried() async {
+            MockURLProtocol.install { request in
+                if request.path == "/auth/token" { return Self.token }
+                return .json(409, #"{"httpStatus":409,"errors":[{"code":"INVALID_BLUEPRINT","description":"Not valid for deployment"}]}"#)
+            }
+            let detail = try! BlueprintDetail(data: Data(appSettingsBlueprintJSON.utf8))
+            await #expect(throws: APIError.self) { try await makeMonitor().deploy(detail) }
+            let posts = MockURLProtocol.requests.filter { $0.method == "POST" && $0.path != "/auth/token" }
+            #expect(posts.count == 1)
+        }
+    }
+}
+
+@Suite("Deploy confirmation")
+@MainActor
+struct DeployModelTests {
+    private func detail(declarations: String) throws -> BlueprintDetail {
+        try BlueprintDetail(data: Data(#"{"id":"b1","name":"Mac apps","scope":{"deviceGroups":["g1"]},"deploymentState":{"state":"NOT_DEPLOYED"},"steps":[{"name":"S","components":[{"identifier":"com.jamf.ddm-strict","configuration":{"declarations":\#(declarations)}}]}]}"#.utf8))
+    }
+
+    @Test func allowListWithoutBaselineNeedsASecondConfirmation() throws {
+        let model = DeployModel(app: AppModel(), detail: try detail(declarations: #"[{"kind":"CONFIGURATION","type":"com.apple.configuration.app.settings","payload":{"Allowed":{"AllowedBinaries":[{"TeamID":"UBF8T346G9"}]}},"channelType":"SYSTEM"}]"#))
+        #expect(model.allowListWarnings.count == 1)
+        model.isConfirmed = true
+        #expect(model.blockingReason != nil)
+        model.acknowledgesAllowListRisk = true
+        #expect(model.blockingReason == nil)
+    }
+
+    @Test func baselinePresentNeedsNoWarning() throws {
+        let model = DeployModel(app: AppModel(), detail: try detail(declarations: #"[{"kind":"CONFIGURATION","type":"com.apple.configuration.app.settings","payload":{"Allowed":{"AllowedBinaries":[{"TeamID":"*APPLE*","SigningState":"Apple"},{"TeamID":"UBF8T346G9"}],"AlwaysAllowManagedApps":true}},"channelType":"SYSTEM"}]"#))
+        #expect(model.allowListWarnings.isEmpty)
+        #expect(model.blockingReason != nil, "Nothing deploys before the confirmation is ticked")
+        model.isConfirmed = true
+        #expect(model.blockingReason == nil)
+    }
+
+    @Test func unscopedBlueprintCannotBeDeployed() throws {
+        let unscoped = try BlueprintDetail(data: Data(#"{"id":"b2","name":"n","scope":null,"steps":[]}"#.utf8))
+        let model = DeployModel(app: AppModel(), detail: unscoped)
+        model.isConfirmed = true
+        #expect(model.blockingReason?.contains("no device groups") == true)
+    }
+}
+
+/// Records deployment updates from the monitor.
+private final class StatusRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var statuses: [DeploymentStatus] = []
+    func record(_ status: DeploymentStatus) { lock.withLock { statuses.append(status) } }
+    var jobStates: [String?] { lock.withLock { statuses.map(\.jobState) } }
+}

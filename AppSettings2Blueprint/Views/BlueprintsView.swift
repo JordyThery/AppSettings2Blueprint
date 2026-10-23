@@ -110,6 +110,7 @@ private struct BlueprintDetailPane: View {
     @Environment(AppModel.self) private var model
     let blueprintID: String
     @State private var isShowingBackups = false
+    @State private var isDeploying = false
 
     var body: some View {
         if let detail = model.details[blueprintID] {
@@ -120,6 +121,9 @@ private struct BlueprintDetailPane: View {
                         .disabled(model.loadingDetailIDs.contains(blueprintID))
                     Button("Backups…", systemImage: "clock.arrow.circlepath") { isShowingBackups = true }
                         .help("Backups written before each change; restore one")
+                    Button("Deploy…", systemImage: "paperplane") { isDeploying = true }
+                        .help(detail.scopeDeviceGroups.isEmpty ? "The blueprint has no device groups in scope" : "Deploy this blueprint to its scope, after a confirmation")
+                        .disabled(detail.scopeDeviceGroups.isEmpty)
                 }
                 .padding(10)
                 AppSettingsSummary(detail: detail)
@@ -130,6 +134,9 @@ private struct BlueprintDetailPane: View {
             }
             .sheet(isPresented: $isShowingBackups) {
                 RestoreBackupSheet(detail: detail)
+            }
+            .sheet(isPresented: $isDeploying) {
+                DeployConfirmationSheet(app: model, detail: detail)
             }
         } else if let error = model.detailErrors[blueprintID] {
             ContentUnavailableView {
