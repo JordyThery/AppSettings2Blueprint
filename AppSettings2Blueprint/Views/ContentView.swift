@@ -71,7 +71,7 @@ struct ContentView: View {
         case .builtInApps:
             ComingLaterView(title: "Apple Built-in Apps", systemImage: "apple.logo", milestone: 3)
         case .localApps:
-            ComingLaterView(title: "Local Mac Apps", systemImage: "macwindow", milestone: 2)
+            LocalAppsView()
         case .ruleSet:
             ComingLaterView(title: "Rule Set", systemImage: "checklist", milestone: 4)
         case nil:
