@@ -5,6 +5,7 @@ import JTKit
 extension AboutConfiguration {
     static let appSettings2Blueprint = AboutConfiguration(
         appName: "AppSettings2Blueprint",
+        copyright: AboutCopyright(year: "2026", holder: "Jordy Thery"),
         author: "Created by Jordy Thery",
         summary: "Finds app identifiers, builds com.apple.configuration.app.settings rules and writes them to a Jamf Blueprint.",
         links: [

@@ -33,4 +33,9 @@ struct AcknowledgementsTests {
         #expect(Acknowledgement.appSettingsUtility.heading == "App Settings Utility by Anthony Darlow")
         #expect(about.links.map(\.url.absoluteString) == ["https://github.com/JordyThery/AppSettings2Blueprint"])
     }
+
+    /// The line JTKit writes; it matches what NSHumanReadableCopyright said before 0.4.1.
+    @Test func aboutShowsTheCopyrightLine() {
+        #expect(AboutConfiguration.appSettings2Blueprint.copyright?.text == "© 2026 Jordy Thery. Released under the MIT License.")
+    }
 }
