@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- About and Acknowledgements now come from JTKit, shared with Jordy's other apps. About opens only from the app menu and is no longer listed in the Window menu.
+- The "Check for updates daily" switch moved from About to **Settings › Updates**; your choice is kept. **Check for Updates…** stays in the app menu.
+
 ## 1.1
 
 - **Edit Scope** for Jamf Pro: change an existing Blueprint's device groups. Only the scope is sent, after a concurrency check and a backup, and the read-back is verified. Removing groups from a deployed Blueprint needs an extra confirmation. Also the way to scope an unscoped Blueprint before writing to it.

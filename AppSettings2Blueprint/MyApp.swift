@@ -17,12 +17,7 @@ import SwiftUI
             AppCommands(model: model)
         }
 
-        Window("About AppSettings2Blueprint", id: WindowID.about) {
-            AboutView()
-                .environment(model.updates)
-                .frame(width: 600, height: 640)
-        }
-        .windowResizability(.contentSize)
+        AboutWindow(configuration: .appSettings2Blueprint)
 
         Window("Request Log", id: WindowID.requestLog) {
             RequestLogView()
@@ -33,13 +28,13 @@ import SwiftUI
         Settings {
             SettingsView()
                 .environment(model)
+                .environment(model.updates)
         }
     }
 }
 
 enum WindowID {
     static let main = "main"
-    static let about = "about"
     static let requestLog = "request-log"
 }
 
@@ -48,15 +43,10 @@ private struct AppCommands: Commands {
     @Environment(\.openWindow) private var openWindow
 
     var body: some Commands {
-        CommandGroup(replacing: .appInfo) {
-            Button("About AppSettings2Blueprint") { openWindow(id: WindowID.about) }
-        }
-        CommandGroup(after: .appInfo) {
-            Button("Check for Updates…") {
-                // The update sheet is presented on the main window.
-                openWindow(id: WindowID.main)
-                model.updates.checkManually()
-            }
+        AppInfoCommands(appName: "AppSettings2Blueprint") {
+            // The update sheet is presented on the main window.
+            openWindow(id: WindowID.main)
+            model.updates.checkManually()
         }
         CommandGroup(after: .toolbar) {
             Button("Refresh Blueprints") { model.refresh() }

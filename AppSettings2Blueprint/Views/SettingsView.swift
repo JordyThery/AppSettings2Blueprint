@@ -1,10 +1,21 @@
+import JTKit
 import SwiftUI
 
-/// The Settings window: saved Jamf Platform API connections.
-/// Update preferences live in About, as in Profile2Blueprint.
+/// The Settings window: saved Jamf Platform API connections and the daily update check.
 struct SettingsView: View {
     var body: some View {
-        ConnectionsSettingsView()
+        TabView {
+            Tab("Connections", systemImage: "network") {
+                ConnectionsSettingsView()
+            }
+            Tab("Updates", systemImage: "arrow.down.circle") {
+                Form {
+                    UpdateSettingsSection()
+                }
+                .formStyle(.grouped)
+                .frame(width: 680, height: 180)
+            }
+        }
     }
 }
 

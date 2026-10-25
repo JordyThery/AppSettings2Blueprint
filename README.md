@@ -79,7 +79,7 @@ The app contacts only these hosts:
 | `itunes.apple.com` | App Store search | The search term, storefront and platform |
 | `uclient-api.itunes.apple.com` | App Store app details | The App Store ID and storefront |
 | `is1`–`is5-ssl.mzstatic.com` | App Store search results | Requests for app icons, from the URLs Apple returns |
-| `api.github.com` | Once a day, and on **Check for Updates…** | A request for the latest release; turn the daily check off in **About** |
+| `api.github.com` | Once a day, and on **Check for Updates…** | A request for the latest release; turn the daily check off in **Settings › Updates** |
 | `github.com`, `objects.githubusercontent.com` | Only on **Download** in the update sheet | A request for the release zip |
 
 Lookups never include Jamf data or credentials. Client secrets are stored in the keychain; the request log is kept in memory with secrets redacted; backups contain only Blueprint JSON. The app runs with the Hardened Runtime and is Developer ID signed and notarized.
