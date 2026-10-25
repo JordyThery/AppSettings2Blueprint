@@ -4,3 +4,6 @@
 # Per-user Xcode state
 xcuserdata/
 .DS_Store
+
+# Built copies of the app
+*.app/
