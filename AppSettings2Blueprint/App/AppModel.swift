@@ -1,4 +1,5 @@
 import Foundation
+import JTKit
 import Observation
 import os
 
@@ -55,7 +56,10 @@ final class AppModel {
 
     init() {
         let logger = Logger(subsystem: "be.jordythery.appsettings2blueprint", category: "updates")
-        updates = UpdateChecker(activity: { logger.info("\($0, privacy: .public)") })
+        updates = UpdateChecker(
+            configuration: UpdateConfiguration(owner: "JordyThery", repository: "AppSettings2Blueprint", appName: "AppSettings2Blueprint"),
+            activity: { logger.info("\($0, privacy: .public)") }
+        )
     }
 
     var isListing: Bool { listState == .listing }

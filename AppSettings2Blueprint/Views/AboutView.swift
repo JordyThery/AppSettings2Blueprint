@@ -1,4 +1,5 @@
 import AppKit
+import JTKit
 import SwiftUI
 
 /// The About window, opened from the app menu: app information and update controls.
@@ -125,7 +126,7 @@ struct AcknowledgementsView: View {
 #if DEBUG
 #Preview {
     AboutView()
-        .environment(UpdateChecker())
+        .environment(UpdateChecker(configuration: UpdateConfiguration(owner: "JordyThery", repository: "AppSettings2Blueprint", appName: "AppSettings2Blueprint")))
         .frame(width: 560, height: 520)
 }
 #endif

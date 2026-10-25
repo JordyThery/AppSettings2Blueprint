@@ -169,20 +169,6 @@ struct PlatformAPIClientTests {
 
 }
 
-@Suite("Update version comparison")
-struct UpdateVersionTests {
-    @Test func comparesNumericComponents() {
-        #expect(UpdateChecker.isNewer("1.10", than: "1.9"))
-        #expect(!UpdateChecker.isNewer("1.0", than: "1.0.1"))
-        #expect(!UpdateChecker.isNewer("1.2", than: "1.2"))
-    }
-
-    @Test func suffixedTagsCompareByLeadingDigits() {
-        #expect(UpdateChecker.isNewer("1.2.1-hotfix", than: "1.2"))
-        #expect(!UpdateChecker.isNewer("1.2.0-beta", than: "1.2"))
-    }
-}
-
 /// Collects log entries delivered on the main actor.
 @MainActor
 private final class LogCollector {
