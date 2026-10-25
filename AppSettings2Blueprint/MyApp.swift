@@ -26,8 +26,8 @@ import SwiftUI
         .defaultSize(width: 1000, height: 650)
 
         // JTKit's Settings window: General (Appearance), Connections, Updates.
-        SettingsWindow(updates: model.updates) {
-            ConnectionsSettingsTab()
+        SettingsWindow(updates: model.updates, opensTabsByName: true) {
+            ConnectionsTab()
                 .environment(model)
         }
     }
@@ -48,6 +48,13 @@ private struct AppCommands: Commands {
             openWindow(id: WindowID.main)
             model.updates.checkManually()
         }
+        // The toolbar picker's items, as JTKit's Connection menu.
+        ConnectionCommands(
+            store: model.profileStore.connections,
+            selection: Binding(get: { model.profileStore.selectedProfileID },
+                               set: { model.profileStore.selectedProfileID = $0 }),
+            itemTitle: \.menuTitle
+        )
         CommandGroup(after: .toolbar) {
             Button("Refresh Blueprints") { model.refresh() }
                 .keyboardShortcut("r", modifiers: .command)

@@ -148,26 +148,14 @@ private struct RuleSetStatusToast: View {
     }
 }
 
-/// Toolbar menu for switching between saved connections.
+/// Toolbar menu for switching between saved connections, with Edit Connections…
+/// (JTKit's `ConnectionPicker`, the same items as the Connection menu).
 private struct ProfilePicker: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        let store = model.profileStore
-        if store.profiles.isEmpty {
-            SettingsLink { Label("Add Connection…", systemImage: "plus") }
-        } else {
-            Picker("Connection", selection: Binding(
-                get: { store.selectedProfileID },
-                set: { store.selectedProfileID = $0 }
-            )) {
-                ForEach(store.profiles) { profile in
-                    Text("\(profile.name) (\(profile.region.rawValue))").tag(Optional(profile.id))
-                }
-            }
-            .pickerStyle(.menu)
-            .help("Active connection")
-        }
+        @Bindable var store = model.profileStore
+        ConnectionPicker(store: store.connections, selection: $store.selectedProfileID, itemTitle: \.menuTitle)
     }
 }
 

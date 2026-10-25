@@ -69,7 +69,7 @@ final class AppModel {
     /// Returns a service for the selected profile, rebuilding the client when credentials change.
     func currentService() throws -> BlueprintService {
         guard let profile = profileStore.selectedProfile,
-              let credentials = try profileStore.credentials(for: profile) else {
+              let credentials = profileStore.credentials(for: profile) else {
             throw APIError.missingCredentials
         }
         if let client, client.credentials == credentials {
