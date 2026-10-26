@@ -1,3 +1,4 @@
+import JTKit
 import SwiftUI
 
 /// Edit Scope: choose the device groups of an existing blueprint. Only the scope
@@ -6,7 +7,7 @@ struct EditScopeSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var model: EditScopeModel
 
-    init(app: AppModel, detail: BlueprintDetail) {
+    init(app: AppModel, detail: JamfPlatform.BlueprintDetail) {
         _model = State(initialValue: EditScopeModel(app: app, detail: detail))
     }
 

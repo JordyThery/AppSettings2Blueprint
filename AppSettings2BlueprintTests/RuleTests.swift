@@ -1,4 +1,5 @@
 import Foundation
+import JTKit
 import Testing
 @testable import AppSettings2Blueprint
 
@@ -68,7 +69,7 @@ struct RuleValidatorTests {
         )]
         #expect(errors(ruleSet).contains { $0.contains("DeniedApps is not supported on macOS") })
         #expect(errors(ruleSet).contains { $0.contains("LocationAccuracy is not supported on macOS") })
-        let json = JSONValue.array(DeclarationEncoder.declarations(for: ruleSet)).serializedString()
+        let json = LosslessJSON.array(DeclarationEncoder.declarations(for: ruleSet)).serializedString()
         #expect(!json.contains("DeniedApps"))
         #expect(!json.contains("LocationAccuracy"))
         #expect(json.contains("Camera"))
@@ -83,7 +84,7 @@ struct RuleValidatorTests {
         #expect(messages.contains { $0.contains("AllowedBinaries is macOS only") })
         #expect(messages.contains { $0.contains("AlwaysAllowManagedApps is macOS only") })
         #expect(messages.contains { $0.contains("Accessibility is not supported on iOS") })
-        let json = JSONValue.array(DeclarationEncoder.declarations(for: ruleSet)).serializedString()
+        let json = LosslessJSON.array(DeclarationEncoder.declarations(for: ruleSet)).serializedString()
         #expect(!json.contains("Binaries"))
         #expect(!json.contains("AlwaysAllowManagedApps"))
         #expect(!json.contains("Accessibility"))
@@ -109,7 +110,7 @@ struct RuleValidatorTests {
         ruleSet.allowedApps = [AppRule(bundleID: "com.apple.mobilesafari")]
         ruleSet.deniedApps = [AppRule(bundleID: "com.apple.news")]
         #expect(warnings(ruleSet).contains { $0.contains("Both AllowedApps and DeniedApps") })
-        let json = JSONValue.array(DeclarationEncoder.declarations(for: ruleSet)).serializedString()
+        let json = LosslessJSON.array(DeclarationEncoder.declarations(for: ruleSet)).serializedString()
         #expect(json.contains(#""AllowedApps":["com.apple.mobilesafari"]"#))
         #expect(json.contains(#""DeniedApps":["com.apple.news"]"#))
     }
@@ -156,7 +157,7 @@ struct DeclarationCodingTests {
     }
 
     @Test func iOSEncodesOneSystemDeclarationInServerOrder() {
-        let json = JSONValue.array(DeclarationEncoder.declarations(for: iOSRuleSet())).serializedString()
+        let json = LosslessJSON.array(DeclarationEncoder.declarations(for: iOSRuleSet())).serializedString()
         #expect(json == #"[{"kind":"CONFIGURATION","type":"com.apple.configuration.app.settings","payload":{"Allowed":{"DeniedApps":["com.apple.news","com.apple.stocks"]},"Privacy":{"PermissionDefaults":{"com.example.scanner":{"OrganizationJustification":"Scanning work documents.","Camera":"Allow","Location":"WhileUsing","LocationAccuracy":"Approximate"}}}},"channelType":"SYSTEM"}]"#)
     }
 
@@ -225,7 +226,7 @@ struct DeclarationCodingTests {
     @Test func preservedForeignChannelsAreWrittenBack() {
         var ruleSet = iOSRuleSet()
         ruleSet.preserved["USER"] = PreservedDeclarationParts(
-            payload: PreservedJSON(JSONObject(["CustomKey": .bool(true)]))
+            payload: PreservedJSON(LosslessJSON.Object(["CustomKey": .bool(true)]))
         )
         #expect(DeclarationEncoder.channels(for: ruleSet) == ["SYSTEM", "USER"])
         let declarations = DeclarationEncoder.declarations(for: ruleSet)
@@ -256,11 +257,11 @@ struct DeclarationCodingTests {
 
     @Test func unknownKeysSurviveDecodeAndEncode() throws {
         let input = #"[{"kind":"CONFIGURATION","type":"com.apple.configuration.app.settings","payload":{"Allowed":{"DeniedApps":["com.apple.news"],"AllowedApps":[],"FutureList":[1.0,2e3],"AllowedBinaries":"not an array"},"Privacy":{"PermissionDefaults":{"com.example":{"OrganizationJustification":"x","Camera":"Allow","Contacts":"Allow","Microphone":true}},"FuturePrivacy":{"a":null}},"FuturePayload":{"keep":"me"}},"channelType":"SYSTEM","identifier":"decl-1","serverToken":12345678901234567890}]"#
-        let declarations = try #require(try JSONValue(string: input).arrayValue)
+        let declarations = try #require(try LosslessJSON(string: input).arrayValue)
         let decoded = DeclarationDecoder.decode(declarations: declarations)
         #expect(decoded.ruleSet.platform == .iOS)
         #expect(decoded.ruleSet.deniedApps.map(\.bundleID) == ["com.apple.news"])
-        let output = JSONValue.array(DeclarationEncoder.declarations(for: decoded.ruleSet)).serializedString()
+        let output = LosslessJSON.array(DeclarationEncoder.declarations(for: decoded.ruleSet)).serializedString()
         for fragment in [
             #""AllowedApps":[]"#, #""FutureList":[1.0,2e3]"#, #""AllowedBinaries":"not an array""#,
             #""Contacts":"Allow""#, #""Microphone":true"#, #""FuturePrivacy":{"a":null}"#,
@@ -270,25 +271,25 @@ struct DeclarationCodingTests {
         }
         // Encoding the decoded rule set again changes nothing.
         let again = DeclarationDecoder.decode(declarations: DeclarationEncoder.declarations(for: decoded.ruleSet))
-        #expect(JSONValue.array(DeclarationEncoder.declarations(for: again.ruleSet)).serializedString() == output)
+        #expect(LosslessJSON.array(DeclarationEncoder.declarations(for: again.ruleSet)).serializedString() == output)
     }
 
     @Test func jamfUIEmptyDeclarationRoundTripsByteForByte() throws {
         // As read back from a Blueprint created in the Jamf UI (milestone 1).
         let text = #"{"kind":"CONFIGURATION","type":"com.apple.configuration.app.settings","payload":{},"channelType":"SYSTEM"}"#
-        let decoded = DeclarationDecoder.decode(declarations: [try JSONValue(string: text)])
+        let decoded = DeclarationDecoder.decode(declarations: [try LosslessJSON(string: text)])
         #expect(decoded.ruleSet.isEmpty)
         #expect(DeclarationEncoder.declarations(for: decoded.ruleSet).map { $0.serializedString() } == [text])
     }
 
     @Test func notesExplainMovedChannelsAndMixedKeys() throws {
         let systemPrivacy = #"[{"type":"com.apple.configuration.app.settings","channelType":"SYSTEM","payload":{"Allowed":{"AllowedBinaries":[{"TeamID":"ABCDE12345"}]},"Privacy":{"PermissionDefaults":{"com.example {anchor apple}":{"OrganizationJustification":"x"}}}}}]"#
-        let decoded = DeclarationDecoder.decode(declarations: try #require(try JSONValue(string: systemPrivacy).arrayValue))
+        let decoded = DeclarationDecoder.decode(declarations: try #require(try LosslessJSON(string: systemPrivacy).arrayValue))
         #expect(decoded.ruleSet.platform == .macOS)
         #expect(decoded.notes.contains { $0.contains("written to the USER declaration") })
 
         let mixed = #"[{"type":"com.apple.configuration.app.settings","channelType":"SYSTEM","payload":{"Allowed":{"DeniedApps":["a"],"DeniedBinaries":[{"SigningID":"b"}]}}}]"#
-        let mixedDecoded = DeclarationDecoder.decode(declarations: try #require(try JSONValue(string: mixed).arrayValue))
+        let mixedDecoded = DeclarationDecoder.decode(declarations: try #require(try LosslessJSON(string: mixed).arrayValue))
         #expect(mixedDecoded.notes.contains { $0.contains("mixes iOS-only and macOS-only keys") })
         #expect(mixedDecoded.ruleSet.deniedApps.count == 1)
         #expect(mixedDecoded.ruleSet.deniedBinaries.count == 1)
@@ -296,11 +297,11 @@ struct DeclarationCodingTests {
 
     @Test func ruleSetFileRoundTripKeepsPreservedLiterals() throws {
         var ruleSet = iOSRuleSet()
-        ruleSet.preserved["SYSTEM"] = PreservedDeclarationParts(payload: PreservedJSON(JSONObject(["Ratio": .number(JSONNumber(literal: "1.0"))])))
+        ruleSet.preserved["SYSTEM"] = PreservedDeclarationParts(payload: PreservedJSON(LosslessJSON.Object(["Ratio": .number(LosslessJSON.Number(literal: "1.0"))])))
         let data = try JSONEncoder().encode(RuleSetDocument.File(ruleSet: ruleSet))
         let decoded = try JSONDecoder().decode(RuleSetDocument.File.self, from: data)
         #expect(decoded.ruleSet == ruleSet)
-        #expect(JSONValue.array(DeclarationEncoder.declarations(for: decoded.ruleSet)).serializedString().contains(#""Ratio":1.0"#))
+        #expect(LosslessJSON.array(DeclarationEncoder.declarations(for: decoded.ruleSet)).serializedString().contains(#""Ratio":1.0"#))
     }
 
     @Test func strategiesWriteOnlyTheirFields() throws {
@@ -369,7 +370,7 @@ struct CSVTests {
                               developer: "Microsoft Corporation", version: "5.2641.0", minimumOS: "26.0",
                               appStoreURL: "https://apps.apple.com/gb/app/microsoft-outlook/id951937596?uo=4",
                               platforms: ["iPad", "iPhone / iOS"])
-        var detail = try #require(AppStoreDetail(lookupResponse: try JSONValue(string: #"{"results":{"951937596":{"bundleId":"x","offers":[{"version":{"display":"5.2641.0","externalId":893334590}}]}}}"#), appStoreID: 951937596))
+        var detail = try #require(AppStoreDetail(lookupResponse: try LosslessJSON(string: #"{"results":{"951937596":{"bundleId":"x","offers":[{"version":{"display":"5.2641.0","externalId":893334590}}]}}}"#), appStoreID: 951937596))
         detail.seller = nil
         let safari = AppleBuiltInApps.App(name: "Safari", bundleId: "com.apple.mobilesafari", builtIn: true)
         let lines = CSVExporter.export(.bundleIDLookup([BundleIDLookupRow(app: app, detail: detail), BundleIDLookupRow(appleApp: safari)]))

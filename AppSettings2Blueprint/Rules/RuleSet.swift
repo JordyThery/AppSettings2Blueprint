@@ -1,4 +1,5 @@
 import Foundation
+import JTKit
 
 /// The device family a rule set targets. A rule set never mixes iOS-only and
 /// macOS-only keys.
@@ -136,9 +137,9 @@ nonisolated struct RuleSet: Codable, Hashable, Sendable {
 /// A JSON object kept verbatim. Codable as its serialized text, so number literals
 /// and key order survive a save to disk.
 nonisolated struct PreservedJSON: Codable, Hashable, Sendable {
-    var object: JSONObject
+    var object: LosslessJSON.Object
 
-    init(_ object: JSONObject = JSONObject()) {
+    init(_ object: LosslessJSON.Object = LosslessJSON.Object()) {
         self.object = object
     }
 
@@ -146,7 +147,7 @@ nonisolated struct PreservedJSON: Codable, Hashable, Sendable {
 
     init(from decoder: any Decoder) throws {
         let text = try decoder.singleValueContainer().decode(String.self)
-        guard let object = try JSONValue(string: text).objectValue else {
+        guard let object = try LosslessJSON(string: text).objectValue else {
             throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath, debugDescription: "Preserved JSON is not an object"))
         }
         self.object = object
@@ -154,6 +155,6 @@ nonisolated struct PreservedJSON: Codable, Hashable, Sendable {
 
     func encode(to encoder: any Encoder) throws {
         var container = encoder.singleValueContainer()
-        try container.encode(JSONValue.object(object).serializedString())
+        try container.encode(LosslessJSON.object(object).serializedString())
     }
 }

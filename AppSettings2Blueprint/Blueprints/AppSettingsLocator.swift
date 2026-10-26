@@ -1,4 +1,5 @@
 import Foundation
+import JTKit
 
 /// Where one `com.apple.configuration.app.settings` declaration sits inside a
 /// blueprint's `steps`.
@@ -13,16 +14,16 @@ nonisolated struct AppSettingsLocation: Hashable, Sendable, Identifiable {
     let kind: String?
     let stepName: String?
 
-    var id: [JSONPathComponent] { path }
+    var id: [LosslessJSON.PathComponent] { path }
 
     var isStrictComponent: Bool { componentIdentifier == AppSettingsLocator.componentIdentifier }
 
-    var componentPath: [JSONPathComponent] {
+    var componentPath: [LosslessJSON.PathComponent] {
         [.key("steps"), .index(stepIndex), .key("components"), .index(componentIndex)]
     }
 
     /// Path from the blueprint root to the declaration object.
-    var path: [JSONPathComponent] {
+    var path: [LosslessJSON.PathComponent] {
         componentPath + [.key("configuration"), .key("declarations"), .index(declarationIndex)]
     }
 }
@@ -34,7 +35,7 @@ nonisolated enum AppSettingsLocator {
 
     /// Every App Settings declaration in `steps[].components[].configuration.declarations[]`,
     /// in document order, whatever the component identifier.
-    static func locate(in blueprint: JSONValue) -> [AppSettingsLocation] {
+    static func locate(in blueprint: LosslessJSON) -> [AppSettingsLocation] {
         guard let steps = blueprint["steps"]?.arrayValue else { return [] }
         var results: [AppSettingsLocation] = []
         for (stepIndex, step) in steps.enumerated() {
@@ -75,14 +76,14 @@ nonisolated enum AppSettingsTarget: Hashable, Sendable {
 nonisolated struct AppSettingsEdit: Sendable {
     /// The complete steps array to PATCH. Everything outside the target component
     /// is the untouched JSON tree of the blueprint as read.
-    let steps: JSONValue
+    let steps: LosslessJSON
     let target: AppSettingsTarget
     /// Path from the blueprint root to the component that was written.
-    let componentPath: [JSONPathComponent]
+    let componentPath: [LosslessJSON.PathComponent]
     /// The component before the write (nil when it is new).
-    let oldComponent: JSONValue?
+    let oldComponent: LosslessJSON?
     /// The component as written.
-    let newComponent: JSONValue
+    let newComponent: LosslessJSON
     /// Components the write did not touch.
     let unchangedComponentCount: Int
     /// App Settings declarations elsewhere in the blueprint, left as they are.
@@ -101,7 +102,7 @@ nonisolated extension AppSettingsLocator {
 
     /// The first editable App Settings component, else a new component in the first
     /// step, else a new step.
-    static func defaultTarget(in blueprint: JSONValue, newStepName: String = "App Settings") -> AppSettingsTarget {
+    static func defaultTarget(in blueprint: LosslessJSON, newStepName: String = "App Settings") -> AppSettingsTarget {
         if let location = locate(in: blueprint).first(where: \.isStrictComponent) {
             return .existingComponent(stepIndex: location.stepIndex, componentIndex: location.componentIndex)
         }
@@ -112,25 +113,25 @@ nonisolated extension AppSettingsLocator {
     }
 
     /// A new com.jamf.ddm-strict component holding `declarations`.
-    static func component(declarations: [JSONValue]) -> JSONValue {
-        .object(JSONObject([
+    static func component(declarations: [LosslessJSON]) -> LosslessJSON {
+        .object(LosslessJSON.Object([
             "identifier": .string(componentIdentifier),
-            "configuration": .object(JSONObject(["declarations": .array(declarations)])),
+            "configuration": .object(LosslessJSON.Object(["declarations": .array(declarations)])),
         ]))
     }
 
     /// A step in the server's member order: name, components, activationPredicate.
-    static func step(name: String, components: [JSONValue], activationPredicate: String?) -> JSONValue {
-        .object(JSONObject([
+    static func step(name: String, components: [LosslessJSON], activationPredicate: String?) -> LosslessJSON {
+        .object(LosslessJSON.Object([
             "name": .string(name),
             "components": .array(components),
-            "activationPredicate": activationPredicate.map(JSONValue.string) ?? .null,
+            "activationPredicate": activationPredicate.map(LosslessJSON.string) ?? .null,
         ]))
     }
 
     /// Builds the new steps array. `declarations` are the rule set's declarations
     /// (SYSTEM and/or USER). Only the target component changes.
-    static func edit(blueprint: JSONValue, declarations: [JSONValue], target: AppSettingsTarget) throws -> AppSettingsEdit {
+    static func edit(blueprint: LosslessJSON, declarations: [LosslessJSON], target: AppSettingsTarget) throws -> AppSettingsEdit {
         guard !declarations.isEmpty else { throw PlacementError(message: "The rule set produced no declarations.") }
         var steps = blueprint["steps"]?.arrayValue ?? []
         if blueprint["steps"] != nil, blueprint["steps"]?.arrayValue == nil {
@@ -212,12 +213,12 @@ nonisolated extension AppSettingsLocator {
     /// Replaces App Settings declarations channel by channel, in place. A channel
     /// the rule set no longer produces is removed; a new one is inserted after the
     /// last App Settings declaration. Other declaration types are untouched.
-    static func replacingAppSettings(in old: [JSONValue], with new: [JSONValue]) -> [JSONValue] {
-        func channel(_ declaration: JSONValue) -> String {
+    static func replacingAppSettings(in old: [LosslessJSON], with new: [LosslessJSON]) -> [LosslessJSON] {
+        func channel(_ declaration: LosslessJSON) -> String {
             declaration["channelType"]?.stringValue ?? DeclarationEncoder.systemChannel
         }
         var unused = new
-        var result: [JSONValue] = []
+        var result: [LosslessJSON] = []
         var insertAt: Int?
         for declaration in old {
             guard declaration["type"]?.stringValue == declarationType else {
@@ -235,4 +236,13 @@ nonisolated extension AppSettingsLocator {
         result.insert(contentsOf: unused, at: insertAt ?? result.count)
         return result
     }
+}
+
+// MARK: - On a fetched Blueprint
+
+nonisolated extension JamfPlatform.BlueprintDetail {
+    /// Every App Settings declaration in the Blueprint, found anew from its JSON.
+    var appSettingsLocations: [AppSettingsLocation] { AppSettingsLocator.locate(in: json) }
+
+    var containsAppSettings: Bool { !appSettingsLocations.isEmpty }
 }

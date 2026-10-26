@@ -1,9 +1,10 @@
 import Foundation
+import JTKit
 
 /// A write that has been checked and backed up, waiting for review.
 nonisolated struct PreparedWrite: Sendable {
     /// The blueprint as fetched right before the backup.
-    let latest: BlueprintDetail
+    let latest: JamfPlatform.BlueprintDetail
     let edit: AppSettingsEdit
     let backupURL: URL
     /// The exact PATCH body: `{"steps": [...]}`.
@@ -23,9 +24,9 @@ nonisolated struct PreparedWrite: Sendable {
 
 /// What the read-back after a write showed.
 nonisolated struct WriteResult: Sendable {
-    let detail: BlueprintDetail
+    let detail: JamfPlatform.BlueprintDetail
     /// The written component, as the server returned it.
-    let readBackComponent: JSONValue?
+    let readBackComponent: LosslessJSON?
     /// Empty when the server returned exactly what was sent (allowing for key
     /// order and number formatting).
     let problems: [String]
@@ -36,7 +37,7 @@ nonisolated struct WriteResult: Sendable {
 
 /// What the read-back after a scope change showed.
 nonisolated struct ScopeChangeResult: Sendable {
-    let detail: BlueprintDetail
+    let detail: JamfPlatform.BlueprintDetail
     let previousGroups: [String]
     let backupURL: URL
     /// Empty when the scope came back as sent and the steps are unchanged.
@@ -72,16 +73,14 @@ nonisolated struct BlueprintWriter: Sendable {
         }
     }
 
-    static let divisionErrorCode = "DIVISION_PATCH_NOT_ALLOWED"
-
-    let service: BlueprintService
+    let service: JamfPlatform.Blueprints
     /// Writes the full blueprint JSON before a PATCH; injectable for tests.
-    var backup: @Sendable (BlueprintDetail) throws -> URL = { try BackupStore.write($0) }
+    var backup: @Sendable (JamfPlatform.BlueprintDetail) throws -> URL = { try BackupStore.write($0) }
 
     // MARK: Existing blueprint
 
     /// Steps 1–3 and the material for step 4: concurrency check, backup, new steps.
-    func prepare(loaded: BlueprintDetail, declarations: [JSONValue], target: AppSettingsTarget) async throws -> PreparedWrite {
+    func prepare(loaded: JamfPlatform.BlueprintDetail, declarations: [LosslessJSON], target: AppSettingsTarget) async throws -> PreparedWrite {
         let latest = try await service.detail(id: loaded.id)
         try checkUnchanged(loaded: loaded, latest: latest)
         if latest.isDivisionLocked { throw WriteError.readOnly(name: latest.overview.name) }
@@ -89,7 +88,7 @@ nonisolated struct BlueprintWriter: Sendable {
         let backupURL = try backup(latest)
         let edit = try AppSettingsLocator.edit(blueprint: latest.json, declarations: declarations, target: target)
         guard edit.steps.arrayValue != nil else { throw WriteError.notAnArray }
-        let body = JSONValue.object(JSONObject(["steps": edit.steps])).serialized()
+        let body = LosslessJSON.object(LosslessJSON.Object(["steps": edit.steps])).serialized()
         return PreparedWrite(latest: latest, edit: edit, backupURL: backupURL, patchBody: body)
     }
 
@@ -100,7 +99,7 @@ nonisolated struct BlueprintWriter: Sendable {
         try checkUnchanged(loaded: prepared.latest, latest: current)
         do {
             try await service.patchSteps(id: prepared.blueprintID, steps: prepared.edit.steps)
-        } catch let error as APIError where error.hasErrorCode(Self.divisionErrorCode) {
+        } catch let error as JamfPlatformError where error.hasCode(.divisionPatchNotAllowed) {
             throw WriteError.readOnly(name: prepared.name)
         }
         let readBack = try await service.detail(id: prepared.blueprintID)
@@ -111,7 +110,7 @@ nonisolated struct BlueprintWriter: Sendable {
 
     /// PATCHes the steps of a backup back, after the same concurrency check and a
     /// fresh backup of the current state.
-    func restore(_ saved: BlueprintBackup, loaded: BlueprintDetail) async throws -> WriteResult {
+    func restore(_ saved: BlueprintBackup, loaded: JamfPlatform.BlueprintDetail) async throws -> WriteResult {
         let backupDetail = try BackupStore.load(saved)
         guard let steps = backupDetail.steps, steps.arrayValue != nil else { throw WriteError.notAnArray }
         let latest = try await service.detail(id: loaded.id)
@@ -121,7 +120,7 @@ nonisolated struct BlueprintWriter: Sendable {
         _ = try backup(latest)
         do {
             try await service.patchSteps(id: loaded.id, steps: steps)
-        } catch let error as APIError where error.hasErrorCode(Self.divisionErrorCode) {
+        } catch let error as JamfPlatformError where error.hasCode(.divisionPatchNotAllowed) {
             throw WriteError.readOnly(name: latest.overview.name)
         }
         let readBack = try await service.detail(id: loaded.id)
@@ -138,7 +137,7 @@ nonisolated struct BlueprintWriter: Sendable {
     /// Changes a blueprint's device groups: concurrency check, backup, PATCH
     /// `{"scope": …}` only, GET and verify that the scope matches and the steps
     /// are untouched. Unlike a steps write, this works on an unscoped blueprint.
-    func changeScope(loaded: BlueprintDetail, deviceGroups: [String]) async throws -> ScopeChangeResult {
+    func changeScope(loaded: JamfPlatform.BlueprintDetail, deviceGroups: [String]) async throws -> ScopeChangeResult {
         guard !deviceGroups.isEmpty else { throw WriteError.emptyScope }
         let latest = try await service.detail(id: loaded.id)
         try checkUnchanged(loaded: loaded, latest: latest)
@@ -146,7 +145,7 @@ nonisolated struct BlueprintWriter: Sendable {
         let backupURL = try backup(latest)
         do {
             try await service.patchScope(id: loaded.id, deviceGroups: deviceGroups)
-        } catch let error as APIError where error.hasErrorCode(Self.divisionErrorCode) {
+        } catch let error as JamfPlatformError where error.hasCode(.divisionPatchNotAllowed) {
             throw WriteError.readOnly(name: latest.overview.name)
         }
         let readBack = try await service.detail(id: loaded.id)
@@ -171,7 +170,7 @@ nonisolated struct BlueprintWriter: Sendable {
         deviceGroups: [String],
         stepName: String,
         activationPredicate: String?,
-        declarations: [JSONValue]
+        declarations: [LosslessJSON]
     ) async throws -> WriteResult {
         let component = AppSettingsLocator.component(declarations: declarations)
         let step = AppSettingsLocator.step(name: stepName, components: [component], activationPredicate: activationPredicate)
@@ -186,9 +185,9 @@ nonisolated struct BlueprintWriter: Sendable {
     // MARK: Checks
 
     /// The `updated` timestamp and the steps must both be as loaded.
-    func checkUnchanged(loaded: BlueprintDetail, latest: BlueprintDetail) throws {
+    func checkUnchanged(loaded: JamfPlatform.BlueprintDetail, latest: JamfPlatform.BlueprintDetail) throws {
         let sameSteps = (loaded.steps ?? .null) == (latest.steps ?? .null)
-        guard loaded.overview.updated == latest.overview.updated, sameSteps else {
+        guard loaded.isUnchanged(in: latest), sameSteps else {
             throw WriteError.changedOnServer(name: latest.overview.name, loaded: loaded.overview.updated, now: latest.overview.updated)
         }
     }
@@ -196,7 +195,7 @@ nonisolated struct BlueprintWriter: Sendable {
     /// Compares the read-back with what was sent: the written component must match,
     /// and every other component must be unchanged. Key order and number
     /// formatting are allowed to differ (the server may canonicalise them).
-    func verify(readBack: BlueprintDetail, sentSteps: JSONValue, componentPath: [JSONPathComponent], created: Bool) -> WriteResult {
+    func verify(readBack: JamfPlatform.BlueprintDetail, sentSteps: LosslessJSON, componentPath: [LosslessJSON.PathComponent], created: Bool) -> WriteResult {
         var problems: [String] = []
         let relative = Array(componentPath.dropFirst())  // drop .key("steps")
         let sentComponent = sentSteps.value(at: relative)
@@ -231,7 +230,7 @@ nonisolated struct BlueprintWriter: Sendable {
                     continue
                 }
                 for (componentIndex, (a, b)) in zip(sentComponents, readComponents).enumerated() {
-                    let path: [JSONPathComponent] = [.key("steps"), .index(stepIndex), .key("components"), .index(componentIndex)]
+                    let path: [LosslessJSON.PathComponent] = [.key("steps"), .index(stepIndex), .key("components"), .index(componentIndex)]
                     if path != componentPath && !a.isSemanticallyEqual(to: b) { changed += 1 }
                 }
             }

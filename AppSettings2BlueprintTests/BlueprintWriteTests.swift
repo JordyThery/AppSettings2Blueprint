@@ -1,10 +1,14 @@
 import Foundation
+import JTKit
 import Testing
 @testable import AppSettings2Blueprint
 
+/// A valid Environment ID: JTKit refuses one that isn't a UUID before sending.
+let testEnvironmentID = "e77c1408-10c8-4007-b177-abc9157fbcaa"
+
 /// Declarations of the fixture's App Settings component, decoded and re-encoded
 /// the way the editor does.
-private func reencodedDeclarations(_ blueprint: JSONValue, edit: (inout RuleSet) -> Void = { _ in }) throws -> [JSONValue] {
+private func reencodedDeclarations(_ blueprint: LosslessJSON, edit: (inout RuleSet) -> Void = { _ in }) throws -> [LosslessJSON] {
     let location = try #require(AppSettingsLocator.locate(in: blueprint).first)
     let declarations = try #require(blueprint.value(at: location.componentPath + [.key("configuration"), .key("declarations")])?.arrayValue)
     var ruleSet = DeclarationDecoder.decode(declarations: declarations).ruleSet
@@ -14,7 +18,7 @@ private func reencodedDeclarations(_ blueprint: JSONValue, edit: (inout RuleSet)
 
 @Suite("Placement and round trip")
 struct AppSettingsPlacementTests {
-    private let blueprint = try! JSONValue(string: appSettingsBlueprintJSON)
+    private let blueprint = try! LosslessJSON(string: appSettingsBlueprintJSON)
     private let replaceTarget = AppSettingsTarget.existingComponent(stepIndex: 0, componentIndex: 3)
 
     @Test func noEditsLeaveStepsByteIdentical() throws {
@@ -35,7 +39,7 @@ struct AppSettingsPlacementTests {
         #expect(expected != original)
         #expect(edit.steps.serializedString() == expected)
         // The PATCH body is exactly {"steps": …}.
-        let body = JSONValue.object(JSONObject(["steps": edit.steps])).serializedString()
+        let body = LosslessJSON.object(LosslessJSON.Object(["steps": edit.steps])).serializedString()
         #expect(body == #"{"steps":"# + expected + "}")
     }
 
@@ -48,13 +52,13 @@ struct AppSettingsPlacementTests {
     }
 
     @Test func macOSReplacesSystemInPlaceAndAddsUser() {
-        let old: [JSONValue] = [
-            .object(JSONObject(["type": .string("com.apple.configuration.keyboard.settings")])),
-            .object(JSONObject(["type": .string(AppSettingsLocator.declarationType), "channelType": .string("SYSTEM"), "payload": .object(JSONObject())])),
-            .object(JSONObject(["type": .string("com.apple.configuration.siri.settings")])),
+        let old: [LosslessJSON] = [
+            .object(LosslessJSON.Object(["type": .string("com.apple.configuration.keyboard.settings")])),
+            .object(LosslessJSON.Object(["type": .string(AppSettingsLocator.declarationType), "channelType": .string("SYSTEM"), "payload": .object(LosslessJSON.Object())])),
+            .object(LosslessJSON.Object(["type": .string("com.apple.configuration.siri.settings")])),
         ]
-        let system = JSONValue.object(JSONObject(["type": .string(AppSettingsLocator.declarationType), "channelType": .string("SYSTEM"), "payload": .object(JSONObject(["Allowed": .object(JSONObject())]))]))
-        let user = JSONValue.object(JSONObject(["type": .string(AppSettingsLocator.declarationType), "channelType": .string("USER"), "payload": .object(JSONObject())]))
+        let system = LosslessJSON.object(LosslessJSON.Object(["type": .string(AppSettingsLocator.declarationType), "channelType": .string("SYSTEM"), "payload": .object(LosslessJSON.Object(["Allowed": .object(LosslessJSON.Object())]))]))
+        let user = LosslessJSON.object(LosslessJSON.Object(["type": .string(AppSettingsLocator.declarationType), "channelType": .string("USER"), "payload": .object(LosslessJSON.Object())]))
         let merged = AppSettingsLocator.replacingAppSettings(in: old, with: [system, user])
         #expect(merged.map { $0["type"]?.stringValue ?? "" } == [
             "com.apple.configuration.keyboard.settings", AppSettingsLocator.declarationType,
@@ -71,7 +75,7 @@ struct AppSettingsPlacementTests {
     }
 
     @Test func appendsNewComponentOrStep() throws {
-        let json = try JSONValue(string: #"{"id":"x","steps":[{"name":"S","components":[{"identifier":"other","configuration":{}}],"activationPredicate":null}]}"#)
+        let json = try LosslessJSON(string: #"{"id":"x","steps":[{"name":"S","components":[{"identifier":"other","configuration":{}}],"activationPredicate":null}]}"#)
         let declarations = DeclarationEncoder.declarations(for: RuleSet(platform: .iOS, deniedApps: [AppRule(bundleID: "com.apple.news")]))
         #expect(AppSettingsLocator.defaultTarget(in: json) == .newComponent(stepIndex: 0))
 
@@ -90,7 +94,7 @@ struct AppSettingsPlacementTests {
 
     @Test func refusesAFullStep() throws {
         let components = Array(repeating: #"{"identifier":"other","configuration":{}}"#, count: 100).joined(separator: ",")
-        let json = try JSONValue(string: #"{"id":"x","steps":[{"components":[\#(components)]}]}"#)
+        let json = try LosslessJSON(string: #"{"id":"x","steps":[{"components":[\#(components)]}]}"#)
         let declarations = DeclarationEncoder.declarations(for: RuleSet())
         #expect(throws: AppSettingsLocator.PlacementError.self) {
             try AppSettingsLocator.edit(blueprint: json, declarations: declarations, target: .newComponent(stepIndex: 0))
@@ -98,37 +102,14 @@ struct AppSettingsPlacementTests {
     }
 
     @Test func emptyBlueprintGetsANewStep() throws {
-        let json = try JSONValue(string: #"{"id":"x","steps":[]}"#)
+        let json = try LosslessJSON(string: #"{"id":"x","steps":[]}"#)
         #expect(AppSettingsLocator.defaultTarget(in: json) == .newStep(name: "App Settings", activationPredicate: nil))
     }
 }
 
-@Suite("JSON semantics and diff")
-struct JSONSemanticsTests {
-    @Test func semanticEqualityIgnoresKeyOrderAndNumberFormat() throws {
-        let a = try JSONValue(string: #"{"a":1,"b":[1.0,{"x":true,"y":null}]}"#)
-        let b = try JSONValue(string: #"{"b":[1,{"y":null,"x":true}],"a":1.00}"#)
-        #expect(a.isSemanticallyEqual(to: b))
-        #expect(!a.isSemanticallyEqual(to: try JSONValue(string: #"{"a":1,"b":[{"x":true,"y":null},1]}"#)))
-        #expect(!a.isSemanticallyEqual(to: try JSONValue(string: #"{"a":"1","b":[1,{"x":true,"y":null}]}"#)))
-    }
-
-    /// Decimal holds 38 significant digits; differing longer literals must not
-    /// collide into "equal", or a verification difference would go unnoticed.
-    @Test func numbersBeyondDecimalPrecisionCompareByLiteral() throws {
-        let digits = String(repeating: "9", count: 45)
-        let a = JSONValue.number(JSONNumber(literal: digits + "1"))
-        let b = JSONValue.number(JSONNumber(literal: digits + "2"))
-        #expect(!a.isSemanticallyEqual(to: b))
-        #expect(a.isSemanticallyEqual(to: a))
-    }
-
-    @Test func alignmentFollowsTheReferenceOrder() throws {
-        let value = try JSONValue(string: #"{"kind":"C","type":"t","payload":{"b":1,"a":2},"extra":0}"#)
-        let reference = try JSONValue(string: #"{"type":"t","payload":{"a":0,"b":0},"kind":"C"}"#)
-        #expect(value.aligned(to: reference).serializedString() == #"{"type":"t","payload":{"a":2,"b":1},"kind":"C","extra":0}"#)
-    }
-
+/// The JSON comparison tests moved to JTKit with `LosslessJSON`.
+@Suite("Line diff")
+struct LineDiffTests {
     @Test func lineDiffMarksOnlyChangedLines() {
         let diff = TextDiff.lines(from: "a\nb\nc", to: "a\nB\nc\nd")
         #expect(diff.map(\.kind) == [.unchanged, .removed, .added, .unchanged, .added])
@@ -145,13 +126,13 @@ extension MockNetworkTests {
         private static let token = MockResponse.json(200, #"{"access_token":"tok","expires_in":900}"#)
 
         private func makeWriter(backups: BackupRecorder = BackupRecorder()) -> BlueprintWriter {
-            let client = PlatformAPIClient(
-                credentials: PlatformCredentials(region: .eu, environmentID: "env", clientID: "id", clientSecret: "secret"),
+            let client = try! PlatformAPIClient.make(
+                credentials: PlatformCredentials(region: .eu, environmentID: testEnvironmentID, clientID: "id", clientSecret: "secret"),
                 session: MockURLProtocol.makeSession(),
                 log: nil,
                 sleep: { _ in }
             )
-            var writer = BlueprintWriter(service: BlueprintService(client: client))
+            var writer = BlueprintWriter(service: JamfPlatform.Blueprints(client: client))
             writer.backup = { detail in
                 backups.record(detail)
                 return URL(filePath: "/tmp/backup.json")
@@ -159,7 +140,7 @@ extension MockNetworkTests {
             return writer
         }
 
-        private var loaded: BlueprintDetail { try! BlueprintDetail(data: Data(appSettingsBlueprintJSON.utf8)) }
+        private var loaded: JamfPlatform.BlueprintDetail { try! JamfPlatform.BlueprintDetail(data: Data(appSettingsBlueprintJSON.utf8)) }
 
         private func apiRequests() -> [RecordedRequest] {
             MockURLProtocol.requests.filter { $0.path != "/auth/token" }
@@ -191,7 +172,7 @@ extension MockNetworkTests {
             #expect(result.isVerified, "\(result.problems)")
             let patch = try #require(apiRequests().first { $0.method == "PATCH" })
             #expect(patch.header("Content-Type") == "application/merge-patch+json")
-            let body = try JSONValue(data: patch.body)
+            let body = try LosslessJSON(data: patch.body)
             #expect(body.objectValue?.keys == ["steps"])
             #expect(!patch.bodyString.contains("divisionId"))
             #expect(result.detail.json.serializedString().contains("com.apple.tips"))
@@ -233,7 +214,7 @@ extension MockNetworkTests {
         @Test func divisionLockedBlueprintIsNeverPatched() async throws {
             let locked = appSettingsBlueprintJSON.replacingOccurrences(of: #""description":null,"#, with: #""description":null,"divisionId":"d-1","#)
             MockURLProtocol.install { $0.path == "/auth/token" ? Self.token : .json(200, locked) }
-            let detail = try BlueprintDetail(data: Data(locked.utf8))
+            let detail = try JamfPlatform.BlueprintDetail(data: Data(locked.utf8))
             #expect(detail.isDivisionLocked)
             await #expect(throws: BlueprintWriter.WriteError.self) {
                 try await makeWriter().prepare(loaded: detail, declarations: try reencodedDeclarations(detail.json), target: .existingComponent(stepIndex: 0, componentIndex: 3))
@@ -246,7 +227,7 @@ extension MockNetworkTests {
             // As created in the Jamf UI: scope null. The server answers 400 NotBlank (scopeId) to a PATCH.
             let unscoped = appSettingsBlueprintJSON.replacingOccurrences(of: #""scope":{"deviceGroups":["11111111-2222-4333-8444-555555555555"]}"#, with: #""scope":null"#)
             MockURLProtocol.install { $0.path == "/auth/token" ? Self.token : .json(200, unscoped) }
-            let detail = try BlueprintDetail(data: Data(unscoped.utf8))
+            let detail = try JamfPlatform.BlueprintDetail(data: Data(unscoped.utf8))
             #expect(detail.scopeDeviceGroups.isEmpty)
             let backups = BackupRecorder()
             do {
@@ -296,7 +277,7 @@ extension MockNetworkTests {
                 }
                 return .json(200, state.text)
             }
-            let detail = try BlueprintDetail(data: Data(unscoped.utf8))
+            let detail = try JamfPlatform.BlueprintDetail(data: Data(unscoped.utf8))
             let result = try await makeWriter().changeScope(loaded: detail, deviceGroups: ["g-1"])
             #expect(result.isVerified, "\(result.problems)")
             #expect(result.previousGroups.isEmpty)
@@ -341,7 +322,7 @@ extension MockNetworkTests {
             _ = try await makeWriter().create(name: "iPad apps", description: nil, deviceGroups: ["g1"], stepName: "App Settings", activationPredicate: nil, declarations: declarations)
             let post = try #require(apiRequests().first { $0.method == "POST" })
             #expect(post.path == "/blueprints/v1/blueprints")
-            let body = try JSONValue(data: post.body)
+            let body = try LosslessJSON(data: post.body)
             #expect(body.objectValue?.keys == ["name", "scope", "steps"])
             #expect(body["scope"]?["deviceGroups"] == .array([.string("g1")]))
             #expect(!post.bodyString.contains("divisionId"))
@@ -349,7 +330,7 @@ extension MockNetworkTests {
 
         @Test func createIsNotRetriedOn5xx() async {
             MockURLProtocol.install { $0.path == "/auth/token" ? Self.token : .json(503, "{}") }
-            await #expect(throws: APIError.self) {
+            await #expect(throws: JamfPlatformError.self) {
                 try await makeWriter().create(name: "n", description: nil, deviceGroups: ["g"], stepName: "s", activationPredicate: nil,
                                               declarations: DeclarationEncoder.declarations(for: RuleSet()))
             }
@@ -359,7 +340,7 @@ extension MockNetworkTests {
 
         @Test func createRequiresADeviceGroup() async {
             MockURLProtocol.install { _ in .json(500, "{}") }
-            await #expect(throws: APIError.self) {
+            await #expect(throws: JamfPlatformError.self) {
                 try await makeWriter().create(name: "n", description: nil, deviceGroups: [], stepName: "s", activationPredicate: nil,
                                               declarations: DeclarationEncoder.declarations(for: RuleSet()))
             }
@@ -371,20 +352,20 @@ extension MockNetworkTests {
 /// A blueprint held by the mock server; PATCH applies merge-patch (steps replaced wholesale).
 private final class ServerState: @unchecked Sendable {
     private let lock = NSLock()
-    private var json: JSONValue
+    private var json: LosslessJSON
 
-    init(_ text: String) { json = try! JSONValue(string: text) }
+    init(_ text: String) { json = try! LosslessJSON(string: text) }
 
     var text: String { lock.withLock { json.serializedString() } }
 
     func applyPatch(_ body: Data) {
         lock.withLock {
-            guard let patch = try? JSONValue(data: body) else { return }
+            guard let patch = try? LosslessJSON(data: body) else { return }
             if let steps = patch["steps"] { json.setValue(steps, at: [.key("steps")]) }
             if let scope = patch["scope"] { json.setValue(scope, at: [.key("scope")]) }
             guard patch["steps"] != nil || patch["scope"] != nil else { return }
             json.setValue(.string("2026-10-23T08:00:00Z"), at: [.key("updated")])
-            json.setValue(.object(JSONObject(["state": .string("OUT_OF_DATE")])), at: [.key("deploymentState")])
+            json.setValue(.object(LosslessJSON.Object(["state": .string("OUT_OF_DATE")])), at: [.key("deploymentState")])
         }
     }
 }
@@ -392,9 +373,9 @@ private final class ServerState: @unchecked Sendable {
 /// Records backups instead of writing them to Application Support.
 private final class BackupRecorder: @unchecked Sendable {
     private let lock = NSLock()
-    private var details: [BlueprintDetail] = []
+    private var details: [JamfPlatform.BlueprintDetail] = []
 
-    func record(_ detail: BlueprintDetail) { lock.withLock { details.append(detail) } }
+    func record(_ detail: JamfPlatform.BlueprintDetail) { lock.withLock { details.append(detail) } }
     var count: Int { lock.withLock { details.count } }
 }
 
@@ -403,7 +384,7 @@ struct BackupStoreTests {
     @Test func writesExactBytesWithoutOverwriting() throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "as2b-backups-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }
-        let detail = try BlueprintDetail(data: Data(appSettingsBlueprintJSON.utf8))
+        let detail = try JamfPlatform.BlueprintDetail(data: Data(appSettingsBlueprintJSON.utf8))
         let date = Date(timeIntervalSince1970: 1_792_740_000)
         let first = try BackupStore.write(detail, date: date, root: root)
         let second = try BackupStore.write(detail, date: date, root: root)
@@ -429,16 +410,15 @@ extension MockNetworkTests {
             )
         }
 
-        private func makeMonitor(maxPolls: Int = 10) -> DeploymentMonitor {
-            let client = PlatformAPIClient(
-                credentials: PlatformCredentials(region: .eu, environmentID: "env", clientID: "id", clientSecret: "secret"),
+        private func makeBlueprints() -> JamfPlatform.Blueprints {
+            JamfPlatform.Blueprints(client: try! PlatformAPIClient.make(
+                credentials: PlatformCredentials(region: .eu, environmentID: testEnvironmentID, clientID: "id", clientSecret: "secret"),
                 session: MockURLProtocol.makeSession(), log: nil, sleep: { _ in }
-            )
-            var monitor = DeploymentMonitor(service: BlueprintService(client: client))
-            monitor.sleep = { _ in }
-            monitor.maxPolls = maxPolls
-            return monitor
+            ))
         }
+
+        /// JTKit's watch, without real waits.
+        private let poller = JamfPlatform.Poller(sleep: { _ in })
 
         @Test func followsTheNewDeploymentUntilItSucceeds() async throws {
             let gets = Counter()
@@ -451,7 +431,7 @@ extension MockNetworkTests {
                     return .json(200, #"{"succeeded":0,"failed":0,"pending":0}"#)
                 case ("GET", Self.path):
                     switch gets.next() {
-                    // GET 1 is deploy()'s own fresh fetch of the previous start time.
+                    // GET 1 is the fresh fetch of the previous start time before the POST.
                     // On the first poll the previous deployment is still the latest:
                     // not the one we started.
                     case 1, 2: return .json(200, appSettingsBlueprintJSON)
@@ -462,43 +442,29 @@ extension MockNetworkTests {
                     return .json(404, "{}")
                 }
             }
-            let monitor = makeMonitor()
-            let detail = try BlueprintDetail(data: Data(appSettingsBlueprintJSON.utf8))
-            let previous = try await monitor.deploy(detail)
+            let blueprints = makeBlueprints()
+            let previous = try await blueprints.startDeployment(id: Self.id)
             #expect(previous == Self.previousStart)
             let updates = StatusRecorder()
-            let final = try await monitor.watch(id: Self.id, previousStart: previous) { updates.record($0) }
+            let outcome = try await blueprints.watchDeployment(id: Self.id, previousStart: previous, poller: poller) { updates.record($0) }
+            let final = try #require(outcome.value)
             #expect(final.didSucceed)
             #expect(final.jobStarted == "2026-10-23T09:00:00Z")
-            #expect(final.report == BlueprintStatusReport(succeeded: 0, failed: 0, pending: 0))
+            #expect(final.report == JamfPlatform.BlueprintReport(succeeded: 0, failed: 0, pending: 0))
             #expect(updates.jobStates == [nil, "DEPLOYING", "SUCCEEDED"])
             let posts = MockURLProtocol.requests.filter { $0.method == "POST" && $0.path != "/auth/token" }
             #expect(posts.map(\.path) == [Self.path + "/deploy"])
         }
 
-        @Test func stopsPollingAtTheLimit() async throws {
-            MockURLProtocol.install { request in
-                if request.path == "/auth/token" { return Self.token }
-                if request.path.hasSuffix("/report") { return .json(404, #"{"httpStatus":404,"errors":[]}"#) }
-                return .json(200, blueprint(state: "DEPLOYED", started: "2026-10-23T09:00:00Z", job: "PENDING"))
-            }
-            let final = try await makeMonitor(maxPolls: 3).watch(id: Self.id, previousStart: Self.previousStart) { _ in }
-            #expect(!final.isFinished)
-            #expect(final.jobState == "PENDING")
-            #expect(final.report == nil, "A 404 report means no report yet")
-            let detailGets = MockURLProtocol.requests.filter { $0.method == "GET" && $0.path == Self.path }
-            #expect(detailGets.count == 3)
-        }
-
         @Test func invalidBlueprintIsReportedNotRetried() async {
             MockURLProtocol.install { request in
                 if request.path == "/auth/token" { return Self.token }
-                // deploy() fetches the blueprint before the POST; only the POST fails.
+                // The blueprint is fetched before the POST; only the POST fails.
                 if request.method == "GET" { return .json(200, appSettingsBlueprintJSON) }
                 return .json(409, #"{"httpStatus":409,"errors":[{"code":"INVALID_BLUEPRINT","description":"Not valid for deployment"}]}"#)
             }
-            let detail = try! BlueprintDetail(data: Data(appSettingsBlueprintJSON.utf8))
-            await #expect(throws: APIError.self) { try await makeMonitor().deploy(detail) }
+            let error = await #expect(throws: JamfPlatformError.self) { _ = try await makeBlueprints().startDeployment(id: Self.id) }
+            #expect(error?.status == 409)
             let posts = MockURLProtocol.requests.filter { $0.method == "POST" && $0.path != "/auth/token" }
             #expect(posts.count == 1)
         }
@@ -508,8 +474,8 @@ extension MockNetworkTests {
 @Suite("Deploy confirmation")
 @MainActor
 struct DeployModelTests {
-    private func detail(declarations: String) throws -> BlueprintDetail {
-        try BlueprintDetail(data: Data(#"{"id":"b1","name":"Mac apps","scope":{"deviceGroups":["g1"]},"deploymentState":{"state":"NOT_DEPLOYED"},"steps":[{"name":"S","components":[{"identifier":"com.jamf.ddm-strict","configuration":{"declarations":\#(declarations)}}]}]}"#.utf8))
+    private func detail(declarations: String) throws -> JamfPlatform.BlueprintDetail {
+        try JamfPlatform.BlueprintDetail(data: Data(#"{"id":"b1","name":"Mac apps","scope":{"deviceGroups":["g1"]},"deploymentState":{"state":"NOT_DEPLOYED"},"steps":[{"name":"S","components":[{"identifier":"com.jamf.ddm-strict","configuration":{"declarations":\#(declarations)}}]}]}"#.utf8))
     }
 
     @Test func allowListWithoutBaselineNeedsASecondConfirmation() throws {
@@ -529,8 +495,16 @@ struct DeployModelTests {
         #expect(model.blockingReason == nil)
     }
 
+    /// The watch takes up to 5 minutes, checking from 2 s growing to 10 s (was 4 s × 45).
+    @Test func deploymentIsWatchedForFiveMinutes() throws {
+        let model = DeployModel(app: AppModel(), detail: try detail(declarations: "[]"))
+        #expect(model.poller.policy == .standard)
+        #expect(model.poller.policy.timeLimit == .seconds(300))
+        #expect(model.poller.policy.interval(afterCheck: 1) == .seconds(2))
+    }
+
     @Test func unscopedBlueprintCannotBeDeployed() throws {
-        let unscoped = try BlueprintDetail(data: Data(#"{"id":"b2","name":"n","scope":null,"steps":[]}"#.utf8))
+        let unscoped = try JamfPlatform.BlueprintDetail(data: Data(#"{"id":"b2","name":"n","scope":null,"steps":[]}"#.utf8))
         let model = DeployModel(app: AppModel(), detail: unscoped)
         model.isConfirmed = true
         #expect(model.blockingReason?.contains("no device groups") == true)
@@ -540,7 +514,7 @@ struct DeployModelTests {
 /// Records deployment updates from the monitor.
 private final class StatusRecorder: @unchecked Sendable {
     private let lock = NSLock()
-    private var statuses: [DeploymentStatus] = []
-    func record(_ status: DeploymentStatus) { lock.withLock { statuses.append(status) } }
+    private var statuses: [JamfPlatform.DeploymentStatus] = []
+    func record(_ status: JamfPlatform.DeploymentStatus) { lock.withLock { statuses.append(status) } }
     var jobStates: [String?] { lock.withLock { statuses.map(\.jobState) } }
 }

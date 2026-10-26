@@ -1,3 +1,4 @@
+import JTKit
 import SwiftUI
 
 /// The explicit confirmation before deploying, then the deployment's progress.
@@ -6,7 +7,7 @@ struct DeployConfirmationSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var model: DeployModel
 
-    init(app: AppModel, detail: BlueprintDetail) {
+    init(app: AppModel, detail: JamfPlatform.BlueprintDetail) {
         _model = State(initialValue: DeployModel(app: app, detail: detail))
     }
 
@@ -170,7 +171,7 @@ private struct ConfirmView: View {
 
 private struct StatusView: View {
     let name: String
-    let status: DeploymentStatus?
+    let status: JamfPlatform.DeploymentStatus?
     let isFinal: Bool
     let close: () -> Void
 
@@ -189,7 +190,7 @@ private struct StatusView: View {
                 if let started = status?.jobStarted {
                     GridRow {
                         Text("Started").foregroundStyle(.secondary)
-                        Text(PlatformDate.parse(started)?.formatted(date: .abbreviated, time: .standard) ?? started)
+                        Text(JamfPlatform.date(from: started)?.formatted(date: .abbreviated, time: .standard) ?? started)
                     }
                 }
                 GridRow {

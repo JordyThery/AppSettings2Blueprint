@@ -1,3 +1,4 @@
+import JTKit
 import SwiftUI
 
 /// Top-level destinations: Lookup | Rule Set | Jamf.
@@ -76,7 +77,7 @@ private struct RuleSetSidebarRow: View {
 
 /// Deployment state of a blueprint as a small colored capsule.
 struct DeploymentStateBadge: View {
-    let state: DeploymentStateKind
+    let state: JamfPlatform.BlueprintState
 
     var body: some View {
         Text(state.displayName)

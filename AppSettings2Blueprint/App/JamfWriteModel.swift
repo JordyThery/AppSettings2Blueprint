@@ -1,4 +1,5 @@
 import Foundation
+import JTKit
 import Observation
 
 /// Drives "Write to Jamf": choose a target, prepare (concurrency check, backup,
@@ -69,9 +70,9 @@ final class JamfWriteModel {
         }
     }
 
-    var declarations: [JSONValue] { DeclarationEncoder.declarations(for: app.ruleSet.ruleSet) }
+    var declarations: [LosslessJSON] { DeclarationEncoder.declarations(for: app.ruleSet.ruleSet) }
 
-    var selectedDetail: BlueprintDetail? { selectedBlueprintID.flatMap { app.details[$0] } }
+    var selectedDetail: JamfPlatform.BlueprintDetail? { selectedBlueprintID.flatMap { app.details[$0] } }
 
     var predicate: String? {
         let text = activationPredicate.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -80,7 +81,7 @@ final class JamfWriteModel {
 
     /// The placement to use: the one picked, else the component the rule set was
     /// loaded from, else the locator's default.
-    func effectivePlacement(for detail: BlueprintDetail) -> Placement {
+    func effectivePlacement(for detail: JamfPlatform.BlueprintDetail) -> Placement {
         if let placement { return placement }
         if let linked = app.ruleSet.linkedBlueprint, linked.id == detail.id,
            let step = linked.stepIndex, let component = linked.componentIndex,
@@ -133,7 +134,7 @@ final class JamfWriteModel {
     /// Other blueprints with App Settings that share a device group with the target.
     /// Allowed* lists from several declarations intersect and Denied* lists combine
     /// on the device, so these change the effective result.
-    var overlappingBlueprints: [BlueprintDetail] {
+    var overlappingBlueprints: [JamfPlatform.BlueprintDetail] {
         let groups: Set<String> = switch mode {
         case .existing: Set(selectedDetail?.scopeDeviceGroups ?? [])
         case .new: selectedGroupIDs
@@ -203,7 +204,7 @@ final class JamfWriteModel {
         BlueprintWriter(service: try app.currentService())
     }
 
-    private func finish(_ result: WriteResult, componentPath: [JSONPathComponent]) {
+    private func finish(_ result: WriteResult, componentPath: [LosslessJSON.PathComponent]) {
         app.storeDetail(result.detail)
         var stepIndex: Int?
         var componentIndex: Int?

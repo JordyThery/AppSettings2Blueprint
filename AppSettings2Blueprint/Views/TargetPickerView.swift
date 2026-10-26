@@ -1,3 +1,4 @@
+import JTKit
 import SwiftUI
 
 /// "Write to Jamf": pick a new or existing blueprint and a placement, review the
@@ -159,7 +160,7 @@ private struct ExistingTargetView: View {
 
 private struct PlacementView: View {
     @Bindable var model: JamfWriteModel
-    let detail: BlueprintDetail
+    let detail: JamfPlatform.BlueprintDetail
 
     var body: some View {
         let steps = detail.steps?.arrayValue ?? []
@@ -248,7 +249,9 @@ private struct NewBlueprintView: View {
                     )) {
                         VStack(alignment: .leading, spacing: 1) {
                             Text(group.name)
-                            Text("\(group.deviceType.displayName) · \(group.groupType.displayName) · \(group.memberCount) member\(group.memberCount == 1 ? "" : "s")")
+                            Text([group.deviceType.displayName, group.groupType.displayName,
+                                  group.memberCount.map { "\($0) member\($0 == 1 ? "" : "s")" }]
+                                .compactMap { $0 }.joined(separator: " · "))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }

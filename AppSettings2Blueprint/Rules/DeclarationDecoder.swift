@@ -1,4 +1,5 @@
 import Foundation
+import JTKit
 
 /// Reads App Settings declarations back into a rule set. Keys it does not
 /// understand, and values of an unexpected type, are kept in `preserved` /
@@ -14,7 +15,7 @@ nonisolated enum DeclarationDecoder {
 
     /// Decodes every `com.apple.configuration.app.settings` declaration in `declarations`.
     /// The platform is inferred from the keys unless `platform` is given.
-    static func decode(declarations: [JSONValue], name: String = "Untitled Rule Set", platform: RulePlatform? = nil) -> Result {
+    static func decode(declarations: [LosslessJSON], name: String = "Untitled Rule Set", platform: RulePlatform? = nil) -> Result {
         var ruleSet = RuleSet(name: name)
         var notes: [String] = []
         var seenChannels = Set<String>()
@@ -33,7 +34,7 @@ nonisolated enum DeclarationDecoder {
             if let object = declaration.objectValue {
                 parts.declaration.object.members += object.members.filter { !declarationKeys.contains($0.key) }
             }
-            let payload = declaration["payload"]?.objectValue ?? JSONObject()
+            let payload = declaration["payload"]?.objectValue ?? LosslessJSON.Object()
             for member in payload.members {
                 switch (member.key, member.value) {
                 case ("Allowed", .object(let allowed)):
@@ -95,7 +96,7 @@ nonisolated enum DeclarationDecoder {
     // MARK: Allowed
 
     private static func decodeAllowed(
-        _ allowed: JSONObject,
+        _ allowed: LosslessJSON.Object,
         into ruleSet: inout RuleSet,
         parts: inout PreservedDeclarationParts,
         hasIOSKeys: inout Bool,
@@ -137,7 +138,7 @@ nonisolated enum DeclarationDecoder {
         }
     }
 
-    static func binaryRule(_ object: JSONObject) -> BinaryRule {
+    static func binaryRule(_ object: LosslessJSON.Object) -> BinaryRule {
         var rule = BinaryRule()
         for member in object.members {
             guard let text = member.value.stringValue else {
@@ -159,7 +160,7 @@ nonisolated enum DeclarationDecoder {
     // MARK: Privacy
 
     private static func decodePrivacy(
-        _ privacy: JSONObject,
+        _ privacy: LosslessJSON.Object,
         into ruleSet: inout RuleSet,
         parts: inout PreservedDeclarationParts,
         hasMacKeys: inout Bool
@@ -179,7 +180,7 @@ nonisolated enum DeclarationDecoder {
         }
     }
 
-    static func permissionDefault(key: String, object: JSONObject) -> PermissionDefault {
+    static func permissionDefault(key: String, object: LosslessJSON.Object) -> PermissionDefault {
         var entry = PermissionDefault(appIdentifier: key)
         let permissionKeys = Set(PermissionKey.allCases.map(\.rawValue))
         for member in object.members {

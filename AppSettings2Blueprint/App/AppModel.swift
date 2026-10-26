@@ -24,15 +24,15 @@ final class AppModel {
     let ruleSet = RuleSetDocument()
     let builtInApps: Result<AppleBuiltInApps, Error> = Result { try AppleBuiltInApps.load() }
 
-    private(set) var overviews: [BlueprintOverview] = []
-    private(set) var details: [String: BlueprintDetail] = [:]
+    private(set) var overviews: [JamfPlatform.BlueprintOverview] = []
+    private(set) var details: [String: JamfPlatform.BlueprintDetail] = [:]
     private(set) var detailErrors: [String: String] = [:]
     private(set) var loadingDetailIDs: Set<String> = []
     private(set) var listState: ListState = .idle
 
     /// Blueprints that answered 409 DIVISION_PATCH_NOT_ALLOWED this session.
     var readOnlyBlueprintIDs: Set<String> = []
-    private(set) var deviceGroups: [PlatformGroup] = []
+    private(set) var deviceGroups: [JamfPlatform.DeviceGroup] = []
     private(set) var deviceGroupsError: String?
     private(set) var isLoadingDeviceGroups = false
     /// True when the connection's environment has no platform device groups: the
@@ -41,8 +41,6 @@ final class AppModel {
     /// scope cannot be chosen in the app.
     private(set) var isJamfSchool = false
 
-    static let tenantNotFoundCode = "TENANT_NOT_FOUND"
-
     var searchText = ""
     var selectedBlueprintID: String? {
         didSet {
@@ -50,7 +48,8 @@ final class AppModel {
         }
     }
 
-    private var client: PlatformAPIClient?
+    /// JTKit's client for the selected profile, kept while its credentials stay the same.
+    private var client: (credentials: PlatformCredentials, client: JamfPlatform.Client)?
     private var listTask: Task<Void, Never>?
     /// Incremented on every profile switch. Async work compares it before storing
     /// results, so a load started against the old tenant cannot repopulate the new one.
@@ -71,22 +70,27 @@ final class AppModel {
 
     // MARK: Connection
 
-    /// Returns a service for the selected profile, rebuilding the client when credentials change.
-    func currentService() throws -> BlueprintService {
+    /// The client for the selected profile, rebuilt when its credentials change.
+    func currentClient() throws -> JamfPlatform.Client {
         guard let profile = profileStore.selectedProfile,
               let credentials = profileStore.credentials(for: profile) else {
             throw APIError.missingCredentials
         }
         if let client, client.credentials == credentials {
-            return BlueprintService(client: client)
+            return client.client
         }
-        let newClient = makeClient(credentials: credentials)
-        client = newClient
-        return BlueprintService(client: newClient)
+        let newClient = try makeClient(credentials: credentials)
+        client = (credentials, newClient)
+        return newClient
     }
 
-    func makeClient(credentials: PlatformCredentials) -> PlatformAPIClient {
-        PlatformAPIClient(credentials: credentials, log: activityLog)
+    /// The Blueprints API for the selected profile.
+    func currentService() throws -> JamfPlatform.Blueprints {
+        JamfPlatform.Blueprints(client: try currentClient())
+    }
+
+    func makeClient(credentials: PlatformCredentials) throws -> JamfPlatform.Client {
+        try PlatformAPIClient.make(credentials: credentials, log: activityLog)
     }
 
     /// Called when the user switches profile: clears everything loaded from the old tenant.
@@ -116,12 +120,11 @@ final class AppModel {
             defer { isLoadingDeviceGroups = false }
             let generation = connectionGeneration
             do {
-                let service = try currentService()
-                let groups = try await DeviceGroupsService(client: service.client).listAll()
+                let groups = try await currentClient().deviceGroups()
                 guard generation == connectionGeneration else { return }
                 deviceGroups = groups
                 isJamfSchool = false
-            } catch let error as APIError where error.hasErrorCode(Self.tenantNotFoundCode) {
+            } catch let error as JamfPlatformError where error.hasCode(.tenantNotFound) {
                 guard generation == connectionGeneration else { return }
                 isJamfSchool = true
             } catch {
@@ -139,7 +142,7 @@ final class AppModel {
     // MARK: Blueprints
 
     /// Whether the blueprint may be written: not division-locked and not refused before.
-    func isReadOnly(_ detail: BlueprintDetail) -> Bool {
+    func isReadOnly(_ detail: JamfPlatform.BlueprintDetail) -> Bool {
         detail.isDivisionLocked || readOnlyBlueprintIDs.contains(detail.id)
     }
 
@@ -149,7 +152,7 @@ final class AppModel {
         guard let service = try? currentService() else { return }
         let generation = connectionGeneration
         let missing = overviews.map(\.id).filter { details[$0] == nil }
-        await withTaskGroup(of: BlueprintDetail?.self) { group in
+        await withTaskGroup(of: JamfPlatform.BlueprintDetail?.self) { group in
             var pending = missing[...]
             func enqueue() {
                 guard let id = pending.popFirst() else { return }
@@ -168,7 +171,7 @@ final class AppModel {
     }
 
     /// Records a blueprint fetched elsewhere (writes, read-backs).
-    func storeDetail(_ detail: BlueprintDetail) {
+    func storeDetail(_ detail: JamfPlatform.BlueprintDetail) {
         store(detail)
     }
 
@@ -176,7 +179,7 @@ final class AppModel {
     func refresh() {
         listTask?.cancel()
         listTask = Task {
-            let service: BlueprintService
+            let service: JamfPlatform.Blueprints
             do {
                 service = try currentService()
             } catch {
@@ -185,7 +188,7 @@ final class AppModel {
             }
             listState = .listing
             do {
-                let list = try await service.listAll()
+                let list = try await service.list()
                 guard !Task.isCancelled else { return }
                 overviews = list
                 let ids = Set(list.map(\.id))
@@ -232,7 +235,7 @@ final class AppModel {
         selectedBlueprintID = detail.id
     }
 
-    private func store(_ detail: BlueprintDetail) {
+    private func store(_ detail: JamfPlatform.BlueprintDetail) {
         details[detail.id] = detail
         detailErrors[detail.id] = nil
         if let index = overviews.firstIndex(where: { $0.id == detail.id }) {
@@ -242,7 +245,7 @@ final class AppModel {
         }
     }
 
-    var visibleOverviews: [BlueprintOverview] {
+    var visibleOverviews: [JamfPlatform.BlueprintOverview] {
         let query = searchText.trimmingCharacters(in: .whitespaces)
         guard !query.isEmpty else { return overviews }
         return overviews.filter {

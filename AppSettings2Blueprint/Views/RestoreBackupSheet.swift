@@ -1,11 +1,12 @@
 import AppKit
+import JTKit
 import SwiftUI
 
 /// Lists local backups of a blueprint and PATCHes the chosen backup's steps back.
 struct RestoreBackupSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
-    let detail: BlueprintDetail
+    let detail: JamfPlatform.BlueprintDetail
     @State private var backups: [BlueprintBackup] = []
     @State private var selection: BlueprintBackup.ID?
     @State private var isConfirming = false

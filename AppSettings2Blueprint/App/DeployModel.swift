@@ -1,15 +1,17 @@
 import Foundation
+import JTKit
 import Observation
 
-/// Drives one deployment: the confirmation, POST deploy, then polling the
-/// blueprint and its status report until the deployment finishes.
+/// Drives one deployment: the confirmation, POST deploy, then JTKit's watch of
+/// the blueprint and its status report until the deployment finishes (checks
+/// from 2 s, growing to 10 s, for up to 5 minutes).
 @Observable
 final class DeployModel {
     enum Phase {
         case confirming
         case deploying
-        case watching(DeploymentStatus?)
-        case finished(DeploymentStatus)
+        case watching(JamfPlatform.DeploymentStatus?)
+        case finished(JamfPlatform.DeploymentStatus)
         /// The deploy POST itself failed; nothing was started.
         case failed(String)
         /// The deployment was started, but following its status failed.
@@ -24,15 +26,17 @@ final class DeployModel {
     }
 
     let app: AppModel
-    private(set) var detail: BlueprintDetail
+    private(set) var detail: JamfPlatform.BlueprintDetail
     var phase: Phase = .confirming
     var isConfirmed = false
     /// Second confirmation, required while an allow list lacks the recommended baseline.
     var acknowledgesAllowListRisk = false
 
     @ObservationIgnored private var watchTask: Task<Void, Never>?
+    /// How the deployment is followed: JTKit's standard policy.
+    @ObservationIgnored var poller = JamfPlatform.Poller()
 
-    init(app: AppModel, detail: BlueprintDetail) {
+    init(app: AppModel, detail: JamfPlatform.BlueprintDetail) {
         self.app = app
         self.detail = detail
     }
@@ -84,15 +88,15 @@ final class DeployModel {
         watchTask = Task {
             // The POST and the watch fail differently: before the POST succeeds
             // nothing was started; after it, the deployment runs on in Jamf.
-            let monitor: DeploymentMonitor
+            let blueprints: JamfPlatform.Blueprints
             let previous: String?
             do {
-                monitor = DeploymentMonitor(service: try app.currentService())
-                previous = try await monitor.deploy(detail)
+                blueprints = try app.currentService()
+                previous = try await blueprints.startDeployment(id: detail.id)
             } catch is CancellationError {
                 return
-            } catch let error as APIError {
-                if case .http(409, _, _) = error {
+            } catch let error as JamfPlatformError {
+                if error.status == 409 {
                     phase = .failed("Jamf did not start the deployment: the blueprint is not valid for deployment.\n\n\(error.localizedDescription)")
                 } else {
                     phase = .failed(error.localizedDescription)
@@ -104,10 +108,12 @@ final class DeployModel {
             }
             phase = .watching(nil)
             do {
-                let final = try await monitor.watch(id: detail.id, previousStart: previous) { status in
+                let outcome = try await blueprints.watchDeployment(id: detail.id, previousStart: previous, poller: poller) { status in
                     await MainActor.run { self.phase = .watching(status) }
                 }
-                if let fresh = try? await monitor.service.detail(id: detail.id) {
+                // a time-out keeps the last status seen; the deployment carries on in Jamf
+                let final = outcome.value ?? JamfPlatform.DeploymentStatus()
+                if let fresh = try? await blueprints.detail(id: detail.id) {
                     detail = fresh
                     app.storeDetail(fresh)
                 }

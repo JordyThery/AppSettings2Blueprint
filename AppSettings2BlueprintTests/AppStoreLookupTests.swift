@@ -43,7 +43,7 @@ struct AppStoreParsingTests {
     }
 
     @Test func normalisesSearchResultAndLeavesMissingValuesNil() throws {
-        let json = try JSONValue(string: searchResponse([(10, "Ten", "com.example.ten"), (11, "Eleven", nil)]))
+        let json = try LosslessJSON(string: searchResponse([(10, "Ten", "com.example.ten"), (11, "Eleven", nil)]))
         let apps = try #require(json["results"]?.arrayValue).compactMap { AppStoreApp(searchResult: $0, platformLabel: "iPad") }
         #expect(apps.count == 2)
         #expect(apps[0].bundleID == "com.example.ten")
@@ -53,12 +53,12 @@ struct AppStoreParsingTests {
         #expect(apps[0].platforms == ["iPad"])
         #expect(apps[1].bundleID == nil)
         // A result without a trackId is not an app record.
-        #expect(AppStoreApp(searchResult: try JSONValue(string: #"{"trackName":"x"}"#), platformLabel: "Mac") == nil)
+        #expect(AppStoreApp(searchResult: try LosslessJSON(string: #"{"trackName":"x"}"#), platformLabel: "Mac") == nil)
     }
 
     @Test func parsesDetailLookup() throws {
         let body = #"{"results":{"951937596":{"bundleId":"com.microsoft.Office.Outlook","softwareInfo":{"seller":"Microsoft Corporation"},"minimumOSVersion":"26.0","deviceFamilies":["watch","iphone","ipad"],"isVppDeviceBasedLicensingEnabled":true,"contentRatingsBySystem":{"appsApple":{"name":"4+"}},"offers":[{"priceFormatted":"0,00 €","version":{"display":"5.2641.0","externalId":893334590}}]}}}"#
-        let detail = try #require(AppStoreDetail(lookupResponse: try JSONValue(string: body), appStoreID: 951937596))
+        let detail = try #require(AppStoreDetail(lookupResponse: try LosslessJSON(string: body), appStoreID: 951937596))
         #expect(detail.seller == "Microsoft Corporation")
         #expect(detail.version == "5.2641.0")
         #expect(detail.externalVersionID == "893334590")
@@ -70,8 +70,8 @@ struct AppStoreParsingTests {
     }
 
     @Test func detailForAnotherAppOrWithoutBundleIDIsUnavailable() throws {
-        let other = try JSONValue(string: #"{"results":{"1":{"bundleId":"a"}}}"#)
-        let noBundle = try JSONValue(string: #"{"results":{"2":{"name":"x"}}}"#)
+        let other = try LosslessJSON(string: #"{"results":{"1":{"bundleId":"a"}}}"#)
+        let noBundle = try LosslessJSON(string: #"{"results":{"2":{"name":"x"}}}"#)
         #expect(AppStoreDetail(lookupResponse: other, appStoreID: 2) == nil)
         #expect(AppStoreDetail(lookupResponse: noBundle, appStoreID: 2) == nil)
     }

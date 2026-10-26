@@ -1,4 +1,5 @@
 import Foundation
+import JTKit
 import Observation
 
 /// Drives Edit Scope: choose a blueprint's device groups, then PATCH the scope
@@ -21,14 +22,14 @@ final class EditScopeModel {
     }
 
     let app: AppModel
-    let detail: BlueprintDetail
+    let detail: JamfPlatform.BlueprintDetail
     var selected: Set<String>
     var searchText = ""
     var phase: Phase = .editing
     /// Required when groups are removed from a blueprint that has been deployed.
     var acknowledgesRemoval = false
 
-    init(app: AppModel, detail: BlueprintDetail) {
+    init(app: AppModel, detail: JamfPlatform.BlueprintDetail) {
         self.app = app
         self.detail = detail
         selected = Set(detail.scopeDeviceGroups)

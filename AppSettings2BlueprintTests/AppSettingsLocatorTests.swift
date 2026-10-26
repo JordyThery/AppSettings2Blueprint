@@ -1,11 +1,12 @@
 import Foundation
+import JTKit
 import Testing
 @testable import AppSettings2Blueprint
 
 @Suite("App Settings discovery")
 struct AppSettingsLocatorTests {
     @Test func findsDeclarationInStrictComponent() throws {
-        let detail = try BlueprintDetail(data: Data(appSettingsBlueprintJSON.utf8))
+        let detail = try JamfPlatform.BlueprintDetail(data: Data(appSettingsBlueprintJSON.utf8))
         #expect(detail.containsAppSettings)
         #expect(detail.appSettingsLocations.count == 1)
         let location = try #require(detail.appSettingsLocations.first)
@@ -19,18 +20,18 @@ struct AppSettingsLocatorTests {
 
     @Test func reportsDeclarationInOtherComponentAsNotStrict() throws {
         let json = #"{"id":"x","steps":[{"components":[{"identifier":"com.jamf.ddm.custom-declarations","configuration":{"declarations":[{"type":"com.apple.configuration.app.settings","channelType":"USER","payload":{}}]}}]}]}"#
-        let location = try #require(try BlueprintDetail(data: Data(json.utf8)).appSettingsLocations.first)
+        let location = try #require(try JamfPlatform.BlueprintDetail(data: Data(json.utf8)).appSettingsLocations.first)
         #expect(!location.isStrictComponent)
         #expect(location.channelType == "USER")
     }
 
     @Test func blueprintWithoutAppSettingsIsNotAMatch() throws {
         let json = #"{"id":"x","steps":[{"components":[{"identifier":"com.jamf.ddm-strict","configuration":{"declarations":[{"type":"com.apple.configuration.keyboard.settings","payload":{}}]}}]}]}"#
-        #expect(!(try BlueprintDetail(data: Data(json.utf8))).containsAppSettings)
+        #expect(!(try JamfPlatform.BlueprintDetail(data: Data(json.utf8))).containsAppSettings)
     }
 
     @Test func untouchedStepsRoundTripByteForByte() throws {
-        let json = try JSONValue(string: appSettingsBlueprintJSON)
+        let json = try LosslessJSON(string: appSettingsBlueprintJSON)
         let steps = try #require(json["steps"])
         #expect(appSettingsBlueprintJSON.contains(steps.serializedString()))
     }

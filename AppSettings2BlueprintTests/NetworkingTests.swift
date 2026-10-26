@@ -49,11 +49,12 @@ struct RequestAllowListTests {
 extension MockNetworkTests {
 @Suite("Platform API client")
 struct PlatformAPIClientTests {
-    private let credentials = PlatformCredentials(region: .eu, environmentID: "env-1", clientID: "id", clientSecret: "s3cr3t")
+    private static let environmentID = "e77c1408-10c8-4007-b177-abc9157fbcaa"
+    private let credentials = PlatformCredentials(region: .eu, environmentID: environmentID, clientID: "id", clientSecret: "s3cr3t")
     private static let token = MockResponse.json(200, #"{"access_token":"tok","expires_in":900}"#)
 
-    private func makeClient(sleeps: SleepRecorder = SleepRecorder(), log: ActivityLog? = nil) -> PlatformAPIClient {
-        PlatformAPIClient(
+    private func makeClient(sleeps: SleepRecorder = SleepRecorder(), log: ActivityLog? = nil) throws -> JamfPlatform.Client {
+        try PlatformAPIClient.make(
             credentials: credentials,
             session: MockURLProtocol.makeSession(),
             log: log,
@@ -61,20 +62,40 @@ struct PlatformAPIClientTests {
         )
     }
 
+    private func blueprints(sleeps: SleepRecorder = SleepRecorder(), log: ActivityLog? = nil) throws -> JamfPlatform.Blueprints {
+        JamfPlatform.Blueprints(client: try makeClient(sleeps: sleeps, log: log))
+    }
+
     private func apiRequests() -> [RecordedRequest] {
         MockURLProtocol.requests.filter { $0.path != "/auth/token" }
     }
 
-    @Test func deleteAndUndeployNeverReachTheNetwork() async {
+    @Test func deleteAndUndeployNeverReachTheNetwork() async throws {
         MockURLProtocol.install { _ in Issue.record("No request may be sent"); return .json(500, "{}") }
-        let client = makeClient()
-        await #expect(throws: APIError.self) {
-            try await client.send(method: "DELETE", path: "/blueprints/v1/blueprints/abc")
+        let client = try makeClient()
+        await #expect(throws: JamfPlatformError.self) {
+            try await client.send(HTTPRequest(method: "DELETE", path: "/blueprints/v1/blueprints/abc"))
         }
-        await #expect(throws: APIError.self) {
-            try await client.send(method: "POST", path: "/blueprints/v1/blueprints/abc/undeploy")
+        await #expect(throws: JamfPlatformError.self) {
+            try await client.send(HTTPRequest(method: "POST", path: "/blueprints/v1/blueprints/abc/undeploy"))
         }
+        await #expect(throws: JamfPlatformError.self) { try await blueprints().delete(id: "abc") }
         #expect(MockURLProtocol.requests.isEmpty)
+    }
+
+    @Test func aRefusedRequestSaysWhatTheAppSends() async throws {
+        MockURLProtocol.install { _ in .json(500, "{}") }
+        let error = await #expect(throws: JamfPlatformError.self) { try await blueprints().delete(id: "abc") }
+        #expect(error?.localizedDescription.contains(PlatformAPIClient.refusedHint) == true)
+    }
+
+    @Test func anEnvironmentIDThatIsNotAUUIDIsRefusedBeforeSending() {
+        MockURLProtocol.install { _ in Issue.record("No request may be sent"); return .json(500, "{}") }
+        var bad = credentials
+        bad.environmentID = "env-1"
+        #expect(throws: JamfPlatformError.self) {
+            _ = try PlatformAPIClient.make(credentials: bad, session: MockURLProtocol.makeSession(), log: nil)
+        }
     }
 
     @Test func refreshesTokenOnceAfter401() async throws {
@@ -87,17 +108,18 @@ struct PlatformAPIClientTests {
             }
             return gets.next() == 1 ? .json(401, "{}") : .json(200, #"{"results":[],"totalCount":0}"#)
         }
-        _ = try await BlueprintService(client: makeClient()).listPage()
+        _ = try await blueprints().listPage()
         #expect(tokens.value == 2)
         #expect(gets.value == 2)
         let request = try #require(apiRequests().last)
-        #expect(request.header("X-Environment-Id") == "env-1")
+        #expect(request.url.host() == "eu.api.jamfcloud.com")
+        #expect(request.header("X-Environment-Id") == Self.environmentID)
         #expect(request.header("Authorization") == "Bearer tok")
     }
 
-    @Test func secondConsecutive401IsThrown() async {
+    @Test func secondConsecutive401IsThrown() async throws {
         MockURLProtocol.install { $0.path == "/auth/token" ? Self.token : .json(401, "{}") }
-        await #expect(throws: APIError.self) { try await BlueprintService(client: makeClient()).listPage() }
+        await #expect(throws: JamfPlatformError.self) { _ = try await blueprints().listPage() }
         #expect(apiRequests().count == 2)
     }
 
@@ -110,14 +132,14 @@ struct PlatformAPIClientTests {
                 ? .json(429, "{}", headers: ["Retry-After": "7"])
                 : .json(200, #"{"results":[],"totalCount":0}"#)
         }
-        _ = try await BlueprintService(client: makeClient(sleeps: sleeps)).listPage()
+        _ = try await blueprints(sleeps: sleeps).listPage()
         #expect(gets.value == 2)
         #expect(sleeps.recorded == [.seconds(7)])
     }
 
-    @Test func deployIsNotRetriedOn5xx() async {
+    @Test func deployIsNotRetriedOn5xx() async throws {
         MockURLProtocol.install { $0.path == "/auth/token" ? Self.token : .json(503, "{}") }
-        await #expect(throws: APIError.self) { try await BlueprintService(client: makeClient()).deploy(id: "abc") }
+        await #expect(throws: JamfPlatformError.self) { try await blueprints().deploy(id: "abc") }
         #expect(apiRequests().count == 1)
         #expect(apiRequests().first?.path == "/blueprints/v1/blueprints/abc/deploy")
     }
@@ -128,7 +150,7 @@ struct PlatformAPIClientTests {
             if request.path == "/auth/token" { return Self.token }
             return posts.next() == 1 ? .json(429, "{}", headers: ["Retry-After": "1"]) : .json(202, "")
         }
-        try await BlueprintService(client: makeClient()).deploy(id: "abc")
+        try await blueprints().deploy(id: "abc")
         #expect(posts.value == 2)
     }
 
@@ -138,15 +160,15 @@ struct PlatformAPIClientTests {
             if request.path == "/auth/token" { return Self.token }
             return gets.next() == 1 ? .json(502, "{}") : .json(200, #"{"results":[],"totalCount":0}"#)
         }
-        _ = try await BlueprintService(client: makeClient()).listPage()
+        _ = try await blueprints().listPage()
         #expect(gets.value == 2)
     }
 
     @Test func patchSendsOnlyStepsAsMergePatch() async throws {
         MockURLProtocol.install { $0.path == "/auth/token" ? Self.token : MockResponse(status: 204, body: Data()) }
-        let blueprint = try JSONValue(string: appSettingsBlueprintJSON)
+        let blueprint = try LosslessJSON(string: appSettingsBlueprintJSON)
         let steps = try #require(blueprint["steps"])
-        try await BlueprintService(client: makeClient()).patchSteps(id: "abc", steps: steps)
+        try await blueprints().patchSteps(id: "abc", steps: steps)
         let request = try #require(apiRequests().first)
         #expect(request.method == "PATCH")
         #expect(request.header("Content-Type") == "application/merge-patch+json")
@@ -160,28 +182,23 @@ struct PlatformAPIClientTests {
             if request.path == "/auth/token" { return Self.token }
             return patches.next() == 1 ? .json(503, "{}") : MockResponse(status: 204, body: Data())
         }
-        try await BlueprintService(client: makeClient()).patchScope(id: "abc", deviceGroups: ["g1"])
+        try await blueprints().patchScope(id: "abc", deviceGroups: ["g1"])
         #expect(patches.value == 2)
     }
 
-    @Test func failedSignInKeepsTheAppsMessage() async {
+    @Test func failedSignInSaysWhatToCheck() async throws {
         MockURLProtocol.install { _ in .json(401, #"{"error":"invalid_client"}"#) }
-        do {
-            try await makeClient().refreshToken()
-            Issue.record("Expected a sign-in error")
-        } catch let error as APIError {
-            guard case .authentication(401, _) = error else { Issue.record("Got \(error)"); return }
-            #expect(error.localizedDescription.contains("Check the Client ID, Client Secret and region"))
-        } catch {
-            Issue.record("Got \(error)")
-        }
+        let error = await #expect(throws: JamfPlatformError.self) { try await makeClient().signIn() }
+        guard case .signIn(401, _, _)? = error?.kind else { Issue.record("Got \(String(describing: error))"); return }
+        #expect(error?.localizedDescription.contains("Check the client ID, client secret and region") == true)
     }
 
-    @Test @MainActor func refusedRequestIsLoggedAsWarning() async {
+    @Test @MainActor func refusedRequestIsLoggedAsWarning() async throws {
         let log = ActivityLog()
         MockURLProtocol.install { _ in Issue.record("No request may be sent"); return .json(500, "{}") }
-        await #expect(throws: APIError.self) {
-            try await makeClient(log: log).send(method: "DELETE", path: "/blueprints/v1/blueprints/abc")
+        let client = try makeClient(log: log)
+        await #expect(throws: JamfPlatformError.self) {
+            try await client.send(HTTPRequest(method: "DELETE", path: "/blueprints/v1/blueprints/abc"))
         }
         #expect(log.entries.count == 1)
         #expect(log.entries.first?.isWarning == true)
@@ -196,7 +213,7 @@ struct PlatformAPIClientTests {
                 ? .json(429, "{}", headers: ["Retry-After": "7"])
                 : .json(200, #"{"results":[],"totalCount":0}"#)
         }
-        _ = try await BlueprintService(client: makeClient(log: log)).listPage()
+        _ = try await blueprints(log: log).listPage()
         let wait = try #require(log.entries.first { $0.category == "Retry" })
         #expect(wait.isWarning)
         #expect(wait.note?.contains("waiting 7 s, attempt 2 of 4") == true)
@@ -205,9 +222,9 @@ struct PlatformAPIClientTests {
     @Test @MainActor func secretsAndBodiesAreNotLogged() async throws {
         let log = ActivityLog()
         MockURLProtocol.install { $0.path == "/auth/token" ? Self.token : MockResponse(status: 204, body: Data()) }
-        let blueprint = try JSONValue(string: appSettingsBlueprintJSON)
+        let blueprint = try LosslessJSON(string: appSettingsBlueprintJSON)
         let steps = try #require(blueprint["steps"])
-        try await BlueprintService(client: makeClient(log: log)).patchSteps(id: "abc", steps: steps)
+        try await blueprints(log: log).patchSteps(id: "abc", steps: steps)
         let entries = log.entries
         #expect(entries.map(\.category) == ["Sign-in", "API"])
         #expect(entries.allSatisfy { $0.service == "Jamf Platform API" })

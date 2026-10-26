@@ -1,3 +1,4 @@
+import JTKit
 import SwiftUI
 
 /// Jamf → Blueprints: the Blueprint list and the raw JSON of the selected one.
@@ -90,8 +91,8 @@ private struct BlueprintListView: View {
 }
 
 private struct BlueprintRow: View {
-    let overview: BlueprintOverview
-    let detail: BlueprintDetail?
+    let overview: JamfPlatform.BlueprintOverview
+    let detail: JamfPlatform.BlueprintDetail?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
@@ -172,7 +173,7 @@ private struct BlueprintDetailPane: View {
 /// channel, and loads an editable one into the rule set.
 private struct AppSettingsSummary: View {
     @Environment(AppModel.self) private var model
-    let detail: BlueprintDetail
+    let detail: JamfPlatform.BlueprintDetail
     @State private var pendingLoad: AppSettingsLocation?
 
     private var locations: [AppSettingsLocation] { detail.appSettingsLocations }

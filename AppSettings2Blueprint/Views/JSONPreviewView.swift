@@ -1,4 +1,5 @@
 import AppKit
+import JTKit
 import SwiftUI
 
 /// The exact com.jamf.ddm-strict component JSON the rule set produces.

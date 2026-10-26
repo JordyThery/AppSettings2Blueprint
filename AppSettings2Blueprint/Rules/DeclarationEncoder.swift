@@ -1,4 +1,5 @@
 import Foundation
+import JTKit
 
 /// Builds the exact JSON written to Jamf from a rule set.
 ///
@@ -17,17 +18,17 @@ nonisolated enum DeclarationEncoder {
     static let userChannel = "USER"
 
     /// The complete `com.jamf.ddm-strict` component.
-    static func component(for ruleSet: RuleSet) -> JSONValue {
-        .object(JSONObject([
+    static func component(for ruleSet: RuleSet) -> LosslessJSON {
+        .object(LosslessJSON.Object([
             "identifier": .string(componentIdentifier),
-            "configuration": .object(JSONObject(["declarations": .array(declarations(for: ruleSet))])),
+            "configuration": .object(LosslessJSON.Object(["declarations": .array(declarations(for: ruleSet))])),
         ]))
     }
 
     /// One declaration per channel, SYSTEM first. Channels the platform does not
     /// use are still written when they hold preserved content, so decoding and
     /// re-encoding never drops a declaration.
-    static func declarations(for ruleSet: RuleSet) -> [JSONValue] {
+    static func declarations(for ruleSet: RuleSet) -> [LosslessJSON] {
         channels(for: ruleSet).map { declaration(for: ruleSet, channel: $0) }
     }
 
@@ -53,8 +54,8 @@ nonisolated enum DeclarationEncoder {
         ruleSet.isSharedIPad ? userChannel : systemChannel
     }
 
-    static func declaration(for ruleSet: RuleSet, channel: String) -> JSONValue {
-        var object = JSONObject([
+    static func declaration(for ruleSet: RuleSet, channel: String) -> LosslessJSON {
+        var object = LosslessJSON.Object([
             "kind": .string("CONFIGURATION"),
             "type": .string(declarationType),
             "payload": .object(payload(for: ruleSet, channel: channel)),
@@ -64,8 +65,8 @@ nonisolated enum DeclarationEncoder {
         return .object(object)
     }
 
-    static func payload(for ruleSet: RuleSet, channel: String) -> JSONObject {
-        var payload = JSONObject()
+    static func payload(for ruleSet: RuleSet, channel: String) -> LosslessJSON.Object {
+        var payload = LosslessJSON.Object()
         if let allowed = allowed(for: ruleSet, channel: channel) {
             payload["Allowed"] = .object(allowed)
         }
@@ -78,15 +79,15 @@ nonisolated enum DeclarationEncoder {
 
     // MARK: Allowed
 
-    private static func allowed(for ruleSet: RuleSet, channel: String) -> JSONObject? {
-        var allowed = JSONObject()
+    private static func allowed(for ruleSet: RuleSet, channel: String) -> LosslessJSON.Object? {
+        var allowed = LosslessJSON.Object()
         switch ruleSet.platform {
         case .iOS:
             guard channel == iOSChannel(for: ruleSet) else { break }
             let allowedApps = ruleSet.allowedApps.map(\.bundleID).map(trim).filter { !$0.isEmpty }
             let deniedApps = ruleSet.deniedApps.map(\.bundleID).map(trim).filter { !$0.isEmpty }
-            if !allowedApps.isEmpty { allowed["AllowedApps"] = .array(allowedApps.map(JSONValue.string)) }
-            if !deniedApps.isEmpty { allowed["DeniedApps"] = .array(deniedApps.map(JSONValue.string)) }
+            if !allowedApps.isEmpty { allowed["AllowedApps"] = .array(allowedApps.map(LosslessJSON.string)) }
+            if !deniedApps.isEmpty { allowed["DeniedApps"] = .array(deniedApps.map(LosslessJSON.string)) }
         case .macOS:
             guard channel == systemChannel else { break }
             if !ruleSet.allowedBinaries.isEmpty {
@@ -104,8 +105,8 @@ nonisolated enum DeclarationEncoder {
     }
 
     /// Only non-empty fields are written, in the schema's order.
-    static func binaryIdentifier(_ rule: BinaryRule) -> JSONValue {
-        var object = JSONObject()
+    static func binaryIdentifier(_ rule: BinaryRule) -> LosslessJSON {
+        var object = LosslessJSON.Object()
         for (key, value) in [
             ("CDHash", rule.cdHash), ("SigningID", rule.signingID), ("TeamID", rule.teamID),
             ("PathPrefix", rule.pathPrefix), ("SigningState", rule.signingState),
@@ -118,11 +119,11 @@ nonisolated enum DeclarationEncoder {
 
     // MARK: Privacy
 
-    private static func privacy(for ruleSet: RuleSet, channel: String) -> JSONObject? {
+    private static func privacy(for ruleSet: RuleSet, channel: String) -> LosslessJSON.Object? {
         let privacyChannel = ruleSet.platform == .macOS ? userChannel : iOSChannel(for: ruleSet)
-        var privacy = JSONObject()
+        var privacy = LosslessJSON.Object()
         if channel == privacyChannel, !ruleSet.permissionDefaults.isEmpty {
-            var defaults = JSONObject()
+            var defaults = LosslessJSON.Object()
             for entry in ruleSet.permissionDefaults {
                 defaults.members.append(.init(
                     key: trim(entry.appIdentifier),
@@ -135,8 +136,8 @@ nonisolated enum DeclarationEncoder {
         return privacy.isEmpty ? nil : privacy
     }
 
-    static func permissionEntry(_ entry: PermissionDefault, platform: RulePlatform) -> JSONObject {
-        var object = JSONObject(["OrganizationJustification": .string(entry.organizationJustification)])
+    static func permissionEntry(_ entry: PermissionDefault, platform: RulePlatform) -> LosslessJSON.Object {
+        var object = LosslessJSON.Object(["OrganizationJustification": .string(entry.organizationJustification)])
         for key in PermissionKey.allCases where key.isSupported(on: platform) {
             if let value = entry.value(key) { object[key.rawValue] = .string(value) }
         }
@@ -147,7 +148,7 @@ nonisolated enum DeclarationEncoder {
     // MARK: Helpers
 
     /// Appends preserved members whose keys the encoder did not already write.
-    private static func appendExtras(_ extras: PreservedJSON?, to object: inout JSONObject) {
+    private static func appendExtras(_ extras: PreservedJSON?, to object: inout LosslessJSON.Object) {
         guard let extras else { return }
         let written = Set(object.keys)
         object.members.append(contentsOf: extras.object.members.filter { !written.contains($0.key) })

@@ -83,7 +83,7 @@ nonisolated struct AppStoreApp: Identifiable, Hashable, Sendable {
 
     // Ported from cantscript/AppSettingsUtility (MIT) — normalise_results in appSettingsUtility.sh
     /// Builds a result from one item of the search response, tagged with `platformLabel`.
-    init?(searchResult item: JSONValue, platformLabel: String) {
+    init?(searchResult item: LosslessJSON, platformLabel: String) {
         guard let id = item["trackId"]?.numberValue?.intValue else { return nil }
         appStoreID = id
         name = item["trackName"]?.stringValue ?? ""
@@ -135,7 +135,7 @@ nonisolated struct AppStoreDetail: Hashable, Sendable {
 
     // Ported from cantscript/AppSettingsUtility (MIT) — load_app_details in appSettingsUtility.sh
     /// Reads `results[<id>]`. Returns nil unless it is an object with a bundleId.
-    init?(lookupResponse json: JSONValue, appStoreID: Int) {
+    init?(lookupResponse json: LosslessJSON, appStoreID: Int) {
         guard let detail = json["results"]?[String(appStoreID)], detail.objectValue != nil,
               detail["bundleId"]?.stringValue != nil else { return nil }
         // The first offer that has both a display version and an external version ID.
@@ -152,7 +152,7 @@ nonisolated struct AppStoreDetail: Hashable, Sendable {
         vppDeviceLicensing = detail["isVppDeviceBasedLicensingEnabled"]?.boolValue
     }
 
-    private static func text(_ value: JSONValue) -> String? {
+    private static func text(_ value: LosslessJSON) -> String? {
         value.stringValue ?? value.numberValue?.literal
     }
 }
@@ -294,14 +294,14 @@ nonisolated struct AppStoreClient: Sendable {
         a.unicodeScalars.lexicographicallyPrecedes(b.unicodeScalars)
     }
 
-    private func getJSON(_ url: URL) async throws -> JSONValue {
+    private func getJSON(_ url: URL) async throws -> LosslessJSON {
         var request = URLRequest(url: url, timeoutInterval: 20)
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         let (data, response) = try await recorder.send(request)
         let status = response.statusCode
         guard status == 200 else { throw LookupError(message: "The App Store answered HTTP \(status).") }
         do {
-            return try JSONValue(data: data)
+            return try LosslessJSON(data: data)
         } catch {
             throw LookupError(message: "The App Store response is not valid JSON.")
         }

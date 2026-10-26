@@ -1,4 +1,5 @@
 import AppKit
+import JTKit
 import SwiftUI
 
 /// Step 4 of the save flow: the component before and after as a diff, what else
@@ -35,7 +36,7 @@ struct ReviewChangesSheet: View {
 
             Divider()
             if showsPatchBody {
-                MonospacedTextView(text: (try? JSONValue(data: prepared.patchBody))?.serializedString(pretty: true) ?? "")
+                MonospacedTextView(text: (try? LosslessJSON(data: prepared.patchBody))?.serializedString(pretty: true) ?? "")
             } else if changed == 0 {
                 ContentUnavailableView("No Differences", systemImage: "equal.circle",
                                        description: Text("The blueprint already holds exactly this rule set. Writing would change nothing."))

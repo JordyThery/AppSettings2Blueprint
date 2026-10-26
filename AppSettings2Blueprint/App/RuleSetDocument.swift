@@ -1,4 +1,5 @@
 import Foundation
+import JTKit
 import Observation
 
 /// A blueprint the rule set belongs to, and the component it was loaded from,
@@ -48,7 +49,7 @@ final class RuleSetDocument {
     var hasErrors: Bool { issues.contains { $0.severity == .error } }
 
     /// The component JSON exactly as it would be written to the Blueprint.
-    var componentJSON: JSONValue { DeclarationEncoder.component(for: ruleSet) }
+    var componentJSON: LosslessJSON { DeclarationEncoder.component(for: ruleSet) }
 
     // MARK: Editing
 
@@ -92,7 +93,7 @@ final class RuleSetDocument {
     // MARK: Jamf
 
     /// Loads the App Settings declarations of one com.jamf.ddm-strict component.
-    func load(from detail: BlueprintDetail, location: AppSettingsLocation) {
+    func load(from detail: JamfPlatform.BlueprintDetail, location: AppSettingsLocation) {
         let declarations = detail.json.value(at: location.componentPath + [.key("configuration"), .key("declarations")])?
             .arrayValue ?? []
         var decoded = DeclarationDecoder.decode(declarations: declarations, name: detail.overview.name)

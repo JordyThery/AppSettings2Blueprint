@@ -1,11 +1,12 @@
 import AppKit
+import JTKit
 import SwiftUI
 import UniformTypeIdentifiers
 
 /// Raw JSON view: the GET response exactly as received, or pretty-printed.
 /// The PATCH body a write will send is shown in the review sheet instead.
 struct RawJSONView: View {
-    let detail: BlueprintDetail
+    let detail: JamfPlatform.BlueprintDetail
 
     @State private var format: Format = .pretty
 
@@ -67,7 +68,7 @@ struct RawJSONView: View {
 /// Name, state, scope and timestamps of a blueprint.
 struct BlueprintHeader: View {
     @Environment(AppModel.self) private var model
-    let detail: BlueprintDetail
+    let detail: JamfPlatform.BlueprintDetail
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -94,7 +95,7 @@ struct BlueprintHeader: View {
             }
             if let deployment = detail.overview.deploymentState,
                let started = deployment.lastDeploymentStarted {
-                Text("Last deployment \(PlatformDate.parse(started)?.formatted(date: .abbreviated, time: .shortened) ?? started)\(deployment.lastDeploymentState.map { " · \(DeploymentStateKind(rawValue: $0).displayName)" } ?? "")")
+                Text("Last deployment \(JamfPlatform.date(from: started)?.formatted(date: .abbreviated, time: .shortened) ?? started)\(deployment.lastDeploymentState.map { " · \(JamfPlatform.BlueprintState(rawValue: $0).displayName)" } ?? "")")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .help(started)
