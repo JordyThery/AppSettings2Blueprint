@@ -1,4 +1,5 @@
 import Foundation
+import JTKit
 
 /// The App Store search platforms. Labels match App Settings Utility's CSV output.
 nonisolated enum AppStorePlatform: String, CaseIterable, Identifiable, Hashable, Sendable {
@@ -157,7 +158,8 @@ nonisolated struct AppStoreDetail: Hashable, Sendable {
 }
 
 /// Talks only to Apple's public App Store endpoints. Uses its own ephemeral session
-/// and never sends Jamf data or credentials.
+/// and never sends Jamf data or credentials. Each lookup is written to JTKit's
+/// activity log by its request recorder; lookups are not retried.
 nonisolated struct AppStoreClient: Sendable {
     struct SearchResult: Sendable {
         var apps: [AppStoreApp]
@@ -171,10 +173,11 @@ nonisolated struct AppStoreClient: Sendable {
     }
 
     static let resultLimit = 50
-    private let session: URLSession
+    private let recorder: RequestRecorder
 
-    init(session: URLSession = URLSession(configuration: .ephemeral)) {
-        self.session = session
+    /// - Parameter log: JTKit's activity log; nil records nothing (tests, previews).
+    init(session: URLSession = URLSession(configuration: .ephemeral), log: ActivityLog? = nil) {
+        recorder = RequestRecorder(session: session, log: log, category: "App Store")
     }
 
     /// Searches one platform, or all three concurrently and merged by App Store ID.
@@ -294,8 +297,8 @@ nonisolated struct AppStoreClient: Sendable {
     private func getJSON(_ url: URL) async throws -> JSONValue {
         var request = URLRequest(url: url, timeoutInterval: 20)
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        let (data, response) = try await session.data(for: request)
-        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        let (data, response) = try await recorder.send(request)
+        let status = response.statusCode
         guard status == 200 else { throw LookupError(message: "The App Store answered HTTP \(status).") }
         do {
             return try JSONValue(data: data)

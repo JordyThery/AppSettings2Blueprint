@@ -1,4 +1,5 @@
 import Foundation
+import JTKit
 import Testing
 @testable import AppSettings2Blueprint
 
@@ -51,12 +52,12 @@ struct PlatformAPIClientTests {
     private let credentials = PlatformCredentials(region: .eu, environmentID: "env-1", clientID: "id", clientSecret: "s3cr3t")
     private static let token = MockResponse.json(200, #"{"access_token":"tok","expires_in":900}"#)
 
-    private func makeClient(sleeps: SleepRecorder = SleepRecorder()) -> PlatformAPIClient {
+    private func makeClient(sleeps: SleepRecorder = SleepRecorder(), log: ActivityLog? = nil) -> PlatformAPIClient {
         PlatformAPIClient(
             credentials: credentials,
             session: MockURLProtocol.makeSession(),
-            sleep: { try await sleeps.sleep(.seconds($0)) },
-            log: { _ in }
+            log: log,
+            sleep: { try await sleeps.sleep($0) }
         )
     }
 
@@ -153,25 +154,73 @@ struct PlatformAPIClientTests {
         #expect(!request.bodyString.contains("divisionId"))
     }
 
-    @Test @MainActor func tokenSecretIsNotLogged() async throws {
-        let entries = LogCollector()
-        MockURLProtocol.install { $0.path == "/auth/token" ? Self.token : .json(200, #"{"results":[],"totalCount":0}"#) }
-        let client = PlatformAPIClient(credentials: credentials, session: MockURLProtocol.makeSession()) { entries.append($0) }
-        _ = try await BlueprintService(client: client).listPage()
-        let all = entries.all
-        #expect(!all.isEmpty)
-        let text = all.map { [$0.requestBody ?? "", $0.responseBody ?? "", $0.requestHeaders.map(\.1).joined()].joined() }.joined()
+    @Test func patchIsRetriedOn5xx() async throws {
+        let patches = Counter()
+        MockURLProtocol.install { request in
+            if request.path == "/auth/token" { return Self.token }
+            return patches.next() == 1 ? .json(503, "{}") : MockResponse(status: 204, body: Data())
+        }
+        try await BlueprintService(client: makeClient()).patchScope(id: "abc", deviceGroups: ["g1"])
+        #expect(patches.value == 2)
+    }
+
+    @Test func failedSignInKeepsTheAppsMessage() async {
+        MockURLProtocol.install { _ in .json(401, #"{"error":"invalid_client"}"#) }
+        do {
+            try await makeClient().refreshToken()
+            Issue.record("Expected a sign-in error")
+        } catch let error as APIError {
+            guard case .authentication(401, _) = error else { Issue.record("Got \(error)"); return }
+            #expect(error.localizedDescription.contains("Check the Client ID, Client Secret and region"))
+        } catch {
+            Issue.record("Got \(error)")
+        }
+    }
+
+    @Test @MainActor func refusedRequestIsLoggedAsWarning() async {
+        let log = ActivityLog()
+        MockURLProtocol.install { _ in Issue.record("No request may be sent"); return .json(500, "{}") }
+        await #expect(throws: APIError.self) {
+            try await makeClient(log: log).send(method: "DELETE", path: "/blueprints/v1/blueprints/abc")
+        }
+        #expect(log.entries.count == 1)
+        #expect(log.entries.first?.isWarning == true)
+    }
+
+    @Test @MainActor func waitBeforeRetryIsLogged() async throws {
+        let log = ActivityLog()
+        let gets = Counter()
+        MockURLProtocol.install { request in
+            if request.path == "/auth/token" { return Self.token }
+            return gets.next() == 1
+                ? .json(429, "{}", headers: ["Retry-After": "7"])
+                : .json(200, #"{"results":[],"totalCount":0}"#)
+        }
+        _ = try await BlueprintService(client: makeClient(log: log)).listPage()
+        let wait = try #require(log.entries.first { $0.category == "Retry" })
+        #expect(wait.isWarning)
+        #expect(wait.note?.contains("waiting 7 s, attempt 2 of 4") == true)
+    }
+
+    @Test @MainActor func secretsAndBodiesAreNotLogged() async throws {
+        let log = ActivityLog()
+        MockURLProtocol.install { $0.path == "/auth/token" ? Self.token : MockResponse(status: 204, body: Data()) }
+        let blueprint = try JSONValue(string: appSettingsBlueprintJSON)
+        let steps = try #require(blueprint["steps"])
+        try await BlueprintService(client: makeClient(log: log)).patchSteps(id: "abc", steps: steps)
+        let entries = log.entries
+        #expect(entries.map(\.category) == ["Sign-in", "API"])
+        #expect(entries.allSatisfy { $0.service == "Jamf Platform API" })
+        let text = entries.compactMap(\.request).map { details in
+            [details.url, details.requestBody ?? "", details.responseBody ?? "",
+             (details.requestHeaders + details.responseHeaders).map(\.value).joined(separator: " ")].joined(separator: " ")
+        }.joined(separator: " ")
         #expect(!text.contains("s3cr3t"))
         #expect(!text.contains("\"tok\""))
         #expect(!text.contains("Bearer tok"))
+        // The default bodies rule: the PATCH body is never recorded.
+        #expect(entries.allSatisfy { $0.request?.requestBody == nil })
     }
 }
 
-}
-
-/// Collects log entries delivered on the main actor.
-@MainActor
-private final class LogCollector {
-    private(set) var all: [RequestLogEntry] = []
-    func append(_ entry: RequestLogEntry) { all.append(entry) }
 }

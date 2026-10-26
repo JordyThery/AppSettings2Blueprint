@@ -1,4 +1,5 @@
 import Foundation
+import JTKit
 import Testing
 @testable import AppSettings2Blueprint
 
@@ -141,6 +142,20 @@ extension MockNetworkTests {
             await #expect(throws: AppStoreClient.LookupError.self) {
                 try await client.search(term: "x", scope: .all, country: "gb")
             }
+        }
+
+        @Test @MainActor func lookupsAreInTheActivityLog() async throws {
+            let log = ActivityLog()
+            MockURLProtocol.install { _ in .json(200, searchResponse([(7, "Seven", "com.example.seven")])) }
+            let client = AppStoreClient(session: MockURLProtocol.makeSession(), log: log)
+            _ = try await client.search(term: "seven", scope: .platform(.mac), country: "us")
+            let entry = try #require(log.entries.first)
+            #expect(log.entries.count == 1)
+            #expect(entry.category == "App Store")
+            #expect(entry.status == 200)
+            #expect(entry.detail.hasPrefix("/search"))
+            // A success's body is not recorded (JTKit's default bodies rule).
+            #expect(entry.request?.responseBody == nil)
         }
 
         @Test func failedDetailThrowsInsteadOfReturningInventedValues() async {

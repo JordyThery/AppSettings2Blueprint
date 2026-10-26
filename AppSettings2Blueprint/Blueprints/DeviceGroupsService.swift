@@ -1,4 +1,5 @@
 import Foundation
+import JTKit
 
 nonisolated enum DeviceType: String, Codable, Hashable, Sendable {
     case computer = "COMPUTER"

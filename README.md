@@ -82,7 +82,7 @@ The app contacts only these hosts:
 | `api.github.com` | Once a day, and on **Check for Updates…** | A request for the latest release; turn the daily check off in **Settings › Updates** |
 | `github.com`, `objects.githubusercontent.com` | Only on **Download** in the update sheet | A request for the release zip |
 
-Lookups never include Jamf data or credentials. Client secrets are stored in the keychain; the request log is kept in memory with secrets redacted; backups contain only Blueprint JSON. The app runs with the Hardened Runtime and is Developer ID signed and notarized.
+Lookups never include Jamf data or credentials. Client secrets are stored in the keychain; the activity log is kept in memory with secrets redacted; backups contain only Blueprint JSON. The app runs with the Hardened Runtime and is Developer ID signed and notarized.
 
 ## Known limitations
 

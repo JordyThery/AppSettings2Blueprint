@@ -148,8 +148,8 @@ extension MockNetworkTests {
             let client = PlatformAPIClient(
                 credentials: PlatformCredentials(region: .eu, environmentID: "env", clientID: "id", clientSecret: "secret"),
                 session: MockURLProtocol.makeSession(),
-                sleep: { _ in },
-                log: { _ in }
+                log: nil,
+                sleep: { _ in }
             )
             var writer = BlueprintWriter(service: BlueprintService(client: client))
             writer.backup = { detail in
@@ -432,7 +432,7 @@ extension MockNetworkTests {
         private func makeMonitor(maxPolls: Int = 10) -> DeploymentMonitor {
             let client = PlatformAPIClient(
                 credentials: PlatformCredentials(region: .eu, environmentID: "env", clientID: "id", clientSecret: "secret"),
-                session: MockURLProtocol.makeSession(), sleep: { _ in }, log: { _ in }
+                session: MockURLProtocol.makeSession(), log: nil, sleep: { _ in }
             )
             var monitor = DeploymentMonitor(service: BlueprintService(client: client))
             monitor.sleep = { _ in }

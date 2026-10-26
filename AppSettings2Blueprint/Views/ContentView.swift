@@ -50,11 +50,11 @@ struct ContentView: View {
                 }
 
                 Button {
-                    openWindow(id: WindowID.requestLog)
+                    openWindow(id: ActivityLogWindow.id)
                 } label: {
-                    Label("Request Log", systemImage: "list.bullet.rectangle")
+                    Label("Activity Log", systemImage: "list.bullet.rectangle")
                 }
-                .help("Show every API request and response (secrets redacted)")
+                .help("Show sign-ins, Jamf API calls and App Store lookups (secrets redacted)")
             }
         }
         .sheet(isPresented: $isShowingFetchByID) {

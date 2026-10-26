@@ -130,14 +130,11 @@ struct APIErrorTests {
         #expect(details.errors.map(\.code) == ["A", "B"])
     }
 
-    @Test func redactsSecrets() {
-        #expect(LogRedactor.formBody("grant_type=client_credentials&client_id=id&client_secret=s3cr3t")
-            == "grant_type=client_credentials&client_id=id&client_secret=<redacted>")
-        let body = LogRedactor.body(Data(#"{"access_token":"tok","expires_in":900}"#.utf8)) ?? ""
-        #expect(!body.contains("tok\""))
-        #expect(body.contains("<redacted>"))
-        let headers = LogRedactor.headers(["Authorization": "Bearer abc"])
-        #expect(headers.first?.1 == "Bearer <redacted>")
+    /// Error messages shown to the user go through JTKit's redaction.
+    @Test func errorMessagesAreRedacted() {
+        let body = #"{"message":"bad request","access_token":"tok-123"}"#
+        let error = APIError.http(status: 400, details: nil, body: body)
+        #expect(!error.localizedDescription.contains("tok-123"))
     }
 
     /// The Device Groups API's answer for a Jamf School environment (verified live).
@@ -145,14 +142,5 @@ struct APIErrorTests {
         let body = #"{"httpStatus":404,"traceId":"t","errors":[{"code":"TENANT_NOT_FOUND","description":"No tenant found for environment 'e'."}]}"#
         let error = APIError.http(status: 404, details: PlatformErrorDetails(data: Data(body.utf8)), body: body)
         #expect(error.hasErrorCode(AppModel.tenantNotFoundCode))
-    }
-
-    /// A cookie's first chunk is the secret itself, so the whole value is redacted;
-    /// an Authorization value without a scheme is too.
-    @Test func redactsCookiesWhole() {
-        let cookie = LogRedactor.headers(["Set-Cookie": "AWSALB=secret-token; Path=/; HttpOnly"])
-        #expect(cookie.first?.1 == "<redacted>")
-        let schemeless = LogRedactor.headers(["Authorization": "rawtoken"])
-        #expect(schemeless.first?.1 == "<redacted>")
     }
 }

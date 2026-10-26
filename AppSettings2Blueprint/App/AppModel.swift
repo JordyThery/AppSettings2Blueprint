@@ -4,7 +4,7 @@ import Observation
 import os
 
 /// App-wide state: the active connection, the Blueprint list, fetched details and
-/// the request log.
+/// JTKit's activity log.
 @Observable
 final class AppModel {
     enum ListState: Equatable {
@@ -15,10 +15,12 @@ final class AppModel {
     }
 
     let profileStore = ProfileStore()
-    let requestLog = RequestLog()
+    /// JTKit's activity log (Window › Activity Log, ⇧⌘L), filled by the Jamf
+    /// client and the App Store lookups.
+    let activityLog: ActivityLog
     let updates: UpdateChecker
     let localApps = LocalAppsModel()
-    let appStore = AppStoreModel()
+    let appStore: AppStoreModel
     let ruleSet = RuleSetDocument()
     let builtInApps: Result<AppleBuiltInApps, Error> = Result { try AppleBuiltInApps.load() }
 
@@ -55,6 +57,9 @@ final class AppModel {
     @ObservationIgnored private var connectionGeneration = 0
 
     init() {
+        let log = ActivityLog()
+        activityLog = log
+        appStore = AppStoreModel(client: AppStoreClient(log: log))
         let logger = Logger(subsystem: "be.jordythery.appsettings2blueprint", category: "updates")
         updates = UpdateChecker(
             configuration: UpdateConfiguration(owner: "JordyThery", repository: "AppSettings2Blueprint", appName: "AppSettings2Blueprint"),
@@ -81,10 +86,7 @@ final class AppModel {
     }
 
     func makeClient(credentials: PlatformCredentials) -> PlatformAPIClient {
-        let log = requestLog
-        return PlatformAPIClient(credentials: credentials) { entry in
-            log.append(entry)
-        }
+        PlatformAPIClient(credentials: credentials, log: activityLog)
     }
 
     /// Called when the user switches profile: clears everything loaded from the old tenant.
