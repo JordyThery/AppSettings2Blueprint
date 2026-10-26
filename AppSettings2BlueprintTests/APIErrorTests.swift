@@ -42,21 +42,21 @@ struct APIErrorTests {
     }
 }
 
-@Suite("Test Connection")
+@Suite("Test Connection (JTKit's message)")
 struct ConnectionTestProblemTests {
     @Test func allowedEverywhereIsNoProblem() {
-        #expect(ConnectionTestProblem([(.blueprintsRead, .allowed), (.deviceGroupsRead, .allowed)]) == nil)
+        #expect(JamfPlatform.PermissionProblem([(.blueprintsRead, .allowed), (.deviceGroupsRead, .allowed)]) == nil)
     }
 
     @Test func aMissingReadPermissionIsNamedWithWhatToAdd() throws {
-        let problem = try #require(ConnectionTestProblem([(.blueprintsRead, .allowed), (.deviceGroupsRead, .missingPermission)]))
+        let problem = try #require(JamfPlatform.PermissionProblem([(.blueprintsRead, .allowed), (.deviceGroupsRead, .missingPermission)]))
         #expect(problem.errorDescription == "Signed in, but the API integration is missing a permission: device-groups:read.")
         #expect(problem.failureReason == "Add the “device-groups:read” permission to the API integration in Jamf Account.")
     }
 
     /// A 404 or a network error isn't counted as a missing permission.
     @Test func whatCouldNotBeCheckedIsSaidSeparately() throws {
-        let problem = try #require(ConnectionTestProblem([(.blueprintsRead, .unreachable("Network error: offline")), (.deviceGroupsRead, .notFound)]))
+        let problem = try #require(JamfPlatform.PermissionProblem([(.blueprintsRead, .unreachable("Network error: offline")), (.deviceGroupsRead, .notFound)]))
         #expect(problem.errorDescription == "Signed in, but not every permission could be checked.")
         #expect(problem.failureReason == "Read Blueprints couldn’t be checked: Network error: offline\nRead device groups couldn’t be checked: not found (HTTP 404)")
     }
