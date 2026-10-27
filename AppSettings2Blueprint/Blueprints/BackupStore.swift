@@ -58,8 +58,8 @@ nonisolated enum BackupStore {
     }
 
     /// Backups for one blueprint, newest first.
-    static func backups(for blueprintID: String) -> [BlueprintBackup] {
-        let directory = directory(for: blueprintID)
+    static func backups(for blueprintID: String, root: URL = rootURL) -> [BlueprintBackup] {
+        let directory = directory(for: blueprintID, root: root)
         let keys: [URLResourceKey] = [.fileSizeKey, .creationDateKey]
         guard let urls = try? FileManager.default.contentsOfDirectory(
             at: directory, includingPropertiesForKeys: keys, options: [.skipsHiddenFiles]

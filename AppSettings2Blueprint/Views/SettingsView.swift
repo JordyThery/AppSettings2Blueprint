@@ -32,6 +32,7 @@ extension AppModel {
     /// Test Connection in Settings: signs in, then checks that the Blueprint
     /// and device group lists can be read, with the editor's values, saved or
     /// not. A secret typed in the editor is used instead of the stored one.
+    /// Always the real connection on the real network, also in demo mode.
     func testConnection(_ profile: ConnectionProfile, typedSecret: String?) async throws -> String {
         let secret = typedSecret ?? profileStore.secret(for: profile) ?? ""
         let client = try makeClient(credentials: PlatformCredentials(profile: profile, secret: secret))
@@ -48,7 +49,7 @@ extension AppModel {
     func environments(for profile: ConnectionProfile, typedSecret: String?) async throws -> [JamfPlatform.Environment] {
         let secret = (typedSecret ?? profileStore.secret(for: profile) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         let credentials = PlatformCredentials(profile: profile, secret: secret)
-        let recorder = RequestRecorder(log: activityLog, service: ConnectionService.jamfPlatform.displayName,
+        let recorder = RequestRecorder(session: session, log: activityLog, service: ConnectionService.jamfPlatform.displayName,
                                        connection: credentials.connectionName.isEmpty ? nil : credentials.connectionName)
         return try await JamfPlatform.environments(
             for: credentials.connection, secret: { secret }, recorder: recorder,

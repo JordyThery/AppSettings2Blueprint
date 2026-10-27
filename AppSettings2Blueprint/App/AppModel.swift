@@ -14,7 +14,10 @@ final class AppModel {
         case failed(String)
     }
 
-    let profileStore = ProfileStore()
+    let profileStore: ProfileStore
+    /// JTKit's demo mode: Contoso's sample tenant, answered inside the app.
+    /// Saved under `demoMode`.
+    let demo: DemoMode
     /// JTKit's activity log (Window › Activity Log, ⇧⌘L), filled by the Jamf
     /// client and the App Store lookups.
     let activityLog: ActivityLog
@@ -50,15 +53,36 @@ final class AppModel {
 
     /// JTKit's client for the selected profile, kept while its credentials stay the same.
     private var client: (credentials: PlatformCredentials, client: JamfPlatform.Client)?
+    /// JTKit's client for demo mode, the same for the whole launch.
+    @ObservationIgnored private var demoClient: JamfPlatform.Client?
+    /// The network for real connections; demo mode has its own.
+    @ObservationIgnored let session: URLSession
     private var listTask: Task<Void, Never>?
     /// Incremented on every profile switch. Async work compares it before storing
     /// results, so a load started against the old tenant cannot repopulate the new one.
     @ObservationIgnored private var connectionGeneration = 0
 
-    init() {
+    static let demoModeKey = "demoMode"
+
+    /// - Parameters:
+    ///   - profileStore: the saved connections; in-memory ones for a sandbox run.
+    ///   - demo: the app passes its saved demo mode (`forLaunch()`). Previews
+    ///     and tests start with it off, and save nothing.
+    ///   - session: the network for real connections.
+    init(
+        profileStore: ProfileStore = ProfileStore(),
+        demo: DemoMode? = nil,
+        session: URLSession = .shared
+    ) {
+        self.profileStore = profileStore
+        self.demo = demo ?? DemoMode(key: Self.demoModeKey, arguments: [DemoMode.launchArgument, "NO"])
+        self.session = session
         let log = ActivityLog()
         activityLog = log
-        appStore = AppStoreModel(client: AppStoreClient(log: log))
+        // A sandbox run (UI tests) makes no public lookups: its App Store client
+        // reaches nothing but demo mode's empty network.
+        let lookups = self.demo.isSandbox ? DemoNetwork(servers: [:]).session : URLSession(configuration: .ephemeral)
+        appStore = AppStoreModel(client: AppStoreClient(session: lookups, log: log))
         let logger = Logger(subsystem: "be.jordythery.appsettings2blueprint", category: "updates")
         updates = UpdateChecker(
             configuration: UpdateConfiguration(owner: "JordyThery", repository: "AppSettings2Blueprint", appName: "AppSettings2Blueprint"),
@@ -66,12 +90,34 @@ final class AppModel {
         )
     }
 
+    /// The model for this launch: the saved connections and demo mode, or, for
+    /// a sandbox run (`-JTKitSandbox YES`), connections and secrets in memory.
+    static func forLaunch() -> AppModel {
+        let demo = DemoMode(key: demoModeKey)
+        guard demo.isSandbox else { return AppModel(demo: demo) }
+        return AppModel(profileStore: ProfileStore(defaults: DemoMode.sandboxDefaults(), secrets: SandboxSecretStore()),
+                        demo: demo)
+    }
+
     var isListing: Bool { listState == .listing }
 
     // MARK: Connection
 
-    /// The client for the selected profile, rebuilt when its credentials change.
+    /// Whether Jamf can be reached: a connection is chosen, or demo mode is on.
+    var hasActiveConnection: Bool { demo.isOn || profileStore.selectedProfile != nil }
+
+    /// The client for demo mode or the selected profile, rebuilt when its
+    /// credentials change. In demo mode no saved connection or Keychain item
+    /// is read, and nothing is sent to a tenant.
     func currentClient() throws -> JamfPlatform.Client {
+        if demo.isOn {
+            if let demoClient { return demoClient }
+            let source = demo.jamfPlatform()
+            let made = try PlatformAPIClient.make(connection: source.connection, secret: source.secret,
+                                                  session: source.session, log: activityLog)
+            demoClient = made
+            return made
+        }
         guard let profile = profileStore.selectedProfile,
               let credentials = profileStore.credentials(for: profile) else {
             throw APIError.missingCredentials
@@ -89,8 +135,26 @@ final class AppModel {
         JamfPlatform.Blueprints(client: try currentClient())
     }
 
+    /// A client for a real connection, on the real network, also while demo
+    /// mode is on (Settings › Connections' Test Connection).
     func makeClient(credentials: PlatformCredentials) throws -> JamfPlatform.Client {
-        try PlatformAPIClient.make(credentials: credentials, log: activityLog)
+        try PlatformAPIClient.make(credentials: credentials, session: session, log: activityLog)
+    }
+
+    // MARK: Backups
+
+    /// Where backups are written and listed: the real folder, or demo mode's
+    /// temporary one, so demo writes never reach `Backups/`.
+    var backupRoot: URL {
+        demo.isOn ? demo.scratchDirectory.appending(path: "Backups", directoryHint: .isDirectory) : BackupStore.rootURL
+    }
+
+    /// A writer for the current connection that backs up into `backupRoot`.
+    func makeWriter() throws -> BlueprintWriter {
+        var writer = BlueprintWriter(service: try currentService())
+        let root = backupRoot
+        writer.backup = { try BackupStore.write($0, root: root) }
+        return writer
     }
 
     /// Called when the user switches profile: clears everything loaded from the old tenant.

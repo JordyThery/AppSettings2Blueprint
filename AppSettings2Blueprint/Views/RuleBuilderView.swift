@@ -168,8 +168,8 @@ struct RuleBuilderView: View {
             Button("Import CSV…", systemImage: "tablecells", action: importCSV)
                 .help("Import an App Settings Utility CSV (BundleID-Lookup or Local-Mac-Apps)")
             Button("Write to Jamf…", systemImage: "square.and.arrow.up.on.square") { isWritingToJamf = true }
-                .disabled(document.hasErrors || model.profileStore.selectedProfile == nil)
-                .help(model.profileStore.selectedProfile == nil
+                .disabled(document.hasErrors || !model.hasActiveConnection)
+                .help(!model.hasActiveConnection
                       ? "Add a Jamf connection in Settings first"
                       : (document.hasErrors ? "Fix the errors below first" : "Write this rule set to a new or existing Blueprint"))
             Toggle(isOn: $showsPreview) {
