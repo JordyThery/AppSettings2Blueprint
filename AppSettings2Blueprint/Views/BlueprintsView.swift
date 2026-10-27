@@ -26,7 +26,7 @@ struct BlueprintsView: View {
         }
         .searchable(text: $model.searchText, placement: .toolbar, prompt: "Filter blueprints")
         .task {
-            if model.listState == .idle && model.profileStore.selectedProfile != nil { model.refresh() }
+            if model.listState == .idle && model.hasActiveConnection { model.refresh() }
         }
     }
 }
@@ -49,13 +49,14 @@ private struct BlueprintListView: View {
 
     @ViewBuilder
     private var overlay: some View {
-        if model.profileStore.selectedProfile == nil {
+        if !model.hasActiveConnection {
             ContentUnavailableView {
                 Label("No Connection", systemImage: "network.slash")
             } description: {
-                Text("Add a Jamf Platform API connection in Settings.")
+                Text("Add a Jamf Platform API connection in Settings, or try the app with sample data.")
             } actions: {
                 SettingsLink { Text("Open Settings…") }
+                Button("Try Demo Mode") { model.demo.isOn = true }
             }
         } else if model.overviews.isEmpty, model.listState != .listing {
             ContentUnavailableView("No Blueprints", systemImage: "square.stack.3d.up.slash")

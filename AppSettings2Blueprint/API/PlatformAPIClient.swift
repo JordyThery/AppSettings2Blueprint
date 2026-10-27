@@ -58,16 +58,28 @@ nonisolated enum PlatformAPIClient {
         log: ActivityLog?,
         sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
     ) throws -> JamfPlatform.Client {
+        let secret = credentials.clientSecret
+        return try make(connection: credentials.connection, secret: { secret }, session: session, log: log, sleep: sleep)
+    }
+
+    /// The same client for a JTKit connection, e.g. demo mode's
+    /// (`DemoMode.jamfPlatform()`), with its secret and network.
+    static func make(
+        connection: Connection,
+        secret: @escaping @Sendable () throws -> String,
+        session: URLSession,
+        log: ActivityLog?,
+        sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
+    ) throws -> JamfPlatform.Client {
         let recorder = RequestRecorder(
             session: session,
             log: log,
             service: ConnectionService.jamfPlatform.displayName,
-            connection: credentials.connectionName.isEmpty ? nil : credentials.connectionName
+            connection: connection.name.isEmpty ? nil : connection.name
         )
-        let secret = credentials.clientSecret
         return try JamfPlatform.Client(
-            connection: credentials.connection,
-            secret: { secret },
+            connection: connection,
+            secret: secret,
             recorder: recorder,
             permits: { RequestAllowList.isPermitted(method: $0.method.uppercased(), path: $0.path) },
             hints: hints(for:),

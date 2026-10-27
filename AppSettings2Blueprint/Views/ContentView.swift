@@ -38,7 +38,7 @@ struct ContentView: View {
                         Label("Fetch by ID", systemImage: "number")
                     }
                     .help("Fetch one blueprint by ID")
-                    .disabled(model.profileStore.selectedProfile == nil)
+                    .disabled(!model.hasActiveConnection)
 
                     Button {
                         model.refresh()
@@ -46,7 +46,7 @@ struct ContentView: View {
                         Label("Refresh", systemImage: "arrow.clockwise")
                     }
                     .help("List blueprints")
-                    .disabled(model.isListing || model.profileStore.selectedProfile == nil)
+                    .disabled(model.isListing || !model.hasActiveConnection)
                 }
 
                 Button {
@@ -65,7 +65,11 @@ struct ContentView: View {
         }
         .onChange(of: model.profileStore.selectedProfile) {
             model.connectionDidChange()
-            if selection == .blueprints && model.profileStore.selectedProfile != nil { model.refresh() }
+            if selection == .blueprints && model.hasActiveConnection { model.refresh() }
+        }
+        .onChange(of: model.demo.isOn) {
+            model.connectionDidChange()
+            if selection == .blueprints && model.hasActiveConnection { model.refresh() }
         }
         // Rule set edits from any view share the window's undo history.
         .onAppear { model.ruleSet.undoManager = undoManager }
@@ -148,15 +152,34 @@ private struct RuleSetStatusToast: View {
     }
 }
 
-/// Toolbar menu for switching between saved connections, with Edit Connections…
-/// (JTKit's `ConnectionPicker`, the same items as the Connection menu).
+/// Toolbar menu for switching between saved connections, with Demo Mode and
+/// Edit Connections… (JTKit's `ConnectionPicker`, the same items as the
+/// Connection menu).
 private struct ProfilePicker: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        @Bindable var store = model.profileStore
-        ConnectionPicker(store: store.connections, selection: $store.selectedProfileID, itemTitle: \.menuTitle)
+        ConnectionPicker(store: model.profileStore.connections, selection: profileSelection(model),
+                         itemTitle: \.menuTitle,
+                         label: model.demo.isOn ? .demo : nil,
+                         help: model.demo.isOn ? DemoMode.helpText : nil) {
+            DemoModeToggle(demo: model.demo)
+        }
     }
+}
+
+/// The connection in use, as the toolbar picker and the Connection menu
+/// choose it. None is checked in demo mode. Choosing one leaves demo mode;
+/// the saved choice stays as it was while demo mode is on.
+@MainActor
+func profileSelection(_ model: AppModel) -> Binding<UUID?> {
+    Binding(
+        get: { model.demo.isOn ? nil : model.profileStore.selectedProfileID },
+        set: { id in
+            guard let id else { return }
+            if model.demo.isOn { model.demo.isOn = false }
+            model.profileStore.selectedProfileID = id
+        })
 }
 
 /// Fetches a single Blueprint by ID so its raw JSON can be inspected.

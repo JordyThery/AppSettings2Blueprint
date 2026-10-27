@@ -99,7 +99,7 @@ final class EditScopeModel {
         phase = .saving
         Task {
             do {
-                let writer = BlueprintWriter(service: try app.currentService())
+                let writer = try app.makeWriter()
                 let result = try await writer.changeScope(loaded: detail, deviceGroups: groups)
                 app.storeDetail(result.detail)
                 phase = .done(result)

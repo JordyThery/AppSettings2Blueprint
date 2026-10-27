@@ -201,7 +201,7 @@ final class JamfWriteModel {
     }
 
     private func makeWriter() throws -> BlueprintWriter {
-        BlueprintWriter(service: try app.currentService())
+        try app.makeWriter()
     }
 
     private func finish(_ result: WriteResult, componentPath: [LosslessJSON.PathComponent]) {

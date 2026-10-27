@@ -75,7 +75,7 @@ struct RestoreBackupSheet: View {
             .padding()
         }
         .frame(width: 560, height: 420)
-        .onAppear { backups = BackupStore.backups(for: detail.id) }
+        .onAppear { backups = BackupStore.backups(for: detail.id, root: model.backupRoot) }
         .confirmationDialog(
             "Restore “\(detail.overview.name)” from this backup?",
             isPresented: $isConfirming,
@@ -96,9 +96,9 @@ struct RestoreBackupSheet: View {
         Task {
             defer { isRestoring = false }
             do {
-                let result = try await BlueprintWriter(service: model.currentService()).restore(backup, loaded: detail)
+                let result = try await model.makeWriter().restore(backup, loaded: detail)
                 model.storeDetail(result.detail)
-                backups = BackupStore.backups(for: detail.id)
+                backups = BackupStore.backups(for: detail.id, root: model.backupRoot)
                 message = result.isVerified
                     ? ("Restored and verified. Devices receive the restored state at the next deployment.", false)
                     : (result.problems.joined(separator: " "), true)
