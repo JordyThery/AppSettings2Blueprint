@@ -5,6 +5,7 @@
 - About and Acknowledgements now come from JTKit, shared with Jordy's other apps. About opens only from the app menu and is no longer listed in the Window menu.
 - **Demo Mode**: try the app without a Jamf tenant. Turn it on in the connection picker or the Connection menu (or with **Try Demo Mode** when no connection is set up). It shows a sample organisation's Blueprints and device groups; writes, scope changes, restores and deployments work on the sample data only, and nothing is sent to Jamf. Window titles end in "— Demo" while it's on. Backups made in Demo Mode go to a temporary folder, and your saved connections and Keychain items are never touched. App Store lookups and local app scans still work as usual.
 - The "Check for updates daily" switch moved from About to **Settings › Updates**; your choice is kept. **Check for Updates…** stays in the app menu.
+- Fixed: **Write to Jamf…** opened before the Blueprints list had loaded (for example, right after launch) showed every Blueprint as "Loading…", so none could be chosen. Their details now load as soon as the list arrives.
 
 ## 1.1
 
