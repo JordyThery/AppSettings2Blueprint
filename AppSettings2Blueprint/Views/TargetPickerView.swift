@@ -45,6 +45,11 @@ struct TargetPickerView: View {
         .task {
             if model.app.deviceGroups.isEmpty && !model.app.isJamfSchool { model.app.loadDeviceGroups() }
             if model.app.overviews.isEmpty { model.app.refresh() }
+        }
+        // Runs again whenever the list changes: a listing started above (or
+        // a refresh) finishes after the sheet opened, and its Blueprints'
+        // details are fetched then, instead of staying on "Loading…".
+        .task(id: model.app.overviews.map(\.id)) {
             await model.app.loadMissingDetails()
         }
     }

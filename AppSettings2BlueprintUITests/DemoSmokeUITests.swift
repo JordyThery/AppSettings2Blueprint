@@ -53,9 +53,9 @@ final class DemoSmokeUITests: JTKitUITestCase {
     /// Build a rule set, see its JSON, write it to a Contoso Blueprint and
     /// deploy it, with the app's confirmations.
     func test5MainTask() {
-        // The list first: Write to Jamf opened before any listing shows every
-        // Blueprint as "Loading…" (reported to Jordy, 2026-10-28; not fixed here).
-        openBlueprints()
+        // Straight after launch, without visiting Blueprints: Write to Jamf
+        // lists the Blueprints itself and loads their details when the list
+        // arrives (they stayed on "Loading…" before 2026-10-28).
         openSidebar("Editor")
         let json = app.textViews["componentJSON"].firstMatch
         XCTAssertTrue(json.waitForExistence(timeout: 10), "The rule builder did not open")
@@ -69,6 +69,8 @@ final class DemoSmokeUITests: JTKitUITestCase {
         XCTAssertTrue(sheet.waitForExistence(timeout: 10), "Write to Jamf didn't open")
         tap(sheet.radioButtons["Existing Blueprint"], timeout: 10)
         tap(text(ipadBlueprint, in: sheet), timeout: 20)
+        XCTAssertTrue(sheet.staticTexts.matching(NSPredicate(format: "value == 'Loading…'")).firstMatch.waitForNonExistence(timeout: 20),
+                      "Blueprints in Write to Jamf stayed on Loading…")
         tap(sheet.buttons["Review Changes…"], timeout: 20)
         tap(sheet.buttons["Write to Blueprint"], timeout: 20)
         XCTAssertTrue(text("Written and verified", in: sheet).waitForExistence(timeout: 20), "The write wasn't verified")
