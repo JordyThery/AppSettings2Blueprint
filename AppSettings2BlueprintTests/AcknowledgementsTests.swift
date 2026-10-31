@@ -14,7 +14,7 @@ struct AcknowledgementsTests {
         let start = try #require(notices.range(of: "```\nMIT License"))
         let end = try #require(notices.range(of: "\n```", range: start.upperBound..<notices.endIndex))
         let fromNotices = String(notices[notices.index(start.lowerBound, offsetBy: 4)..<end.lowerBound])
-        let inApp = try #require(Acknowledgement.appSettingsUtility.licence)
+        let inApp = try #require(Acknowledgement.appSettingsUtility.license)
         #expect(inApp == fromNotices)
         #expect(inApp.contains("Copyright (c) 2026 Anthony Darlow"))
     }

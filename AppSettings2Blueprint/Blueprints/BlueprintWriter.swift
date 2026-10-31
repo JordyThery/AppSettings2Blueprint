@@ -99,7 +99,7 @@ nonisolated struct BlueprintWriter: Sendable {
         try checkUnchanged(loaded: prepared.latest, latest: current)
         do {
             try await service.patchSteps(id: prepared.blueprintID, steps: prepared.edit.steps)
-        } catch let error as JamfPlatformError where error.hasCode(.divisionPatchNotAllowed) {
+        } catch let error as JamfPlatform.APIError where error.hasCode(.divisionPatchNotAllowed) {
             throw WriteError.readOnly(name: prepared.name)
         }
         let readBack = try await service.detail(id: prepared.blueprintID)
@@ -120,7 +120,7 @@ nonisolated struct BlueprintWriter: Sendable {
         _ = try backup(latest)
         do {
             try await service.patchSteps(id: loaded.id, steps: steps)
-        } catch let error as JamfPlatformError where error.hasCode(.divisionPatchNotAllowed) {
+        } catch let error as JamfPlatform.APIError where error.hasCode(.divisionPatchNotAllowed) {
             throw WriteError.readOnly(name: latest.overview.name)
         }
         let readBack = try await service.detail(id: loaded.id)
@@ -145,7 +145,7 @@ nonisolated struct BlueprintWriter: Sendable {
         let backupURL = try backup(latest)
         do {
             try await service.patchScope(id: loaded.id, deviceGroups: deviceGroups)
-        } catch let error as JamfPlatformError where error.hasCode(.divisionPatchNotAllowed) {
+        } catch let error as JamfPlatform.APIError where error.hasCode(.divisionPatchNotAllowed) {
             throw WriteError.readOnly(name: latest.overview.name)
         }
         let readBack = try await service.detail(id: loaded.id)

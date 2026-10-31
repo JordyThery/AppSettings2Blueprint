@@ -28,8 +28,6 @@ CREDENTIALS=(
     "jamf-test-a:jamfPlatform:client-id"
     "jamf-test-a:jamfPlatform:client-secret"
 )
-# No older test objects: the app's earlier UI tests never reached a tenant.
-LEGACY_PREFIXES=""
 DOMAIN="be.jordythery.appsettings2blueprint"
 # The saved connections share the preferences file with window frames, so
 # only these settings are compared (JTKit 0.12.1).

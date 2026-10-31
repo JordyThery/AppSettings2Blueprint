@@ -95,7 +95,7 @@ final class DeployModel {
                 previous = try await blueprints.startDeployment(id: detail.id)
             } catch is CancellationError {
                 return
-            } catch let error as JamfPlatformError {
+            } catch let error as JamfPlatform.APIError {
                 if error.status == 409 {
                     phase = .failed("Jamf did not start the deployment: the blueprint is not valid for deployment.\n\n\(error.localizedDescription)")
                 } else {

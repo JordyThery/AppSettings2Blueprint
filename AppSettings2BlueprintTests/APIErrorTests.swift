@@ -7,8 +7,8 @@ import Testing
 /// JSON tests moved to JTKit with the code.)
 @Suite("API errors")
 struct APIErrorTests {
-    private func failure(_ status: Int, _ body: String) -> JamfPlatformError {
-        JamfPlatformError(HTTPError.status(HTTPResponse(status: status, headers: ["Content-Type": "application/json"], data: Data(body.utf8)),
+    private func failure(_ status: Int, _ body: String) -> JamfPlatform.APIError {
+        JamfPlatform.APIError(HTTPError.status(HTTPResponse(status: status, headers: ["Content-Type": "application/json"], data: Data(body.utf8)),
                                            method: "PATCH", path: "/blueprints/v1/blueprints/b1", duringSignIn: false))
     }
 
@@ -32,7 +32,7 @@ struct APIErrorTests {
 
     /// A refused request keeps the app's explanation of what it sends.
     @Test func refusedRequestKeepsTheAppsHint() {
-        let refused = JamfPlatformError(.refused(method: "DELETE", path: "/blueprints/v1/blueprints/abc"))
+        let refused = JamfPlatform.APIError(.refused(method: "DELETE", path: "/blueprints/v1/blueprints/abc"))
         #expect(PlatformAPIClient.hints(for: refused) == [PlatformAPIClient.refusedHint])
         #expect(PlatformAPIClient.hints(for: failure(500, "{}")).isEmpty)
     }
@@ -58,6 +58,6 @@ struct ConnectionTestProblemTests {
     @Test func whatCouldNotBeCheckedIsSaidSeparately() throws {
         let problem = try #require(JamfPlatform.PermissionProblem([(.blueprintsRead, .unreachable("Network error: offline")), (.deviceGroupsRead, .notFound)]))
         #expect(problem.errorDescription == "Signed in, but not every permission could be checked.")
-        #expect(problem.failureReason == "Read Blueprints couldn’t be checked: Network error: offline\nRead device groups couldn’t be checked: not found (HTTP 404)")
+        #expect(problem.failureReason == "Read Blueprints couldn’t be checked: Network error: offline\nRead Device Groups couldn’t be checked: not found (HTTP 404)")
     }
 }

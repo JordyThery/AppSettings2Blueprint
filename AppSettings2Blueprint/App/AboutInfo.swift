@@ -29,7 +29,7 @@ extension Acknowledgement {
             appSettingsUtilityRepositoryURL.map { AboutLink("cantscript/AppSettingsUtility", url: $0) },
             appSettingsUtilityBlogPostURL.map { AboutLink("Stop Hunting for Bundle IDs & CDHashes", url: $0) },
         ].compactMap { $0 },
-        licence: """
+        license: """
             MIT License
 
             Copyright (c) 2026 Anthony Darlow

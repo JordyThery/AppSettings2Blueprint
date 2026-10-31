@@ -188,7 +188,7 @@ final class AppModel {
                 guard generation == connectionGeneration else { return }
                 deviceGroups = groups
                 isJamfSchool = false
-            } catch let error as JamfPlatformError where error.hasCode(.tenantNotFound) {
+            } catch let error as JamfPlatform.APIError where error.hasCode(.tenantNotFound) {
                 guard generation == connectionGeneration else { return }
                 isJamfSchool = true
             } catch {

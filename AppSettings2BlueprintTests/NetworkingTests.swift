@@ -73,19 +73,19 @@ struct PlatformAPIClientTests {
     @Test func deleteAndUndeployNeverReachTheNetwork() async throws {
         MockURLProtocol.install { _ in Issue.record("No request may be sent"); return .json(500, "{}") }
         let client = try makeClient()
-        await #expect(throws: JamfPlatformError.self) {
+        await #expect(throws: JamfPlatform.APIError.self) {
             try await client.send(HTTPRequest(method: "DELETE", path: "/blueprints/v1/blueprints/abc"))
         }
-        await #expect(throws: JamfPlatformError.self) {
+        await #expect(throws: JamfPlatform.APIError.self) {
             try await client.send(HTTPRequest(method: "POST", path: "/blueprints/v1/blueprints/abc/undeploy"))
         }
-        await #expect(throws: JamfPlatformError.self) { try await blueprints().delete(id: "abc") }
+        await #expect(throws: JamfPlatform.APIError.self) { try await blueprints().delete(id: "abc") }
         #expect(MockURLProtocol.requests.isEmpty)
     }
 
     @Test func aRefusedRequestSaysWhatTheAppSends() async throws {
         MockURLProtocol.install { _ in .json(500, "{}") }
-        let error = await #expect(throws: JamfPlatformError.self) { try await blueprints().delete(id: "abc") }
+        let error = await #expect(throws: JamfPlatform.APIError.self) { try await blueprints().delete(id: "abc") }
         #expect(error?.localizedDescription.contains(PlatformAPIClient.refusedHint) == true)
     }
 
@@ -93,7 +93,7 @@ struct PlatformAPIClientTests {
         MockURLProtocol.install { _ in Issue.record("No request may be sent"); return .json(500, "{}") }
         var bad = credentials
         bad.environmentID = "env-1"
-        #expect(throws: JamfPlatformError.self) {
+        #expect(throws: JamfPlatform.APIError.self) {
             _ = try PlatformAPIClient.make(credentials: bad, session: MockURLProtocol.makeSession(), log: nil)
         }
     }
@@ -119,7 +119,7 @@ struct PlatformAPIClientTests {
 
     @Test func secondConsecutive401IsThrown() async throws {
         MockURLProtocol.install { $0.path == "/auth/token" ? Self.token : .json(401, "{}") }
-        await #expect(throws: JamfPlatformError.self) { _ = try await blueprints().listPage() }
+        await #expect(throws: JamfPlatform.APIError.self) { _ = try await blueprints().listPage() }
         #expect(apiRequests().count == 2)
     }
 
@@ -139,7 +139,7 @@ struct PlatformAPIClientTests {
 
     @Test func deployIsNotRetriedOn5xx() async throws {
         MockURLProtocol.install { $0.path == "/auth/token" ? Self.token : .json(503, "{}") }
-        await #expect(throws: JamfPlatformError.self) { try await blueprints().deploy(id: "abc") }
+        await #expect(throws: JamfPlatform.APIError.self) { try await blueprints().deploy(id: "abc") }
         #expect(apiRequests().count == 1)
         #expect(apiRequests().first?.path == "/blueprints/v1/blueprints/abc/deploy")
     }
@@ -188,7 +188,7 @@ struct PlatformAPIClientTests {
 
     @Test func failedSignInSaysWhatToCheck() async throws {
         MockURLProtocol.install { _ in .json(401, #"{"error":"invalid_client"}"#) }
-        let error = await #expect(throws: JamfPlatformError.self) { try await makeClient().signIn() }
+        let error = await #expect(throws: JamfPlatform.APIError.self) { try await makeClient().signIn() }
         guard case .signIn(401, _, _)? = error?.kind else { Issue.record("Got \(String(describing: error))"); return }
         #expect(error?.localizedDescription.contains("Check the client ID, client secret and region") == true)
     }
@@ -197,7 +197,7 @@ struct PlatformAPIClientTests {
         let log = ActivityLog()
         MockURLProtocol.install { _ in Issue.record("No request may be sent"); return .json(500, "{}") }
         let client = try makeClient(log: log)
-        await #expect(throws: JamfPlatformError.self) {
+        await #expect(throws: JamfPlatform.APIError.self) {
             try await client.send(HTTPRequest(method: "DELETE", path: "/blueprints/v1/blueprints/abc"))
         }
         #expect(log.entries.count == 1)

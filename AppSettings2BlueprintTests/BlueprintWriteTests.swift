@@ -330,7 +330,7 @@ extension MockNetworkTests {
 
         @Test func createIsNotRetriedOn5xx() async {
             MockURLProtocol.install { $0.path == "/auth/token" ? Self.token : .json(503, "{}") }
-            await #expect(throws: JamfPlatformError.self) {
+            await #expect(throws: JamfPlatform.APIError.self) {
                 try await makeWriter().create(name: "n", description: nil, deviceGroups: ["g"], stepName: "s", activationPredicate: nil,
                                               declarations: DeclarationEncoder.declarations(for: RuleSet()))
             }
@@ -340,7 +340,7 @@ extension MockNetworkTests {
 
         @Test func createRequiresADeviceGroup() async {
             MockURLProtocol.install { _ in .json(500, "{}") }
-            await #expect(throws: JamfPlatformError.self) {
+            await #expect(throws: JamfPlatform.APIError.self) {
                 try await makeWriter().create(name: "n", description: nil, deviceGroups: [], stepName: "s", activationPredicate: nil,
                                               declarations: DeclarationEncoder.declarations(for: RuleSet()))
             }
@@ -463,7 +463,7 @@ extension MockNetworkTests {
                 if request.method == "GET" { return .json(200, appSettingsBlueprintJSON) }
                 return .json(409, #"{"httpStatus":409,"errors":[{"code":"INVALID_BLUEPRINT","description":"Not valid for deployment"}]}"#)
             }
-            let error = await #expect(throws: JamfPlatformError.self) { _ = try await makeBlueprints().startDeployment(id: Self.id) }
+            let error = await #expect(throws: JamfPlatform.APIError.self) { _ = try await makeBlueprints().startDeployment(id: Self.id) }
             #expect(error?.status == 409)
             let posts = MockURLProtocol.requests.filter { $0.method == "POST" && $0.path != "/auth/token" }
             #expect(posts.count == 1)
