@@ -1,10 +1,11 @@
 import Foundation
 import JTKit
+import JTKitTestSupport
 import Testing
 @testable import AppSettings2Blueprint
 
 /// A valid Environment ID: JTKit refuses one that isn't a UUID before sending.
-let testEnvironmentID = "e77c1408-10c8-4007-b177-abc9157fbcaa"
+let testEnvironmentID = "12345678-1234-4123-8123-123456789abc"
 
 /// Declarations of the fixture's App Settings component, decoded and re-encoded
 /// the way the editor does.
@@ -328,19 +329,22 @@ extension MockNetworkTests {
             #expect(!post.bodyString.contains("divisionId"))
         }
 
+        /// A 5xx leaves it open whether the Blueprint exists: not retried, and
+        /// reported as possibly created.
         @Test func createIsNotRetriedOn5xx() async {
             MockURLProtocol.install { $0.path == "/auth/token" ? Self.token : .json(503, "{}") }
-            await #expect(throws: JamfPlatform.APIError.self) {
+            let error = await #expect(throws: BlueprintWriter.WriteError.self) {
                 try await makeWriter().create(name: "n", description: nil, deviceGroups: ["g"], stepName: "s", activationPredicate: nil,
                                               declarations: DeclarationEncoder.declarations(for: RuleSet()))
             }
+            #expect(error?.mayHaveWritten == true)
             let posts = apiRequests().filter { $0.method == "POST" }
             #expect(posts.count == 1)
         }
 
         @Test func createRequiresADeviceGroup() async {
             MockURLProtocol.install { _ in .json(500, "{}") }
-            await #expect(throws: JamfPlatform.APIError.self) {
+            await #expect(throws: BlueprintWriter.WriteError.self) {
                 try await makeWriter().create(name: "n", description: nil, deviceGroups: [], stepName: "s", activationPredicate: nil,
                                               declarations: DeclarationEncoder.declarations(for: RuleSet()))
             }
@@ -350,13 +354,21 @@ extension MockNetworkTests {
 }
 
 /// A blueprint held by the mock server; PATCH applies merge-patch (steps replaced wholesale).
-private final class ServerState: @unchecked Sendable {
+final class ServerState: @unchecked Sendable {
     private let lock = NSLock()
     private var json: LosslessJSON
 
     init(_ text: String) { json = try! LosslessJSON(string: text) }
 
     var text: String { lock.withLock { json.serializedString() } }
+
+    /// A change made in Jamf by someone else.
+    func change(_ value: LosslessJSON, at path: [LosslessJSON.PathComponent]) {
+        lock.withLock {
+            json.setValue(value, at: path)
+            json.setValue(.string("2026-10-24T12:00:00Z"), at: [.key("updated")])
+        }
+    }
 
     func applyPatch(_ body: Data) {
         lock.withLock {
@@ -371,7 +383,7 @@ private final class ServerState: @unchecked Sendable {
 }
 
 /// Records backups instead of writing them to Application Support.
-private final class BackupRecorder: @unchecked Sendable {
+final class BackupRecorder: @unchecked Sendable {
     private let lock = NSLock()
     private var details: [JamfPlatform.BlueprintDetail] = []
 
@@ -479,7 +491,7 @@ struct DeployModelTests {
     }
 
     @Test func allowListWithoutBaselineNeedsASecondConfirmation() throws {
-        let model = DeployModel(app: AppModel(), detail: try detail(declarations: #"[{"kind":"CONFIGURATION","type":"com.apple.configuration.app.settings","payload":{"Allowed":{"AllowedBinaries":[{"TeamID":"UBF8T346G9"}]}},"channelType":"SYSTEM"}]"#))
+        let model = DeployModel(app: TestApp.model(), detail: try detail(declarations: #"[{"kind":"CONFIGURATION","type":"com.apple.configuration.app.settings","payload":{"Allowed":{"AllowedBinaries":[{"TeamID":"ABCDE12345"}]}},"channelType":"SYSTEM"}]"#))
         #expect(model.allowListWarnings.count == 1)
         model.isConfirmed = true
         #expect(model.blockingReason != nil)
@@ -488,7 +500,7 @@ struct DeployModelTests {
     }
 
     @Test func baselinePresentNeedsNoWarning() throws {
-        let model = DeployModel(app: AppModel(), detail: try detail(declarations: #"[{"kind":"CONFIGURATION","type":"com.apple.configuration.app.settings","payload":{"Allowed":{"AllowedBinaries":[{"TeamID":"*APPLE*","SigningState":"Apple"},{"TeamID":"UBF8T346G9"}],"AlwaysAllowManagedApps":true}},"channelType":"SYSTEM"}]"#))
+        let model = DeployModel(app: TestApp.model(), detail: try detail(declarations: #"[{"kind":"CONFIGURATION","type":"com.apple.configuration.app.settings","payload":{"Allowed":{"AllowedBinaries":[{"TeamID":"*APPLE*","SigningState":"Apple"},{"TeamID":"ABCDE12345"}],"AlwaysAllowManagedApps":true}},"channelType":"SYSTEM"}]"#))
         #expect(model.allowListWarnings.isEmpty)
         #expect(model.blockingReason != nil, "Nothing deploys before the confirmation is ticked")
         model.isConfirmed = true
@@ -497,7 +509,7 @@ struct DeployModelTests {
 
     /// The watch takes up to 5 minutes, checking from 2 s growing to 10 s (was 4 s × 45).
     @Test func deploymentIsWatchedForFiveMinutes() throws {
-        let model = DeployModel(app: AppModel(), detail: try detail(declarations: "[]"))
+        let model = DeployModel(app: TestApp.model(), detail: try detail(declarations: "[]"))
         #expect(model.poller.policy == .standard)
         #expect(model.poller.policy.timeLimit == .seconds(300))
         #expect(model.poller.policy.interval(afterCheck: 1) == .seconds(2))
@@ -505,7 +517,7 @@ struct DeployModelTests {
 
     @Test func unscopedBlueprintCannotBeDeployed() throws {
         let unscoped = try JamfPlatform.BlueprintDetail(data: Data(#"{"id":"b2","name":"n","scope":null,"steps":[]}"#.utf8))
-        let model = DeployModel(app: AppModel(), detail: unscoped)
+        let model = DeployModel(app: TestApp.model(), detail: unscoped)
         model.isConfirmed = true
         #expect(model.blockingReason?.contains("no device groups") == true)
     }

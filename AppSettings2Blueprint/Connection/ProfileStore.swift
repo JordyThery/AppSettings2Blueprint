@@ -4,8 +4,8 @@ import Observation
 import os
 
 /// The saved connection profiles and the active one. JTKit's `ConnectionStore`
-/// keeps the profiles (without secrets) where they have always been, under the
-/// UserDefaults key `connectionProfiles`, and their client secrets in the login
+/// keeps the profiles (without secrets) under the UserDefaults key
+/// `connectionProfiles`, and their client secrets in the login
 /// Keychain (service `AppSettings2Blueprint.client-secret`, account = profile
 /// UUID). The active profile is saved under `selectedConnectionProfileID`.
 @Observable
@@ -53,10 +53,6 @@ final class ProfileStore {
 
     var selectedProfile: ConnectionProfile? {
         selectedProfileID.flatMap(connections.record(id:))
-    }
-
-    func profile(id: UUID) -> ConnectionProfile? {
-        connections.record(id: id)
     }
 
     /// A new profile for + in Settings › Connections. The first one becomes active.

@@ -13,7 +13,7 @@ struct InspectorView: View {
             InspectionDetail(inspection: inspection)
         } else if let error = model.inspectionErrors[path] {
             ContentUnavailableView {
-                Label("Couldn't Read the Signature", systemImage: "exclamationmark.triangle")
+                Label("Couldn’t Read the Signature", systemImage: "exclamationmark.triangle")
             } description: {
                 Text(error).textSelection(.enabled)
             } actions: {
@@ -115,7 +115,7 @@ private struct InspectionDetail: View {
         )) { target in
             AddBinaryRuleSheet(binary: inspection, toAllowList: target.toAllowList)
         }
-        .alert("Couldn't Export", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
+        .alert("Couldn’t Export", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
             Button("OK") { errorMessage = nil }
         } message: { Text(errorMessage ?? "") }
     }
@@ -142,7 +142,7 @@ private struct InspectionDetail: View {
                 verificationBadge
             }
             Spacer()
-            Button("Reveal in Finder", systemImage: "folder") {
+            Button("Show in Finder", systemImage: "folder") {
                 NSWorkspace.shared.activateFileViewerSelecting([URL(filePath: inspection.path)])
             }
             Button("Reload", systemImage: "arrow.clockwise") {
@@ -156,11 +156,11 @@ private struct InspectionDetail: View {
         switch inspection.verification {
         case .valid:
             Label("Signature verification: Valid", systemImage: "checkmark.seal.fill")
-                .foregroundStyle(.green)
+                .labelStyle(.tintedIcon(.green))
                 .font(.callout)
         case .unverified(let reason):
             Label("Signature verification: Unverified (\(reason))", systemImage: "xmark.seal.fill")
-                .foregroundStyle(.orange)
+                .labelStyle(.tintedIcon(.orange))
                 .font(.callout)
                 .textSelection(.enabled)
         }
@@ -178,9 +178,9 @@ private struct InspectionDetail: View {
                 Text("Each architecture has its own CDHash. A CDHash rule matches one slice of this exact build only.")
             }
             Text("PathPrefix is a suggested app-folder restriction, not a signature field.")
-            Text("Details describe the main executable; embedded helpers are not inspected.")
+            Text("Details describe the main executable; embedded helpers aren’t inspected.")
             if shownSlices.contains(where: { $0.signingState == .unknown }) {
-                Text("SigningState could not be established. Unknown is not a declaration value.")
+                Text("SigningState couldn’t be established. Unknown isn’t a declaration value.")
             }
             Text("The app is only read, never launched.")
         }
@@ -190,7 +190,7 @@ private struct InspectionDetail: View {
     }
 }
 
-/// A labelled value with an optional copy button. Missing values read "Unavailable";
+/// A labeled value with an optional copy button. Missing values read "Unavailable";
 /// nothing is ever filled in.
 struct ValueRow: View {
     let label: String

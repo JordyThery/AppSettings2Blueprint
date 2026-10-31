@@ -1,5 +1,6 @@
 import Foundation
 import JTKit
+import JTKitTestSupport
 import Testing
 @testable import AppSettings2Blueprint
 
@@ -178,7 +179,7 @@ struct AppleBuiltInAppsTests {
         #expect(list.source == "cantscript/AppSettingsUtility (MIT)")
         #expect(list.appleSource == "https://support.apple.com/en-gb/guide/deployment/depece748c41/web")
         #expect(list.verified == "2026-09-11")
-        #expect(list.verifiedDisplay == "11 September 2026")
+        #expect(list.verifiedDisplay == "September 11, 2026")
         #expect(list.apps.first { $0.name == "Safari" }?.bundleId == "com.apple.mobilesafari")
         #expect(list.apps.first { $0.name == "App Store Connect" }?.builtIn == false)
     }

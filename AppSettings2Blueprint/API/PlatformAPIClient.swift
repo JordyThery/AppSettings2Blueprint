@@ -46,7 +46,7 @@ nonisolated enum RequestAllowList {
 /// answers and writes each attempt, wait and refusal to the activity log.
 nonisolated enum PlatformAPIClient {
     /// Shown below a refused request, before JTKit's standard hints.
-    static let refusedHint = "The app only sends GET requests, token requests, and blueprint create, update and deploy requests; it never deletes or undeploys."
+    static let refusedHint = "The app only sends GET requests, token requests, and Blueprint create, update and deploy requests; it never deletes or undeploys."
 
     /// - Parameters:
     ///   - log: JTKit's activity log; nil records nothing (tests).

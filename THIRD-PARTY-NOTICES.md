@@ -1,7 +1,7 @@
 # Third-party notices
 
 AppSettings2Blueprint is MIT licensed (see LICENSE). It includes material
-ported from the following project, which is distributed under its own licence.
+ported from the following project, which is distributed under its own license.
 
 ## App Settings Utility
 
@@ -22,11 +22,11 @@ in Swift. Every ported function starts with a comment naming its source function
 | Merging results by App Store ID with every platform label | `merge_results` | `Lookup/AppStoreClient.swift` |
 | MDM lockup detail endpoint and offer selection | `load_app_details` | `Lookup/AppStoreClient.swift` |
 | Storefront presets (GB, US, CA, AU, DE, FR) | `change_store` | `App/AppStoreModel.swift` |
-| The embedded Apple app list (75 apps) and its 53-app built-in subset, with Apple's source URL and the 11 September 2026 verification date | `apple_preinstalled_data`, `apple_builtin_data` | `Resources/AppleBuiltInApps.json`, `Lookup/AppleBuiltInApps.swift` |
+| The embedded Apple app list (75 apps) and its 53-app built-in subset, with Apple’s source URL and the September 11, 2026 verification date | `apple_preinstalled_data`, `apple_builtin_data` | `Resources/AppleBuiltInApps.json`, `Lookup/AppleBuiltInApps.swift` |
 | BundleID-Lookup CSV columns and values (strings quoted, numbers bare, as jq `@csv` writes them) | `create_csv` | `Interop/CSVFormats.swift`, `Interop/CSVExporter.swift`, `Interop/CSVImporter.swift` |
 | Local-Mac-Apps CSV columns, one row per architecture | `export_local_csv`, `inspect_local_app` | `Interop/CSVFormats.swift`, `Interop/CSVExporter.swift`, `Interop/CSVImporter.swift` |
 
-### Licence
+### License
 
 ```
 MIT License

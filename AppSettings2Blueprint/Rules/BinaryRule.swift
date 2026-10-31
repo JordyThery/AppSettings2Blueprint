@@ -13,7 +13,7 @@ nonisolated enum SigningStateValue: String, CaseIterable, Identifiable, Sendable
 }
 
 /// One BinaryIdentifier in AllowedBinaries or DeniedBinaries. Empty strings mean
-/// "not set". `signingState` stays a string so an unrecognised value read from
+/// "not set". `signingState` stays a string so an unrecognized value read from
 /// Jamf is kept and reported, not dropped.
 nonisolated struct BinaryRule: Codable, Hashable, Sendable, Identifiable {
     var id = UUID()

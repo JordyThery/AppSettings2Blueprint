@@ -25,9 +25,10 @@ struct JSONPreviewView: View {
             }
             .padding(10)
             if document.hasErrors {
-                Text("Keys a platform does not support are left out of this JSON. Fix the errors before saving.")
+                Label("Keys a platform doesn’t support are left out of this JSON. Fix the errors before saving.",
+                      systemImage: "xmark.octagon.fill")
                     .font(.caption)
-                    .foregroundStyle(.red)
+                    .labelStyle(.tintedIcon(.red))
                     .padding(.horizontal, 10)
                     .padding(.bottom, 6)
             }

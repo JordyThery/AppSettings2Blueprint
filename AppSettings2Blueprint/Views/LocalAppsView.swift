@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Lookup → Local Mac Apps: scanned and dropped apps, and the inspector for the selected one.
+/// Lookup › Local Mac Apps: scanned and dropped apps, and the inspector for the selected one.
 struct LocalAppsView: View {
     @Environment(AppModel.self) private var app
     @State private var isDropTargeted = false
@@ -124,7 +124,7 @@ private struct LocalAppListView: View {
         panel.allowsMultipleSelection = true
         panel.treatsFilePackagesAsDirectories = false
         panel.allowedContentTypes = [.applicationBundle, .unixExecutable, .executable, .data]
-        panel.message = "Choose an .app bundle or a Mach-O executable. It is only read, never launched."
+        panel.message = "Choose an .app bundle or a Mach-O executable. It’s only read, never launched."
         panel.prompt = "Inspect"
         guard panel.runModal() == .OK else { return }
         app.localApps.add(urls: panel.urls)

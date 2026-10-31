@@ -16,7 +16,7 @@ extension AboutConfiguration {
 }
 
 /// Credit for App Settings Utility, which the identifier discovery is based on,
-/// with its MIT licence as it appears in THIRD-PARTY-NOTICES.md.
+/// with its MIT license as it appears in THIRD-PARTY-NOTICES.md.
 extension Acknowledgement {
     static let appSettingsUtilityRepositoryURL = URL(string: "https://github.com/cantscript/AppSettingsUtility")
     static let appSettingsUtilityBlogPostURL = URL(string: "https://cantscript.com/posts/stop-hunting-for-bundle-ids--cdhashes/")

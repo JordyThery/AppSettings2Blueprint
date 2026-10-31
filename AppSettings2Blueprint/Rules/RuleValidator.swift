@@ -28,10 +28,6 @@ nonisolated enum RuleValidator {
         return issues
     }
 
-    static func hasErrors(_ ruleSet: RuleSet) -> Bool {
-        validate(ruleSet).contains { $0.severity == .error }
-    }
-
     // MARK: iOS / iPadOS apps
 
     private static func appIssues(_ ruleSet: RuleSet) -> [ValidationIssue] {
@@ -40,7 +36,7 @@ nonisolated enum RuleValidator {
         if ruleSet.platform == .macOS {
             for (key, list) in lists where !list.isEmpty {
                 issues.append(.init(severity: .error, area: .apps, itemID: nil,
-                                    message: "\(key) is not supported on macOS. Remove these \(list.count) entries or switch the rule set to iOS / iPadOS."))
+                                    message: "\(key) isn’t supported on macOS. Remove these \(list.count) entries or switch the rule set to iOS / iPadOS."))
             }
             return issues
         }
@@ -72,10 +68,10 @@ nonisolated enum RuleValidator {
         if ruleSet.platform == .iOS {
             for (key, list) in lists where !list.isEmpty {
                 issues.append(.init(severity: .error, area: .binaries, itemID: nil,
-                                    message: "\(key) is macOS only. Remove these \(list.count) rules or switch the rule set to macOS."))
+                                    message: "\(key) is macOS-only. Remove these \(list.count) rules or switch the rule set to macOS."))
             }
             if ruleSet.alwaysAllowManagedApps != nil {
-                issues.append(.init(severity: .error, area: .binaries, itemID: nil, message: "AlwaysAllowManagedApps is macOS only."))
+                issues.append(.init(severity: .error, area: .binaries, itemID: nil, message: "AlwaysAllowManagedApps is macOS-only."))
             }
             return issues
         }
@@ -123,12 +119,12 @@ nonisolated enum RuleValidator {
         }
         let state = rule.signingState.trimmingCharacters(in: .whitespacesAndNewlines)
         if !state.isEmpty && SigningStateValue(rawValue: state) == nil {
-            error("SigningState “\(state)” is not valid. Use one of: \(SigningStateValue.allCases.map(\.rawValue).joined(separator: ", ")).")
+            error("SigningState “\(state)” isn’t valid. Use one of: \(SigningStateValue.allCases.map(\.rawValue).joined(separator: ", ")).")
         }
         if rule.teamID.trimmingCharacters(in: .whitespacesAndNewlines) == CodeSignatureInspector.appleTeamPlaceholder,
            !state.isEmpty, state != SigningStateValue.apple.rawValue, state != SigningStateValue.all.rawValue {
             issues.append(.init(severity: .warning, area: .binaries, itemID: rule.id,
-                                message: "TeamID *APPLE* only matches Apple-signed binaries, so SigningState \(state) will not match anything."))
+                                message: "TeamID *APPLE* only matches Apple-signed binaries, so SigningState \(state) won’t match anything."))
         }
         return issues
     }
@@ -146,7 +142,7 @@ nonisolated enum RuleValidator {
             if key.isEmpty {
                 add(.error, ruleSet.platform == .macOS
                     ? "An app identifier is required: the composed “Bundle-ID {Designated-Requirement}” identifier."
-                    : "An app identifier is required: the app's bundle ID.")
+                    : "An app identifier is required: the app’s bundle ID.")
             } else {
                 if !seen.insert(key).inserted { add(.error, "“\(key)” has more than one entry; PermissionDefaults keys must be unique.") }
                 let isComposed = key.contains(" {") && key.hasSuffix("}")
@@ -162,9 +158,9 @@ nonisolated enum RuleValidator {
             for permission in PermissionKey.allCases {
                 guard let value = entry.value(permission) else { continue }
                 if !permission.isSupported(on: ruleSet.platform) {
-                    add(.error, "\(permission.rawValue) is not supported on \(ruleSet.platform.displayName).")
+                    add(.error, "\(permission.rawValue) isn’t supported on \(ruleSet.platform.displayName).")
                 } else if !permission.allowedValues.contains(value) {
-                    add(.error, "\(permission.rawValue) “\(value)” is not valid. Use one of: \(permission.allowedValues.joined(separator: ", ")).")
+                    add(.error, "\(permission.rawValue) “\(value)” isn’t valid. Use one of: \(permission.allowedValues.joined(separator: ", ")).")
                 }
             }
         }

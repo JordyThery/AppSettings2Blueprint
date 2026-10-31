@@ -11,7 +11,7 @@ struct PermissionDefaultsView: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Text(ruleSet.platform == .macOS
-                         ? "Keys are composed identifiers: “Bundle-ID {Designated-Requirement}”. Add an app from Lookup → Local Mac Apps to fill it in. On macOS these defaults are written to a USER-channel declaration."
+                         ? "Keys are composed identifiers: “Bundle-ID {Designated-Requirement}”. Add an app from Lookup › Local Mac Apps to fill it in. On macOS these defaults are written to a USER-channel declaration."
                          : "Keys are bundle IDs.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
@@ -31,7 +31,7 @@ struct PermissionDefaultsView: View {
                 ForEach(ruleSet.permissionDefaults) { entry in
                     PermissionDefaultRow(document: document, entry: entry, platform: ruleSet.platform)
                 }
-                Text("Not supported on tvOS, visionOS or watchOS. Accessibility is not supported on iOS; LocationAccuracy is not supported on macOS. On macOS, WhileUsing location is equivalent to Always.")
+                Text("Not supported on tvOS, visionOS or watchOS. Accessibility isn’t supported on iOS; LocationAccuracy isn’t supported on macOS. On macOS, WhileUsing location is equivalent to Always.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -96,6 +96,6 @@ private struct PermissionDefaultRow: View {
         }
         .fixedSize()
         .accessibilityLabel(key.title)
-        .help(key.isSupported(on: platform) ? key.rawValue : "\(key.rawValue) is not supported on \(platform.displayName); choose Not set.")
+        .help(key.isSupported(on: platform) ? key.rawValue : "\(key.rawValue) isn’t supported on \(platform.displayName); choose Not set")
     }
 }

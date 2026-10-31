@@ -29,7 +29,7 @@ struct RuleValidatorTests {
     @Test func allowedBinaryNeedsCDHashOrTeamID() {
         #expect(!RuleValidator.binaryRuleIssues(BinaryRule(signingID: "com.example"), inAllowList: true).isEmpty)
         #expect(!RuleValidator.binaryRuleIssues(BinaryRule(pathPrefix: "/Applications/"), inAllowList: true).isEmpty)
-        #expect(RuleValidator.binaryRuleIssues(BinaryRule(teamID: "UBF8T346G9"), inAllowList: true).isEmpty)
+        #expect(RuleValidator.binaryRuleIssues(BinaryRule(teamID: "ABCDE12345"), inAllowList: true).isEmpty)
         #expect(RuleValidator.binaryRuleIssues(BinaryRule(cdHash: validCDHash), inAllowList: true).isEmpty)
     }
 
@@ -67,8 +67,8 @@ struct RuleValidatorTests {
             appIdentifier: "com.example {anchor apple}", organizationJustification: "x",
             values: ["LocationAccuracy": "Precise", "Camera": "Allow"]
         )]
-        #expect(errors(ruleSet).contains { $0.contains("DeniedApps is not supported on macOS") })
-        #expect(errors(ruleSet).contains { $0.contains("LocationAccuracy is not supported on macOS") })
+        #expect(errors(ruleSet).contains { $0.contains("DeniedApps isn’t supported on macOS") })
+        #expect(errors(ruleSet).contains { $0.contains("LocationAccuracy isn’t supported on macOS") })
         let json = LosslessJSON.array(DeclarationEncoder.declarations(for: ruleSet)).serializedString()
         #expect(!json.contains("DeniedApps"))
         #expect(!json.contains("LocationAccuracy"))
@@ -81,9 +81,9 @@ struct RuleValidatorTests {
         ruleSet.alwaysAllowManagedApps = true
         ruleSet.permissionDefaults = [PermissionDefault(appIdentifier: "com.example", organizationJustification: "x", values: ["Accessibility": "Allow"])]
         let messages = errors(ruleSet)
-        #expect(messages.contains { $0.contains("AllowedBinaries is macOS only") })
-        #expect(messages.contains { $0.contains("AlwaysAllowManagedApps is macOS only") })
-        #expect(messages.contains { $0.contains("Accessibility is not supported on iOS") })
+        #expect(messages.contains { $0.contains("AllowedBinaries is macOS-only") })
+        #expect(messages.contains { $0.contains("AlwaysAllowManagedApps is macOS-only") })
+        #expect(messages.contains { $0.contains("Accessibility isn’t supported on iOS") })
         let json = LosslessJSON.array(DeclarationEncoder.declarations(for: ruleSet)).serializedString()
         #expect(!json.contains("Binaries"))
         #expect(!json.contains("AlwaysAllowManagedApps"))
@@ -92,7 +92,7 @@ struct RuleValidatorTests {
 
     @Test func allowListWithoutBaselineWarnsUntilBaselineAdded() {
         var ruleSet = RuleSet(platform: .macOS)
-        ruleSet.allowedBinaries = [BinaryRule(teamID: "UBF8T346G9", signingID: "com.microsoft.Outlook")]
+        ruleSet.allowedBinaries = [BinaryRule(teamID: "ABCDE12345", signingID: "com.microsoft.Outlook")]
         #expect(ruleSet.isMissingAllowListBaseline)
         #expect(warnings(ruleSet).contains { $0.contains("allow list") })
         ruleSet.alwaysAllowManagedApps = true
@@ -147,7 +147,7 @@ struct DeclarationCodingTests {
     private func macRuleSet() -> RuleSet {
         var ruleSet = RuleSet(name: "Mac", platform: .macOS)
         ruleSet.addRecommendedBaseline()
-        ruleSet.allowedBinaries.append(BinaryRule(teamID: "UBF8T346G9", signingID: "com.microsoft.Outlook"))
+        ruleSet.allowedBinaries.append(BinaryRule(teamID: "ABCDE12345", signingID: "com.microsoft.Outlook"))
         ruleSet.deniedBinaries = [BinaryRule(cdHash: validCDHash, pathPrefix: "/Applications/Safari.app/", signingState: "Apple")]
         ruleSet.permissionDefaults = [PermissionDefault(
             appIdentifier: #"com.microsoft.Outlook {identifier "com.microsoft.Outlook" and anchor apple generic}"#,
@@ -166,7 +166,7 @@ struct DeclarationCodingTests {
         #expect(declarations.count == 2)
         #expect(declarations[0]["channelType"]?.stringValue == "SYSTEM")
         #expect(declarations[0]["payload"]?["Privacy"] == nil)
-        #expect(declarations[0]["payload"]?["Allowed"]?.serializedString() == #"{"AllowedBinaries":[{"TeamID":"*APPLE*","SigningState":"Apple"},{"SigningID":"com.microsoft.Outlook","TeamID":"UBF8T346G9"}],"DeniedBinaries":[{"CDHash":"a09ef19476472dd66365c3d8e45151c6ab1771e5","PathPrefix":"/Applications/Safari.app/","SigningState":"Apple"}],"AlwaysAllowManagedApps":true}"#)
+        #expect(declarations[0]["payload"]?["Allowed"]?.serializedString() == #"{"AllowedBinaries":[{"TeamID":"*APPLE*","SigningState":"Apple"},{"SigningID":"com.microsoft.Outlook","TeamID":"ABCDE12345"}],"DeniedBinaries":[{"CDHash":"a09ef19476472dd66365c3d8e45151c6ab1771e5","PathPrefix":"/Applications/Safari.app/","SigningState":"Apple"}],"AlwaysAllowManagedApps":true}"#)
         #expect(declarations[1]["channelType"]?.stringValue == "USER")
         #expect(declarations[1]["payload"]?["Allowed"] == nil)
         #expect(declarations[1]["payload"]?["Privacy"]?["PermissionDefaults"]?.objectValue?.keys.first?.hasSuffix("anchor apple generic}") == true)

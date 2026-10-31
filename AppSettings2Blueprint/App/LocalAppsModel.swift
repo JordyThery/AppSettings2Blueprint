@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-/// State for Lookup → Local Mac Apps: scan results, added files and inspections.
+/// State for Lookup › Local Mac Apps: scan results, added files and inspections.
 @Observable
 final class LocalAppsModel {
     static let includeUserApplicationsKey = "includeUserApplicationsFolder"
@@ -22,11 +22,17 @@ final class LocalAppsModel {
         didSet { if let selectedPath { inspect(path: selectedPath) } }
     }
     var showsAllArchitectures = false
-    var includesUserApplications = UserDefaults.standard.bool(forKey: LocalAppsModel.includeUserApplicationsKey) {
+    var includesUserApplications: Bool {
         didSet {
-            UserDefaults.standard.set(includesUserApplications, forKey: Self.includeUserApplicationsKey)
+            defaults.set(includesUserApplications, forKey: Self.includeUserApplicationsKey)
             if hasScanned { scan() }
         }
+    }
+    @ObservationIgnored private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        includesUserApplications = defaults.bool(forKey: Self.includeUserApplicationsKey)
     }
 
     var folders: [String] {
@@ -35,10 +41,6 @@ final class LocalAppsModel {
 
     var visibleScanned: [LocalAppEntry] { filter(scanned) }
     var visibleAdded: [LocalAppEntry] { filter(added) }
-
-    func entry(path: String) -> LocalAppEntry? {
-        added.first { $0.path == path } ?? scanned.first { $0.path == path }
-    }
 
     /// Set when the folder list changes during a scan; that scan's results are
     /// stale, so another scan follows as soon as it finishes.

@@ -135,7 +135,7 @@ nonisolated extension AppSettingsLocator {
         guard !declarations.isEmpty else { throw PlacementError(message: "The rule set produced no declarations.") }
         var steps = blueprint["steps"]?.arrayValue ?? []
         if blueprint["steps"] != nil, blueprint["steps"]?.arrayValue == nil {
-            throw PlacementError(message: "The blueprint's steps are not an array; refusing to write.")
+            throw PlacementError(message: "The Blueprint’s steps aren’t an array; refusing to write.")
         }
         let totalComponents = steps.reduce(0) { $0 + ($1["components"]?.arrayValue?.count ?? 0) }
         let allAppSettings = locate(in: blueprint)
@@ -150,7 +150,7 @@ nonisolated extension AppSettingsLocator {
             let oldComponent = components[componentIndex]
             guard oldComponent["identifier"]?.stringValue == componentIdentifier,
                   let oldDeclarations = oldComponent["configuration"]?["declarations"]?.arrayValue else {
-                throw PlacementError(message: "Step \(stepIndex + 1), component \(componentIndex + 1) is not a \(componentIdentifier) component.")
+                throw PlacementError(message: "Step \(stepIndex + 1), component \(componentIndex + 1) isn’t a \(componentIdentifier) component.")
             }
             let merged = replacingAppSettings(in: oldDeclarations, with: declarations)
             guard merged.count <= maxDeclarationsPerComponent else {
@@ -172,7 +172,7 @@ nonisolated extension AppSettingsLocator {
 
         case let .newComponent(stepIndex):
             guard steps.indices.contains(stepIndex) else {
-                throw PlacementError(message: "Step \(stepIndex + 1) does not exist.")
+                throw PlacementError(message: "Step \(stepIndex + 1) doesn’t exist.")
             }
             guard var components = steps[stepIndex]["components"]?.arrayValue else {
                 throw PlacementError(message: "Step \(stepIndex + 1) has no components array to append to.")
@@ -194,7 +194,7 @@ nonisolated extension AppSettingsLocator {
 
         case let .newStep(name, activationPredicate):
             guard steps.count < maxSteps else {
-                throw PlacementError(message: "The blueprint already has \(steps.count) steps, the most it can hold.")
+                throw PlacementError(message: "The Blueprint already has \(steps.count) steps, the most it can hold.")
             }
             if let activationPredicate, activationPredicate.count > 10_000 {
                 throw PlacementError(message: "The activation predicate is longer than 10,000 characters.")

@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-/// State for Lookup → App Store: search, results, local filter and on-demand details.
+/// State for Lookup › App Store: search, results, local filter and on-demand details.
 @Observable
 final class AppStoreModel {
     enum SearchState: Equatable {
@@ -29,7 +29,7 @@ final class AppStoreModel {
     var scope: AppStoreSearchScope = .all
     /// Lowercase two-letter code. Defaults to the system region.
     var storefront: String {
-        didSet { UserDefaults.standard.set(storefront, forKey: Self.storefrontKey) }
+        didSet { defaults.set(storefront, forKey: Self.storefrontKey) }
     }
     var developerFilter = ""
     var selection: Set<AppStoreApp.ID> = []
@@ -42,10 +42,12 @@ final class AppStoreModel {
     private(set) var details: [String: DetailState] = [:]
 
     @ObservationIgnored private let client: AppStoreClient
+    @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private var searchTask: Task<Void, Never>?
 
     init(client: AppStoreClient = AppStoreClient(), defaults: UserDefaults = .standard) {
         self.client = client
+        self.defaults = defaults
         let stored = defaults.string(forKey: Self.storefrontKey).flatMap(AppStoreClient.normalizedCountry)
         let region = Locale.current.region.flatMap { AppStoreClient.normalizedCountry($0.identifier) }
         storefront = stored ?? region ?? "gb"

@@ -93,7 +93,7 @@ struct AddBinaryRuleSheet: View {
             }
 
             if strategy == .exactBuild && binary.slices.count > 1 {
-                GroupBox("Slices (one rule each)") {
+                GroupBox("Slices (One Rule Each)") {
                     VStack(alignment: .leading) {
                         ForEach(binary.slices) { slice in
                             Toggle(isOn: Binding(
@@ -109,7 +109,7 @@ struct AddBinaryRuleSheet: View {
             }
 
             if strategy == .custom, let slice = preferredSlice {
-                GroupBox("Fields from \(slice.architecture)") {
+                GroupBox("Fields From \(slice.architecture)") {
                     VStack(alignment: .leading, spacing: 4) {
                         customToggle("CDHash", slice.cdHash, $useCDHash)
                         customToggle("TeamID", slice.teamID, $useTeamID)
@@ -128,7 +128,7 @@ struct AddBinaryRuleSheet: View {
                 }
             }
 
-            GroupBox("Will be written") {
+            GroupBox("Will Be Written") {
                 VStack(alignment: .leading, spacing: 4) {
                     if rules.isEmpty {
                         Text("Nothing: choose at least one slice or field.").foregroundStyle(.secondary)

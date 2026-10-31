@@ -1,8 +1,8 @@
 import JTKit
 import SwiftUI
 
-/// "Write to Jamf": pick a new or existing blueprint and a placement, review the
-/// change, write it and show what the server returned.
+/// "Write to Jamf": pick a new or existing Blueprint and a placement, review the
+/// change, write it and show what Jamf returned.
 struct TargetPickerView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var model: JamfWriteModel
@@ -26,18 +26,20 @@ struct TargetPickerView: View {
                 ChooseTargetView(model: model, cancel: { dismiss() })
             case .preparing:
                 ProgressPane(text: model.mode == .existing
-                             ? "Checking the blueprint, writing a backup and building the new steps…"
-                             : "Creating the blueprint…")
+                             ? "Checking the Blueprint, writing a backup and building the new steps…"
+                             : "Creating the Blueprint…")
             case .review(let prepared):
                 ReviewChangesSheet(model: model, prepared: prepared, cancel: { dismiss() })
             case .writing:
-                ProgressPane(text: "Writing to Jamf and reading the blueprint back…")
+                ProgressPane(text: "Writing to Jamf and reading the Blueprint back…")
             case .done(let result):
                 WriteResultView(result: result, done: { dismiss() }, deploy: {
                     deployModel = DeployModel(app: model.app, detail: result.detail)
                 })
             case .failed(let message):
                 FailureView(message: message, back: { model.backToChoosing() }, cancel: { dismiss() })
+            case .uncertain(let message):
+                UncertainWriteView(message: message, close: { dismiss() })
             }
             }
         }
@@ -47,11 +49,12 @@ struct TargetPickerView: View {
             if model.app.overviews.isEmpty { model.app.refresh() }
         }
         // Runs again whenever the list changes: a listing started above (or
-        // a refresh) finishes after the sheet opened, and its Blueprints'
+        // a refresh) finishes after the sheet opened, and its Blueprints’
         // details are fetched then, instead of staying on "Loading…".
         .task(id: model.app.overviews.map(\.id)) {
             await model.app.loadMissingDetails()
         }
+        .onChange(of: model.app.listState) { model.listDidChange() }
     }
 }
 
@@ -82,7 +85,7 @@ private struct ChooseTargetView: View {
             }
 
             if !model.canCreateBlueprints {
-                Banner(style: .info, text: "Jamf School: the API does not list Jamf School device groups, so new blueprints can't be scoped here. Create the blueprint in Jamf School, then write to it.")
+                Banner(style: .info, text: "Jamf School: the API doesn’t list Jamf School device groups, so new Blueprints can’t be scoped here. Create the Blueprint in Jamf School, then write to it.")
             }
 
             switch model.mode {
@@ -91,7 +94,7 @@ private struct ChooseTargetView: View {
             }
 
             if !model.overlappingBlueprints.isEmpty {
-                Banner(style: .warning, text: "Also scoped to these device groups with App Settings: \(model.overlappingBlueprints.map { "“\($0.overview.name)”" }.joined(separator: ", ")). Devices combine every App Settings declaration: AllowedApps and AllowedBinaries are intersected (only apps allowed by all of them run), DeniedApps and DeniedBinaries are combined. Check that they do not conflict.")
+                Banner(style: .warning, text: "Also scoped to these device groups with App Settings: \(model.overlappingBlueprints.map { "“\($0.overview.name)”" }.joined(separator: ", ")). Devices combine every App Settings declaration: AllowedApps and AllowedBinaries are intersected (only apps allowed by all of them run), DeniedApps and DeniedBinaries are combined. Check that they don’t conflict.")
             }
 
             Spacer(minLength: 0)
@@ -106,12 +109,12 @@ private struct ChooseTargetView: View {
                 Button("Cancel", role: .cancel, action: cancel)
                     .keyboardShortcut(.cancelAction)
                 Button(model.mode == .existing ? "Review Changes…" : "Create Blueprint") { model.prepare() }
-                    .keyboardShortcut(.defaultAction)
+                    .keyboardShortcut(model.primaryButtonIsDefault ? .defaultAction : nil)
                     .disabled(model.blockingReason != nil)
             }
         }
         .padding(16)
-        // Jamf School is recognised once the device group list answers, which can
+        // Jamf School is recognized once the device group list answers, which can
         // be after the sheet opened in New Blueprint mode.
         .onChange(of: app.isJamfSchool, initial: true) { _, isSchool in
             if isSchool { model.mode = .existing }
@@ -136,7 +139,13 @@ private struct ExistingTargetView: View {
                     HStack(spacing: 6) {
                         if let detail {
                             if detail.containsAppSettings { Text("App Settings").foregroundStyle(.secondary) }
-                            if app.isReadOnly(detail) { Label("Division (read-only)", systemImage: "lock").foregroundStyle(.orange) }
+                            if app.isReadOnly(detail) { Label("Division (read-only)", systemImage: "lock").labelStyle(.tintedIcon(.orange)) }
+                        } else if let error = app.detailErrors[overview.id] {
+                            Label("Couldn’t load", systemImage: "exclamationmark.triangle")
+                                .labelStyle(.tintedIcon(.orange))
+                                .help(error)
+                            Button("Try Again") { app.loadDetail(id: overview.id) }
+                                .buttonStyle(.link)
                         } else {
                             Text("Loading…").foregroundStyle(.tertiary)
                         }
@@ -149,7 +158,7 @@ private struct ExistingTargetView: View {
             .overlay {
                 if app.overviews.isEmpty {
                     ContentUnavailableView("No Blueprints", systemImage: "square.stack.3d.up.slash",
-                                           description: Text(app.listState == .listing ? "Listing…" : "Create a new blueprint instead."))
+                                           description: Text(app.listState == .listing ? "Listing…" : "Create a new Blueprint instead."))
                 }
             }
 
@@ -176,12 +185,10 @@ private struct PlacementView: View {
                 Text(detail.overview.name).font(.headline)
                 Text(scopeText).font(.caption).foregroundStyle(.secondary)
                 if model.app.isReadOnly(detail) {
-                    Banner(style: .error, text: "This blueprint is assigned to a division. The API does not allow changing it, so it is shown read-only.")
+                    Banner(style: .error, text: JamfWriteModel.divisionText)
                 }
                 if detail.scopeDeviceGroups.isEmpty {
-                    Banner(style: .error, text: model.app.isJamfSchool
-                        ? "This blueprint has no device groups in scope. The Platform API rejects changes to it (400 NotBlank: scopeId) until it has one. Set its scope in Jamf School, then reload."
-                        : "This blueprint has no device groups in scope. The Platform API rejects changes to it (400 NotBlank: scopeId) until it has one. Set it with Edit Scope… in Jamf → Blueprints, then reload.")
+                    Banner(style: .error, text: JamfWriteModel.noScopeText(isJamfSchool: model.app.isJamfSchool))
                 }
 
                 Text("Placement").font(.subheadline.weight(.semibold))
@@ -207,13 +214,12 @@ private struct PlacementView: View {
                     StepOptionsView(model: model)
                 }
                 if case .replaceExisting = model.effectivePlacement(for: detail) {
-                    Text("Only the App Settings declarations in that component are replaced, channel by channel. Other declarations in it, and every other component, stay byte for byte as they are.")
-                        .font(.caption)
+                    Text("Only the App Settings declarations in that component are replaced, channel by channel. Other declarations in it, and every other component, stay byte for byte as they are.")                        .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 if !others.isEmpty {
-                    Banner(style: .info, text: "\(others.count) App Settings declaration\(others.count == 1 ? " is" : "s are") in components this app does not edit (\(Set(others.map(\.componentIdentifier)).sorted().joined(separator: ", "))). They are left unchanged.")
+                    Banner(style: .info, text: "\(others.count) App Settings declaration\(others.count == 1 ? " is" : "s are") in components this app doesn’t edit (\(Set(others.map(\.componentIdentifier)).sorted().joined(separator: ", "))). They’re left unchanged.")
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -238,7 +244,7 @@ private struct NewBlueprintView: View {
                 TextField("Description", text: $model.newDescription, axis: .vertical)
                     .lineLimit(1...3)
                 StepOptionsView(model: model)
-                Text("Recommended: one blueprint per platform. Use an activation predicate only to keep an iPadOS and a macOS rule set in one blueprint.")
+                Text("Recommended: one Blueprint per platform. Use an activation predicate only to keep an iPadOS and a macOS rule set in one Blueprint.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -268,11 +274,11 @@ private struct NewBlueprintView: View {
                         ProgressView()
                     } else if let error = app.deviceGroupsError {
                         ContentUnavailableView {
-                            Label("Couldn't Load Device Groups", systemImage: "exclamationmark.triangle")
+                            Label("Couldn’t Load Device Groups", systemImage: "exclamationmark.triangle")
                         } description: {
                             Text(error)
                         } actions: {
-                            Button("Retry") { app.loadDeviceGroups() }
+                            Button("Try Again") { app.loadDeviceGroups() }
                         }
                     } else if app.deviceGroups.isEmpty {
                         ContentUnavailableView("No Device Groups", systemImage: "person.3")
@@ -291,7 +297,7 @@ private struct StepOptionsView: View {
         VStack(alignment: .leading, spacing: 6) {
             TextField("Step name", text: $model.stepName)
             Toggle("Activation predicate", isOn: $model.usesActivationPredicate)
-                .help("Limit the step to devices matching a predicate, so one blueprint can hold an iPadOS and a macOS rule set")
+                .help("Limit the step to devices matching a predicate, so one Blueprint can hold an iPadOS and a macOS rule set")
             if model.usesActivationPredicate {
                 TextField("Predicate", text: $model.activationPredicate, axis: .vertical)
                     .font(.body.monospaced())
@@ -323,25 +329,25 @@ private struct WriteResultView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if result.isVerified {
-                Label(result.created ? "Blueprint created and verified" : "Written and verified", systemImage: "checkmark.seal.fill")
+                Label(result.created ? "Blueprint Created and Verified" : "Written and Verified", systemImage: "checkmark.seal.fill")
                     .font(.title3.weight(.semibold))
-                    .foregroundStyle(.green)
-                Text("The server returned exactly the component that was sent, and every other component is unchanged.")
+                    .labelStyle(.tintedIcon(.green))
+                Text("Jamf returned exactly the component that was sent, and every other component is unchanged.")
                     .foregroundStyle(.secondary)
             } else {
-                Label("Written, but the read-back differs", systemImage: "exclamationmark.triangle.fill")
+                Label("Written, but the Read-Back Differs", systemImage: "exclamationmark.triangle.fill")
                     .font(.title3.weight(.semibold))
-                    .foregroundStyle(.orange)
+                    .labelStyle(.tintedIcon(.orange))
                 ForEach(result.problems, id: \.self) { Text($0) }
             }
             HStack(spacing: 8) {
                 Text("“\(result.detail.overview.name)”").font(.headline)
                 if let state = result.detail.overview.deploymentState?.state { DeploymentStateBadge(state: state) }
             }
-            Text("Nothing reaches devices until the blueprint is deployed. Deploying is a separate, confirmed step.")
+            Text("Nothing reaches devices until the Blueprint is deployed. Deploying is a separate, confirmed step.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
-            Text("Component as returned by the server").font(.subheadline.weight(.semibold))
+            Text("Component as Returned by Jamf").font(.subheadline.weight(.semibold))
             MonospacedTextView(text: result.readBackComponent?.serializedString(pretty: true) ?? "Not found")
                 .frame(maxHeight: .infinity)
             HStack {
@@ -349,7 +355,7 @@ private struct WriteResultView: View {
                 Spacer()
                 Button("Deploy…", action: deploy)
                     .disabled(result.detail.scopeDeviceGroups.isEmpty)
-                    .help("Deploy the blueprint to its scope, after a confirmation")
+                    .help("Deploy the Blueprint to its scope, after a confirmation")
                 Button("Done", action: done).keyboardShortcut(.defaultAction)
             }
         }
@@ -357,6 +363,7 @@ private struct WriteResultView: View {
     }
 }
 
+/// Nothing was sent, or Jamf refused the request: going back is safe.
 private struct FailureView: View {
     let message: String
     let back: () -> Void
@@ -366,13 +373,10 @@ private struct FailureView: View {
         VStack(alignment: .leading, spacing: 12) {
             Label("Nothing Was Written", systemImage: "xmark.octagon.fill")
                 .font(.title3.weight(.semibold))
-                .foregroundStyle(.red)
+                .labelStyle(.tintedIcon(.red))
             Text(message)
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
-            Text("If the write itself failed after it was sent, check the request log and the blueprint before retrying.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
             Spacer()
             HStack {
                 Spacer()
@@ -381,5 +385,33 @@ private struct FailureView: View {
             }
         }
         .padding(16)
+    }
+}
+
+/// The write may have reached Jamf. No Back: repeating it could create a
+/// second Blueprint. The Blueprint is fetched again in the background.
+private struct UncertainWriteView: View {
+    let message: String
+    let close: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("Written, Not Verified", systemImage: "exclamationmark.triangle.fill")
+                .font(.title3.weight(.semibold))
+                .labelStyle(.tintedIcon(.orange))
+            Text(message)
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+            Text("The requests and Jamf’s answers are in the activity log (Window › Activity Log).")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            Spacer()
+            HStack {
+                Spacer()
+                Button("Close", action: close).keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(16)
+        .accessibilityIdentifier("uncertainWrite")
     }
 }

@@ -3,7 +3,7 @@ import Security
 
 /// The signing state established for one slice. `unknown` is diagnostic only and
 /// never written to a declaration.
-nonisolated enum DetectedSigningState: String, Hashable, Sendable, CaseIterable {
+nonisolated enum DetectedSigningState: String, Hashable, Sendable {
     case apple = "Apple"
     case developerID = "DeveloperID"
     case appStore = "AppStore"
@@ -18,7 +18,7 @@ nonisolated enum SignatureVerification: Hashable, Sendable {
     case valid
     case unverified(String)
 
-    /// Anthony's CSV values: `Valid` or `Unverified`.
+    /// App Settings Utility's CSV values: `Valid` or `Unverified`.
     var csvValue: String {
         if case .valid = self { return "Valid" }
         return "Unverified"
@@ -89,7 +89,7 @@ nonisolated enum CodeSignatureInspector {
         var errorDescription: String? { message }
     }
 
-    /// Anthony's requirement strings, checked in this order.
+    /// App Settings Utility's requirement strings, checked in this order.
     static let appleRequirement = "anchor apple"
     static let developerIDRequirement = "anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] exists and certificate leaf[field.1.2.840.113635.100.6.1.13] exists"
     static let appStoreRequirement = "anchor apple generic and certificate leaf[field.1.2.840.113635.100.6.1.9] exists"
@@ -102,7 +102,7 @@ nonisolated enum CodeSignatureInspector {
         let path = url.path(percentEncoded: false)
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory) else {
-            throw InspectionError(message: "\(path) does not exist.")
+            throw InspectionError(message: "\(path) doesn’t exist.")
         }
         let isBundle = isDirectory.boolValue
         let name = isBundle ? url.deletingPathExtension().lastPathComponent : url.lastPathComponent
@@ -176,7 +176,7 @@ nonisolated enum CodeSignatureInspector {
         var code: SecStaticCode?
         let status = SecStaticCodeCreateWithPathAndAttributes(url as CFURL, [], attributes as CFDictionary, &code)
         guard status == errSecSuccess, let code else {
-            throw InspectionError(message: "Could not read the code signature of \(url.path(percentEncoded: false)) (\(describe(status))).")
+            throw InspectionError(message: "Couldn’t read the code signature of \(url.path(percentEncoded: false)) (\(describe(status))).")
         }
         return code
     }

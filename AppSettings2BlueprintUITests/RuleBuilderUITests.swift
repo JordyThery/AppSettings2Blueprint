@@ -16,7 +16,7 @@ final class RuleBuilderUITests: AppSettingsUITestCase {
         let json = componentJSON
         XCTAssertEqual(json.components(separatedBy: "com.apple.news").count - 1, 1, "The duplicate was added")
 
-        tap(app.radioButtons["Allow list (AllowedApps)"])
+        tap(app.radioButtons["Allow List (AllowedApps)"])
         type("com.apple.mobilesafari\n", into: bundleField)
         waitForJSON { $0.contains("AllowedApps") && $0.contains("DeniedApps") }
         XCTAssertTrue(anyContaining("also has 1 entry").waitForExistence(timeout: 5), "No both-lists warning")

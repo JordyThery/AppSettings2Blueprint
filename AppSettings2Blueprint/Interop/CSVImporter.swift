@@ -2,7 +2,7 @@ import Foundation
 
 // Ported from cantscript/AppSettingsUtility (MIT) — reads the CSV layouts that
 // create_csv and export_local_csv in appSettingsUtility.sh write.
-/// Reads App Settings Utility CSV files. The layout is recognised from the header
+/// Reads App Settings Utility CSV files. The layout is recognized from the header
 /// row, which must match one of the two column lists exactly and in order.
 nonisolated enum CSVImporter {
     struct ImportError: Error, LocalizedError {
@@ -16,7 +16,7 @@ nonisolated enum CSVImporter {
         guard let header = records.first else { throw ImportError(message: "The file is empty.") }
         let names = header.map { $0.value ?? "" }
         guard let format = CSVFormat.allCases.first(where: { $0.columns == names }) else {
-            throw ImportError(message: "The header row does not match either App Settings Utility layout (BundleID-Lookup or Local-Mac-Apps).")
+            throw ImportError(message: "The header row doesn’t match either App Settings Utility layout (BundleID-Lookup or Local-Mac-Apps).")
         }
         let rows = records.dropFirst()
         for (index, row) in rows.enumerated() where row.count != format.columns.count {
@@ -86,7 +86,7 @@ nonisolated enum CSVImporter {
                 cellStarted = true
             }
         }
-        if inQuotes { throw ImportError(message: "A quoted cell is not closed.") }
+        if inQuotes { throw ImportError(message: "A quoted cell isn’t closed.") }
         // A final line without a trailing newline still counts.
         if cellStarted || !record.isEmpty { endRecord() }
         return records

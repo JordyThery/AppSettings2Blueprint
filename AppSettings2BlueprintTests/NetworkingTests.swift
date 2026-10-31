@@ -1,5 +1,6 @@
 import Foundation
 import JTKit
+import JTKitTestSupport
 import Testing
 @testable import AppSettings2Blueprint
 
@@ -49,7 +50,7 @@ struct RequestAllowListTests {
 extension MockNetworkTests {
 @Suite("Platform API client")
 struct PlatformAPIClientTests {
-    private static let environmentID = "e77c1408-10c8-4007-b177-abc9157fbcaa"
+    private static let environmentID = "12345678-1234-4123-8123-123456789abc"
     private let credentials = PlatformCredentials(region: .eu, environmentID: environmentID, clientID: "id", clientSecret: "s3cr3t")
     private static let token = MockResponse.json(200, #"{"access_token":"tok","expires_in":900}"#)
 

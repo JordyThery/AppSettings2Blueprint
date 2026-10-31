@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Rule Set → App Settings: the three editor tabs, issues and the live JSON preview.
+/// Rule Set › Editor: the three editor tabs, issues and the live JSON preview.
 struct RuleBuilderView: View {
     enum EditorTab: Hashable { case apps, binaries, privacy }
 
@@ -79,9 +79,9 @@ struct RuleBuilderView: View {
         } message: { action in
             switch action {
             case .switchPlatform(let platform):
-                Text("The current entries stay in the rule set, but keys \(platform.displayName) does not support are marked as errors and never written. Remove them before saving.")
+                Text("The current entries stay in the rule set, but keys \(platform.displayName) doesn’t support are marked as errors and never written. Remove them before saving.")
             default:
-                Text("The rule set has changes that are not saved to a file or written to Jamf.")
+                Text("The rule set has changes that aren’t saved to a file or written to Jamf.")
             }
         }
         .sheet(isPresented: $isWritingToJamf) {
@@ -90,7 +90,7 @@ struct RuleBuilderView: View {
         .sheet(item: $csvImport) { item in
             CSVImportSheet(document: item.document)
         }
-        .alert("Couldn't Complete", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
+        .alert("Couldn’t Complete", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
             Button("OK") { errorMessage = nil }
         } message: {
             Text(errorMessage ?? "")
@@ -122,14 +122,14 @@ struct RuleBuilderView: View {
             .pickerStyle(.segmented)
             .fixedSize()
             .labelsHidden()
-            .help("The device family this rule set targets. iOS-only and macOS-only keys never mix.")
+            .help("The device family this rule set targets; iOS-only and macOS-only keys never mix")
             if document.ruleSet.platform == .iOS {
                 Toggle("Shared iPad", isOn: Binding(
                     get: { document.ruleSet.isSharedIPad },
                     set: { value in document.update("Change Shared iPad") { $0.isSharedIPad = value } }
                 ))
                 .toggleStyle(.checkbox)
-                .help("On Shared iPad, Apple only accepts App Settings on the user channel. When on, the declaration is written as USER instead of SYSTEM.")
+                .help("On Shared iPad, Apple only accepts App Settings on the user channel; when on, the declaration is written as USER instead of SYSTEM")
             }
             if let url = document.fileURL {
                 Text(url.lastPathComponent)
@@ -143,12 +143,12 @@ struct RuleBuilderView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-                    .help("Loaded from or last written to this blueprint")
+                    .help("Loaded from or last written to this Blueprint")
             }
             if document.isDirty {
                 Text("Edited")
                     .font(.caption)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(.secondary)
             }
             Spacer()
             Menu("New", systemImage: "doc.badge.plus") {
@@ -242,14 +242,8 @@ struct RuleBuilderView: View {
     }
 
     private func saveFile() {
-        let document = model.ruleSet
-        let panel = NSSavePanel()
-        panel.allowedContentTypes = [.json]
-        let base = document.ruleSet.name.replacingOccurrences(of: "/", with: "-")
-        panel.nameFieldStringValue = document.fileURL?.lastPathComponent ?? "\(base).\(RuleSetDocument.fileExtension)"
-        guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
-            try document.save(to: url)
+            try model.ruleSet.saveWithPanel()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -306,15 +300,15 @@ private struct IssuesBar: View {
             HStack(spacing: 10) {
                 if issues.isEmpty {
                     Label("No issues. The rule set matches the App Settings schema.", systemImage: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
+                        .labelStyle(.tintedIcon(.green))
                 } else {
                     if errorCount > 0 {
                         Label("\(errorCount) error\(errorCount == 1 ? "" : "s") (saving is disabled)", systemImage: "xmark.octagon.fill")
-                            .foregroundStyle(.red)
+                            .labelStyle(.tintedIcon(.red))
                     }
                     if warningCount > 0 {
                         Label("\(warningCount) warning\(warningCount == 1 ? "" : "s")", systemImage: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.orange)
+                            .labelStyle(.tintedIcon(.orange))
                     }
                     Spacer()
                     Button(isExpanded ? "Hide" : "Show All") { isExpanded.toggle() }
@@ -354,6 +348,23 @@ struct IssueLabel: View {
         }
         .font(.callout)
         .textSelection(.enabled)
+    }
+}
+
+// MARK: - Saving
+
+extension RuleSetDocument {
+    /// Asks where to save the rule set and saves it. False when the panel was
+    /// canceled.
+    @discardableResult
+    func saveWithPanel() throws -> Bool {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.json]
+        let base = ruleSet.name.replacingOccurrences(of: "/", with: "-")
+        panel.nameFieldStringValue = fileURL?.lastPathComponent ?? "\(base).\(RuleSetDocument.fileExtension)"
+        guard panel.runModal() == .OK, let url = panel.url else { return false }
+        try save(to: url)
+        return true
     }
 }
 

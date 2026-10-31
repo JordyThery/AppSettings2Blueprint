@@ -101,7 +101,7 @@ final class RuleSetDocument {
             $0.stepIndex != location.stepIndex || $0.componentIndex != location.componentIndex
         }
         if !others.isEmpty {
-            decoded.notes.append("This blueprint has \(others.count) more App Settings declaration\(others.count == 1 ? "" : "s") in other components. Only step \(location.stepIndex + 1), component \(location.componentIndex + 1) was loaded, and only it is replaced when you write.")
+            decoded.notes.append("This Blueprint has \(others.count) more App Settings declaration\(others.count == 1 ? "" : "s") in other components. Only step \(location.stepIndex + 1), component \(location.componentIndex + 1) was loaded, and only it is replaced when you write.")
         }
         replace(
             with: decoded.ruleSet, fileURL: nil, notes: decoded.notes,
@@ -129,7 +129,7 @@ final class RuleSetDocument {
         do {
             file = try JSONDecoder().decode(File.self, from: data)
         } catch {
-            throw DocumentError(message: "\(url.lastPathComponent) is not an AppSettings2Blueprint rule set: \(error.localizedDescription)")
+            throw DocumentError(message: "\(url.lastPathComponent) isn’t an AppSettings2Blueprint rule set: \(error.localizedDescription)")
         }
         guard file.format == File.formatIdentifier else {
             throw DocumentError(message: "\(url.lastPathComponent) has an unknown format (\(file.format)).")

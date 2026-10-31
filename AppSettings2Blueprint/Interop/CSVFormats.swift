@@ -3,7 +3,7 @@ import Foundation
 /// One CSV cell as jq's `@csv` writes it: strings quoted, numbers and booleans
 /// bare, null as an empty unquoted cell. Keeping the distinction makes an import
 /// followed by an export byte-identical for files the exporter writes; foreign
-/// CRLF line endings are normalised to `\n`.
+/// CRLF line endings are normalized to `\n`.
 nonisolated enum CSVField: Hashable, Sendable {
     case text(String)
     case bare(String)
