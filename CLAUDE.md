@@ -1,5 +1,7 @@
 # AppSettings2Blueprint: instructions for Claude
 
+At the start of every conversation, run ../JTKit/Scripts/check-versions.sh (or fetch it from GitHub if ../JTKit isn’t there) and mention the result in one line if anything is out of date.
+
 Shared code and the standards for every app: see JTKit's CLAUDE.md and ROADMAP.md (github.com/JordyThery/JTKit, or ../JTKit in the workspace).
 
 ## What the app does
@@ -39,7 +41,7 @@ Extend JTKit instead of adding another copy. If something here would be useful t
 - The Blueprints API applies PATCH as a JSON merge-patch, which replaces arrays wholesale. Always send the complete `steps` array, with everything outside the App Settings component exactly as received (`LosslessJSON` keeps key order and number text). Never reformat or re-sort JSON.
 - Only the `com.jamf.ddm-strict` component is edited. App Settings in other components are shown, not changed.
 - Order of a write: fetch again, check `updated` and the steps are unchanged, back up, PATCH, verify against a read-back. If the Blueprint changed on the server, write nothing.
-- Backups are never overwritten. Write them with `.withoutOverwriting` only: Foundation on macOS 27 traps when it is combined with `.atomic`.
+- Backups are never overwritten. Write them with `.withoutOverwriting` only, never combined with `.atomic`.
 - Never send `divisionId`. Division-assigned Blueprints are read-only (JTKit's `DIVISION_PATCH_NOT_ALLOWED`).
 - The allow-list permits only GET, `POST /auth/token`, Blueprint create, PATCH and deploy. Never add DELETE or undeploy.
 - Writing never deploys. Deploy needs a confirmation listing groups and device count, and a second one for a macOS allow list without `AlwaysAllowManagedApps` or the Apple-signed baseline. Removing groups from a deployed Blueprint needs an extra confirmation.
@@ -66,6 +68,10 @@ Extend JTKit instead of adding another copy. If something here would be useful t
 - Jamf School: no scope editing and no new-Blueprint creation (no device group list). Deploy stays available and shows group IDs instead of names and counts. Scope editing is a Jamf Pro feature.
 - App Store lookups are logged in the activity log as "App Store" and are not retried. Lookups never include Jamf data or credentials.
 - Keep README's Permissions and Network tables complete when adding an endpoint or host.
+
+## Watchlist
+
+What this app waits for from Apple, Jamf or Microsoft, or must recheck: see WATCHLIST.md.
 
 ## Testing
 
