@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import JTKit
 import SwiftUI
 
@@ -24,6 +24,31 @@ struct ConnectionsTab: View {
     }
 }
 
+/// The app's section of JTKit's General tab, below Appearance: what backups
+/// hold, how long they're kept, and where they are.
+struct BackupSettingsSection: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        @Bindable var model = model
+        Section("Backups") {
+            Picker("Keep backups", selection: $model.backupRetention) {
+                ForEach(BackupStore.Retention.allCases) { Text($0.title).tag($0) }
+            }
+            Text("A backup of the whole Blueprint is written before every change, including the settings of its other components, such as Wi-Fi passwords. Backups are plain JSON files that only your user account can read. The newest backup of each Blueprint is always kept.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Button("Show Backups in Finder") {
+                let root = model.backupRoot
+                try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true,
+                                                         attributes: [.posixPermissions: 0o700])
+                NSWorkspace.shared.open(root)
+            }
+        }
+    }
+}
+
 extension AppModel {
     /// The read permissions Test Connection checks. Write permissions can't be
     /// checked without writing, so they stay in the footer.
@@ -40,7 +65,7 @@ extension AppModel {
         let results = await client.checkPermissions(Self.readChecks)
         if let problem = JamfPlatform.PermissionProblem(results) { throw problem }
         let page = try await JamfPlatform.Blueprints(client: client).listPage(page: 0, pageSize: 1)
-        let count = page.totalCount.map { "\($0) blueprint\($0 == 1 ? "" : "s")" } ?? "blueprint list OK"
+        let count = page.totalCount.map { "\($0) Blueprint\($0 == 1 ? "" : "s")" } ?? "Blueprint list OK"
         return "Connected · \(count) · device groups OK"
     }
 

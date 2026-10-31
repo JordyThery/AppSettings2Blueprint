@@ -1,5 +1,5 @@
 #!/bin/zsh
-# AppSettings2Blueprint's release check (JTKit ROADMAP step 11). Claude runs
+# AppSettings2Blueprint's release check. Claude runs
 # it unattended with nohup; the report lands in
 # ~/Library/Application Support/JTKit Release Check/runs/.
 #
@@ -30,8 +30,9 @@ CREDENTIALS=(
 )
 DOMAIN="be.jordythery.appsettings2blueprint"
 # The saved connections share the preferences file with window frames, so
-# only these settings are compared (JTKit 0.12.1).
-FINGERPRINT_DEFAULTS=("$DOMAIN connectionProfiles" "$DOMAIN selectedConnectionProfileID" "$DOMAIN demoMode")
+# only these settings are compared.
+FINGERPRINT_DEFAULTS=("$DOMAIN connectionProfiles" "$DOMAIN selectedConnectionProfileID" "$DOMAIN demoMode"
+    "$DOMAIN sidebarSelection" "$DOMAIN appStoreStorefront" "$DOMAIN includeUserApplicationsFolder" "$DOMAIN backupRetentionDays")
 FINGERPRINT_PATHS=("$HOME/Library/Application Support/AppSettings2Blueprint/Backups")
 KEYCHAIN_PREFIXES=("AppSettings2Blueprint.")
 

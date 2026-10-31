@@ -1,11 +1,11 @@
 import AppKit
 import SwiftUI
 
-/// Lookup → Apple Built-in Apps: the embedded reference list of Apple app bundle IDs.
+/// Lookup › Apple Built-in Apps: the embedded reference list of Apple app bundle IDs.
 struct BuiltInAppsView: View {
     enum ListChoice: String, CaseIterable, Identifiable {
-        case builtIn = "Built-in only"
-        case all = "All Apple apps"
+        case builtIn = "Built-in Only"
+        case all = "All Apple Apps"
         var id: String { rawValue }
     }
 
@@ -103,7 +103,7 @@ struct BuiltInAppsView: View {
         }
         .searchable(text: $searchText, placement: .toolbar, prompt: "Filter Apple apps")
         .onChange(of: choice) { selection = [] }
-        .alert("Couldn't Export", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
+        .alert("Couldn’t Export", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
             Button("OK") { errorMessage = nil }
         } message: { Text(errorMessage ?? "") }
     }
@@ -121,7 +121,7 @@ private struct SourceFooter: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 4) {
-                Text("Source: Apple's list of app bundle IDs, verified \(list.verifiedDisplay), as embedded in")
+                Text("Source: Apple’s list of app bundle IDs, verified \(list.verifiedDisplay), as embedded in")
                 if let repository = URL(string: "https://github.com/cantscript/AppSettingsUtility") {
                     Link("App Settings Utility", destination: repository)
                 }

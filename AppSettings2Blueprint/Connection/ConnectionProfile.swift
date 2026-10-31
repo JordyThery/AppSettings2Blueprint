@@ -70,7 +70,7 @@ nonisolated extension ConnectionProfile {
         let value = environmentID.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !value.isEmpty else { return nil }
         return UUID(uuidString: value) == nil
-            ? "Not a UUID. Expected 8-4-4-4-12 hexadecimal characters, e.g. e77c1408-10c8-4007-b177-abc9157fbcaa."
+            ? "Not a UUID. Expected 8-4-4-4-12 hexadecimal characters, e.g. 12345678-1234-4123-8123-123456789abc."
             : nil
     }
 }

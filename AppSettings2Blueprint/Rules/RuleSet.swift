@@ -26,8 +26,8 @@ nonisolated enum AppListMode: String, Codable, CaseIterable, Identifiable, Hasha
 
     var title: String {
         switch self {
-        case .allow: "Allow list (AllowedApps)"
-        case .deny: "Deny list (DeniedApps)"
+        case .allow: "Allow List (AllowedApps)"
+        case .deny: "Deny List (DeniedApps)"
         }
     }
 

@@ -1,7 +1,7 @@
 import JTKit
 import SwiftUI
 
-/// Edit Scope: choose the device groups of an existing blueprint. Only the scope
+/// Edit Scope: choose the device groups of an existing Blueprint. Only the scope
 /// is sent; the steps are left exactly as they are.
 struct EditScopeSheet: View {
     @Environment(\.dismiss) private var dismiss
@@ -19,7 +19,7 @@ struct EditScopeSheet: View {
             case .saving:
                 VStack(spacing: 12) {
                     ProgressView()
-                    Text("Checking the blueprint, writing a backup and changing the scope…").foregroundStyle(.secondary)
+                    Text("Checking the Blueprint, writing a backup and changing the scope…").foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             case .done(let result):
@@ -28,7 +28,7 @@ struct EditScopeSheet: View {
                 VStack(alignment: .leading, spacing: 12) {
                     Label("Scope Not Changed", systemImage: "xmark.octagon.fill")
                         .font(.title3.weight(.semibold))
-                        .foregroundStyle(.red)
+                        .labelStyle(.tintedIcon(.red))
                     Text(message)
                         .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
@@ -37,6 +37,22 @@ struct EditScopeSheet: View {
                         Spacer()
                         Button("Close", role: .cancel) { dismiss() }
                         Button("Back") { model.phase = .editing }.keyboardShortcut(.defaultAction)
+                    }
+                }
+                .padding(16)
+            case .uncertain(let message):
+                // The scope may have changed: no Back to send it again.
+                VStack(alignment: .leading, spacing: 12) {
+                    Label("Scope Changed, Not Verified", systemImage: "exclamationmark.triangle.fill")
+                        .font(.title3.weight(.semibold))
+                        .labelStyle(.tintedIcon(.orange))
+                    Text(message)
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Button("Close") { dismiss() }.keyboardShortcut(.defaultAction)
                     }
                 }
                 .padding(16)
@@ -87,11 +103,11 @@ private struct EditScopeForm: View {
                     ProgressView()
                 } else if let error = model.app.deviceGroupsError {
                     ContentUnavailableView {
-                        Label("Couldn't Load Device Groups", systemImage: "exclamationmark.triangle")
+                        Label("Couldn’t Load Device Groups", systemImage: "exclamationmark.triangle")
                     } description: {
                         Text(error)
                     } actions: {
-                        Button("Retry") { model.app.loadDeviceGroups() }
+                        Button("Try Again") { model.app.loadDeviceGroups() }
                     }
                 }
             }
@@ -108,8 +124,8 @@ private struct EditScopeForm: View {
                 Spacer()
                 Button("Cancel", role: .cancel, action: cancel)
                     .keyboardShortcut(.cancelAction)
+                // No default button: Return in the filter field must not change the scope.
                 Button("Change Scope") { model.save() }
-                    .keyboardShortcut(.defaultAction)
                     .disabled(model.blockingReason != nil)
             }
         }
@@ -117,7 +133,7 @@ private struct EditScopeForm: View {
     }
 }
 
-/// Added and removed groups, with the removal warning for deployed blueprints.
+/// Added and removed groups, with the removal warning for deployed Blueprints.
 private struct ChangeSummary: View {
     @Bindable var model: EditScopeModel
 
@@ -126,15 +142,14 @@ private struct ChangeSummary: View {
             VStack(alignment: .leading, spacing: 6) {
                 if !model.addedGroups.isEmpty {
                     Label("Add: \(names(model.addedGroups))", systemImage: "plus.circle")
-                        .foregroundStyle(.green)
+                        .labelStyle(.tintedIcon(.green))
                 }
                 if !model.removedGroups.isEmpty {
                     Label("Remove: \(names(model.removedGroups))", systemImage: "minus.circle")
-                        .foregroundStyle(.orange)
+                        .labelStyle(.tintedIcon(.orange))
                 }
                 if model.removalNeedsAcknowledgement {
-                    Toggle("I understand that devices in the removed groups lose this blueprint's settings at the next deployment.", isOn: $model.acknowledgesRemoval)
-                        .foregroundStyle(.orange)
+                    Toggle("I understand that devices in the removed groups lose this Blueprint’s settings at the next deployment.", isOn: $model.acknowledgesRemoval)
                 }
                 Text("Only the scope is sent; the steps stay exactly as they are. Devices are affected at the next deployment.")
                     .font(.caption)
@@ -164,15 +179,15 @@ private struct ScopeResultView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if result.isVerified {
-                Label("Scope changed and verified", systemImage: "checkmark.seal.fill")
+                Label("Scope Changed and Verified", systemImage: "checkmark.seal.fill")
                     .font(.title3.weight(.semibold))
-                    .foregroundStyle(.green)
-                Text("The server returned the new scope, and the steps are unchanged.")
+                    .labelStyle(.tintedIcon(.green))
+                Text("Jamf returned the new scope, and the steps are unchanged.")
                     .foregroundStyle(.secondary)
             } else {
-                Label("Scope changed, but the read-back differs", systemImage: "exclamationmark.triangle.fill")
+                Label("Scope Changed, but the Read-Back Differs", systemImage: "exclamationmark.triangle.fill")
                     .font(.title3.weight(.semibold))
-                    .foregroundStyle(.orange)
+                    .labelStyle(.tintedIcon(.orange))
                 ForEach(result.problems, id: \.self) { Text($0) }
             }
             HStack(spacing: 8) {

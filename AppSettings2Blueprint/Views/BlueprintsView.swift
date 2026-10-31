@@ -1,7 +1,7 @@
 import JTKit
 import SwiftUI
 
-/// Jamf → Blueprints: the Blueprint list and the raw JSON of the selected one.
+/// Jamf › Blueprints: the Blueprint list and the raw JSON of the selected one.
 struct BlueprintsView: View {
     @Environment(AppModel.self) private var model
 
@@ -18,13 +18,13 @@ struct BlueprintsView: View {
                     ContentUnavailableView(
                         "No Blueprint Selected",
                         systemImage: "doc.text.magnifyingglass",
-                        description: Text("Select a blueprint to see its raw JSON.")
+                        description: Text("Select a Blueprint to see its raw JSON.")
                     )
                 }
             }
             .frame(minWidth: 360, maxWidth: .infinity, maxHeight: .infinity)
         }
-        .searchable(text: $model.searchText, placement: .toolbar, prompt: "Filter blueprints")
+        .searchable(text: $model.searchText, placement: .toolbar, prompt: "Filter Blueprints")
         .task {
             if model.listState == .idle && model.hasActiveConnection { model.refresh() }
         }
@@ -70,14 +70,14 @@ private struct BlueprintListView: View {
                 Text("Not loaded")
             case .listing:
                 ProgressView().controlSize(.small)
-                Text("Listing blueprints…")
+                Text("Listing Blueprints…")
             case .finished(let date):
                 let total = model.overviews.count
                 let visible = model.visibleOverviews.count
                 if visible == total {
-                    Text("^[\(total) blueprint](inflect: true) · \(date.formatted(date: .omitted, time: .shortened))")
+                    Text("^[\(total) Blueprint](inflect: true) · \(date.formatted(date: .omitted, time: .shortened))")
                 } else {
-                    Text("\(visible) of \(total) blueprints · \(date.formatted(date: .omitted, time: .shortened))")
+                    Text("\(visible) of \(total) Blueprints · \(date.formatted(date: .omitted, time: .shortened))")
                 }
             case .failed(let message):
                 Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
@@ -132,11 +132,11 @@ private struct BlueprintDetailPane: View {
                         .help("Backups written before each change; restore one")
                     if !model.isJamfSchool {
                         Button("Edit Scope…", systemImage: "person.3") { isEditingScope = true }
-                            .help(model.isReadOnly(detail) ? "The blueprint is assigned to a division and is read-only" : "Choose the device groups this blueprint is scoped to")
+                            .help(model.isReadOnly(detail) ? "The Blueprint is assigned to a division and is read-only" : "Choose the device groups this Blueprint is scoped to")
                             .disabled(model.isReadOnly(detail))
                     }
                     Button("Deploy…", systemImage: "paperplane") { isDeploying = true }
-                        .help(detail.scopeDeviceGroups.isEmpty ? "The blueprint has no device groups in scope" : "Deploy this blueprint to its scope, after a confirmation")
+                        .help(detail.scopeDeviceGroups.isEmpty ? "The Blueprint has no device groups in scope" : "Deploy this Blueprint to its scope, after a confirmation")
                         .disabled(detail.scopeDeviceGroups.isEmpty)
                 }
                 .padding(10)
@@ -157,11 +157,11 @@ private struct BlueprintDetailPane: View {
             }
         } else if let error = model.detailErrors[blueprintID] {
             ContentUnavailableView {
-                Label("Couldn't Load Blueprint", systemImage: "exclamationmark.triangle")
+                Label("Couldn’t Load Blueprint", systemImage: "exclamationmark.triangle")
             } description: {
                 Text(error).textSelection(.enabled)
             } actions: {
-                Button("Retry") { model.loadDetail(id: blueprintID) }
+                Button("Try Again") { model.loadDetail(id: blueprintID) }
             }
         } else {
             ProgressView("Loading Blueprint…")
@@ -202,7 +202,7 @@ private struct AppSettingsSummary: View {
     private var content: some View {
         VStack(alignment: .leading, spacing: 4) {
             if locations.isEmpty {
-                Label("No com.apple.configuration.app.settings declaration in this blueprint.", systemImage: "minus.circle")
+                Label("No com.apple.configuration.app.settings declaration in this Blueprint.", systemImage: "minus.circle")
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(locations) { location in
@@ -218,7 +218,7 @@ private struct AppSettingsSummary: View {
                                 if model.ruleSet.isDirty { pendingLoad = location } else { load(location) }
                             }
                             .controlSize(.small)
-                            .help("Edit this component's App Settings in the rule builder")
+                            .help("Edit this component’s App Settings in the editor")
                         } else {
                             Text("Not editable (\(location.componentIdentifier))")
                                 .font(.caption)

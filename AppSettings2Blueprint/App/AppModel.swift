@@ -22,7 +22,10 @@ final class AppModel {
     /// client and the App Store lookups.
     let activityLog: ActivityLog
     let updates: UpdateChecker
-    let localApps = LocalAppsModel()
+    /// Where the app's own settings are saved (sidebar selection, storefront,
+    /// scan folders): the real preferences, or a sandbox run's own suite.
+    @ObservationIgnored let defaults: UserDefaults
+    let localApps: LocalAppsModel
     let appStore: AppStoreModel
     let ruleSet = RuleSetDocument()
     let builtInApps: Result<AppleBuiltInApps, Error> = Result { try AppleBuiltInApps.load() }
@@ -45,6 +48,8 @@ final class AppModel {
     private(set) var isJamfSchool = false
 
     var searchText = ""
+    /// Fetch Blueprint by ID…, from the toolbar or the View menu.
+    var isShowingFetchByID = false
     var selectedBlueprintID: String? {
         didSet {
             if let selectedBlueprintID, details[selectedBlueprintID] == nil { loadDetail(id: selectedBlueprintID) }
@@ -59,8 +64,9 @@ final class AppModel {
     @ObservationIgnored let session: URLSession
     private var listTask: Task<Void, Never>?
     /// Incremented on every profile switch. Async work compares it before storing
-    /// results, so a load started against the old tenant cannot repopulate the new one.
-    @ObservationIgnored private var connectionGeneration = 0
+    /// results, so a load started against the old tenant can’t repopulate the new
+    /// one; the write, deploy and scope sheets compare it before sending.
+    @ObservationIgnored private(set) var connectionGeneration = 0
 
     static let demoModeKey = "demoMode"
 
@@ -69,20 +75,28 @@ final class AppModel {
     ///   - demo: the app passes its saved demo mode (`forLaunch()`). Previews
     ///     and tests start with it off, and save nothing.
     ///   - session: the network for real connections.
+    ///   - defaults: where the app's own settings are saved.
+    ///   - backupRoot: where backups go outside demo mode; tests pass a
+    ///     temporary folder.
     init(
         profileStore: ProfileStore = ProfileStore(),
         demo: DemoMode? = nil,
-        session: URLSession = .shared
+        session: URLSession = .shared,
+        defaults: UserDefaults = .standard,
+        backupRoot: URL = BackupStore.rootURL
     ) {
         self.profileStore = profileStore
         self.demo = demo ?? DemoMode(key: Self.demoModeKey, arguments: [DemoMode.launchArgument, "NO"])
         self.session = session
+        self.defaults = defaults
+        realBackupRoot = backupRoot
         let log = ActivityLog()
         activityLog = log
+        localApps = LocalAppsModel(defaults: defaults)
         // A sandbox run (UI tests) makes no public lookups: its App Store client
         // reaches nothing but demo mode's empty network.
         let lookups = self.demo.isSandbox ? DemoNetwork(servers: [:]).session : URLSession(configuration: .ephemeral)
-        appStore = AppStoreModel(client: AppStoreClient(session: lookups, log: log))
+        appStore = AppStoreModel(client: AppStoreClient(session: lookups, log: log), defaults: defaults)
         let logger = Logger(subsystem: "be.jordythery.appsettings2blueprint", category: "updates")
         updates = UpdateChecker(
             configuration: UpdateConfiguration(owner: "JordyThery", repository: "AppSettings2Blueprint", appName: "AppSettings2Blueprint"),
@@ -91,12 +105,27 @@ final class AppModel {
     }
 
     /// The model for this launch: the saved connections and demo mode, or, for
-    /// a sandbox run (`-JTKitSandbox YES`), connections and secrets in memory.
+    /// a sandbox run (`-JTKitSandbox YES`), connections and secrets in memory
+    /// and settings in the run's own suite.
     static func forLaunch() -> AppModel {
         let demo = DemoMode(key: demoModeKey)
         guard demo.isSandbox else { return AppModel(demo: demo) }
-        return AppModel(profileStore: ProfileStore(defaults: DemoMode.sandboxDefaults(), secrets: SandboxSecretStore()),
-                        demo: demo)
+        let defaults = DemoMode.sandboxDefaults()
+        return AppModel(profileStore: ProfileStore(defaults: defaults, secrets: SandboxSecretStore()),
+                        demo: demo, defaults: defaults)
+    }
+
+    // MARK: Settings
+
+    static let sidebarSelectionKey = "sidebarSelection"
+
+    /// The sidebar row of the last launch; read once when the window opens.
+    var savedSidebarSelection: SidebarItem? {
+        defaults.string(forKey: Self.sidebarSelectionKey).flatMap(SidebarItem.init(rawValue:))
+    }
+
+    func saveSidebarSelection(_ item: SidebarItem?) {
+        defaults.set(item?.rawValue, forKey: Self.sidebarSelectionKey)
     }
 
     var isListing: Bool { listState == .listing }
@@ -146,14 +175,35 @@ final class AppModel {
     /// Where backups are written and listed: the real folder, or demo mode's
     /// temporary one, so demo writes never reach `Backups/`.
     var backupRoot: URL {
-        demo.isOn ? demo.scratchDirectory.appending(path: "Backups", directoryHint: .isDirectory) : BackupStore.rootURL
+        demo.isOn ? demo.scratchDirectory.appending(path: "Backups", directoryHint: .isDirectory) : realBackupRoot
+    }
+    @ObservationIgnored private let realBackupRoot: URL
+
+    /// How long backups are kept (Settings › General); forever unless chosen.
+    var backupRetention: BackupStore.Retention {
+        get {
+            access(keyPath: \.backupRetention)
+            return BackupStore.Retention(rawValue: defaults.integer(forKey: BackupStore.Retention.key)) ?? .forever
+        }
+        set {
+            withMutation(keyPath: \.backupRetention) {
+                defaults.set(newValue.rawValue, forKey: BackupStore.Retention.key)
+            }
+            BackupStore.prune(newValue, root: backupRoot)
+        }
     }
 
-    /// A writer for the current connection that backs up into `backupRoot`.
+    /// A writer for the current connection that backs up into `backupRoot`,
+    /// then removes backups older than the retention allows.
     func makeWriter() throws -> BlueprintWriter {
         var writer = BlueprintWriter(service: try currentService())
         let root = backupRoot
-        writer.backup = { try BackupStore.write($0, root: root) }
+        let retention = backupRetention
+        writer.backup = { detail in
+            let url = try BackupStore.write(detail, root: root)
+            BackupStore.prune(retention, root: root)
+            return url
+        }
         return writer
     }
 
@@ -210,33 +260,56 @@ final class AppModel {
         detail.isDivisionLocked || readOnlyBlueprintIDs.contains(detail.id)
     }
 
-    /// Fetches every listed blueprint's detail (five at a time) that is not loaded
-    /// yet, so App Settings in other blueprints can be found.
+    /// Fetches every listed Blueprint's detail (five at a time) that isn’t loaded
+    /// yet, so App Settings in other Blueprints can be found. A failure is kept
+    /// in `detailErrors`; that Blueprint is tried again on the next call.
     func loadMissingDetails() async {
         guard let service = try? currentService() else { return }
         let generation = connectionGeneration
-        let missing = overviews.map(\.id).filter { details[$0] == nil }
-        await withTaskGroup(of: JamfPlatform.BlueprintDetail?.self) { group in
+        let missing = overviews.map(\.id).filter { details[$0] == nil && !loadingDetailIDs.contains($0) }
+        loadingDetailIDs.formUnion(missing)
+        defer { if generation == connectionGeneration { loadingDetailIDs.subtract(missing) } }
+        for id in missing { detailErrors[id] = nil }
+        await withTaskGroup(of: (id: String, detail: JamfPlatform.BlueprintDetail?, error: String?).self) { group in
             var pending = missing[...]
             func enqueue() {
                 guard let id = pending.popFirst() else { return }
-                group.addTask { try? await service.detail(id: id) }
+                group.addTask {
+                    do {
+                        return (id, try await service.detail(id: id), nil)
+                    } catch {
+                        return (id, nil, error.localizedDescription)
+                    }
+                }
             }
             for _ in 0..<5 { enqueue() }
-            for await detail in group {
+            for await answer in group {
                 guard generation == connectionGeneration else {
                     group.cancelAll()
                     return
                 }
-                if let detail { store(detail) }
+                if let detail = answer.detail { store(detail) }
+                if let error = answer.error { detailErrors[answer.id] = error }
                 enqueue()
             }
         }
     }
 
-    /// Records a blueprint fetched elsewhere (writes, read-backs).
+    /// Records a Blueprint fetched elsewhere (writes, read-backs).
     func storeDetail(_ detail: JamfPlatform.BlueprintDetail) {
         store(detail)
+    }
+
+    /// After a write that may have reached Jamf but couldn’t be verified: the
+    /// cached copy is out of date, so it is dropped and fetched again (a new
+    /// Blueprint is added to the list that way).
+    func reloadAfterUncertainWrite(id: String?) {
+        if let id {
+            details[id] = nil
+            loadDetail(id: id)
+        } else {
+            refresh()
+        }
     }
 
     /// Lists every Blueprint (overview fields only; the list has no steps).

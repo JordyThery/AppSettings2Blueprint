@@ -8,14 +8,17 @@ struct ContentView: View {
     @Environment(UpdateChecker.self) private var updates
     @Environment(\.openWindow) private var openWindow
     @Environment(\.undoManager) private var undoManager
-    /// Restored from the last launch once; changes are saved as they happen.
-    @State private var selection: SidebarItem? = UserDefaults.standard.string(forKey: ContentView.selectionKey)
-        .flatMap(SidebarItem.init(rawValue:)) ?? .blueprints
-    private static let selectionKey = "sidebarSelection"
-    @State private var isShowingFetchByID = false
+    /// Restored from the last launch once; changes are saved as they happen
+    /// (to the sandbox run's own settings in UI tests).
+    @State private var selection: SidebarItem?
+
+    init(initialSelection: SidebarItem? = nil) {
+        _selection = State(initialValue: initialSelection ?? .blueprints)
+    }
 
     var body: some View {
         @Bindable var updates = updates
+        @Bindable var model = model
         NavigationSplitView {
             SidebarView(selection: $selection)
                 .navigationSplitViewColumnWidth(min: 200, ideal: 220)
@@ -33,11 +36,11 @@ struct ContentView: View {
             ToolbarItemGroup(placement: .primaryAction) {
                 if selection == .blueprints {
                     Button {
-                        isShowingFetchByID = true
+                        model.isShowingFetchByID = true
                     } label: {
                         Label("Fetch by ID", systemImage: "number")
                     }
-                    .help("Fetch one blueprint by ID")
+                    .help("Fetch one Blueprint by ID")
                     .disabled(!model.hasActiveConnection)
 
                     Button {
@@ -45,7 +48,7 @@ struct ContentView: View {
                     } label: {
                         Label("Refresh", systemImage: "arrow.clockwise")
                     }
-                    .help("List blueprints")
+                    .help("List Blueprints")
                     .disabled(model.isListing || !model.hasActiveConnection)
                 }
 
@@ -57,7 +60,7 @@ struct ContentView: View {
                 .help("Show sign-ins, Jamf API calls and App Store lookups (secrets redacted)")
             }
         }
-        .sheet(isPresented: $isShowingFetchByID) {
+        .sheet(isPresented: $model.isShowingFetchByID) {
             FetchByIDSheet()
         }
         .sheet(isPresented: $updates.isPresented) {
@@ -74,7 +77,7 @@ struct ContentView: View {
         // Rule set edits from any view share the window's undo history.
         .onAppear { model.ruleSet.undoManager = undoManager }
         .onChange(of: undoManager) { model.ruleSet.undoManager = undoManager }
-        .onChange(of: selection) { UserDefaults.standard.set(selection?.rawValue, forKey: Self.selectionKey) }
+        .onChange(of: selection) { model.saveSidebarSelection(selection) }
         .background(WindowEditedMarker(isEdited: model.ruleSet.isDirty))
     }
 
@@ -135,6 +138,8 @@ private struct RuleSetStatusToast: View {
                     Image(systemName: "xmark")
                 }
                 .buttonStyle(.borderless)
+                .accessibilityLabel("Dismiss")
+                .help("Dismiss")
             }
             .font(.callout)
             .padding(.horizontal, 14)
@@ -202,9 +207,9 @@ private struct FetchByIDSheet: View {
                 .font(.body.monospaced())
                 .onSubmit(fetch)
             if let errorMessage {
-                Text(errorMessage)
+                Label(errorMessage, systemImage: "xmark.octagon.fill")
                     .font(.callout)
-                    .foregroundStyle(.red)
+                    .labelStyle(.tintedIcon(.red))
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
             }

@@ -1,7 +1,7 @@
 import XCTest
 import JTKitUITestSupport
 
-/// The release check's UI smoke tests (JTKit ROADMAP step 11), in demo mode:
+/// The release check’s UI smoke tests, in demo mode:
 /// the same answers every run, no tenant, nothing saved. Run one at a time by
 /// `Scripts/release-check.sh`; minutes, not hours. The other UI tests
 /// (`AppSettingsUITestCase`) are separate and not part of the release check.
@@ -55,7 +55,7 @@ final class DemoSmokeUITests: JTKitUITestCase {
     func test5MainTask() {
         // Straight after launch, without visiting Blueprints: Write to Jamf
         // lists the Blueprints itself and loads their details when the list
-        // arrives (they stayed on "Loading…" before 2026-10-28).
+        // arrives, instead of staying on "Loading…".
         openSidebar("Editor")
         let json = app.textViews["componentJSON"].firstMatch
         XCTAssertTrue(json.waitForExistence(timeout: 10), "The rule builder did not open")
@@ -73,13 +73,13 @@ final class DemoSmokeUITests: JTKitUITestCase {
                       "Blueprints in Write to Jamf stayed on Loading…")
         tap(sheet.buttons["Review Changes…"], timeout: 20)
         tap(sheet.buttons["Write to Blueprint"], timeout: 20)
-        XCTAssertTrue(text("Written and verified", in: sheet).waitForExistence(timeout: 20), "The write wasn't verified")
+        XCTAssertTrue(text("Written and Verified", in: sheet).waitForExistence(timeout: 20), "The write wasn't verified")
 
         tap(sheet.buttons["Deploy…"], timeout: 10)
         let confirm = sheet.checkBoxes.matching(NSPredicate(format: "label BEGINSWITH 'I confirm deploying' OR title BEGINSWITH 'I confirm deploying'")).firstMatch
         tap(confirm, timeout: 20)
         tap(sheet.buttons["Deploy"], timeout: 10)
-        XCTAssertTrue(text("Deployment succeeded", in: sheet).waitForExistence(timeout: 90), "The deployment didn't succeed")
+        XCTAssertTrue(text("Deployment Succeeded", in: sheet).waitForExistence(timeout: 90), "The deployment didn't succeed")
         tap(sheet.buttons["Done"])
         XCTAssertTrue(sheet.waitForNonExistence(timeout: 10), "The sheet did not close")
     }

@@ -6,12 +6,11 @@ nonisolated struct LocalAppEntry: Hashable, Sendable, Identifiable {
     let path: String
 
     var id: String { path }
-    var url: URL { URL(filePath: path) }
 }
 
 /// Finds .app bundles in the standard application folders.
 nonisolated enum LocalAppScanner {
-    /// Anthony's three search folders.
+    /// App Settings Utility's three search folders.
     static let defaultFolders = [
         "/Applications",
         "/System/Applications",

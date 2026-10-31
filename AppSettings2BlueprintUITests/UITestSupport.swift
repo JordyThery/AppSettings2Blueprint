@@ -40,9 +40,12 @@ class AppSettingsUITestCase: XCTestCase {
     }
 
     /// Launch arguments land in the app's argument defaults domain, so they
-    /// override the user's settings for this run only.
+    /// override the user's settings for this run only. `-JTKitSandbox YES`
+    /// keeps the run away from the saved connections, the Keychain and the
+    /// real preferences: whatever the app saves goes to a suite of its own.
     func launch(section: String = "ruleSet") {
         app.launchArguments = [
+            "-JTKitSandbox", "YES",
             "-sidebarSelection", section,
             "-checksForUpdates", "NO",
             "-includeUserApplicationsFolder", "NO",

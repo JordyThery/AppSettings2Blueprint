@@ -13,7 +13,7 @@ final class ConnectionStorageTests {
     private let suiteName = "be.jordythery.appsettings2blueprint.tests.connections"
     private let secrets = InMemorySecretStore()
 
-    private let first = UUID(uuidString: "ADE57996-82F0-43F1-A2F0-57D462ADFA34")!
+    private let first = UUID(uuidString: "C0FFEE00-0000-4000-8000-000000000001")!
     private let second = UUID(uuidString: "42B1F00D-0000-4000-8000-000000000002")!
 
     init() {
@@ -32,7 +32,7 @@ final class ConnectionStorageTests {
 
     private var oldProfiles: [ConnectionProfile] {
         [ConnectionProfile(id: first, name: "Production", region: .eu,
-                           environmentID: "e77c1408-10c8-4007-b177-abc9157fbcaa", clientID: "client-1"),
+                           environmentID: "12345678-1234-4123-8123-123456789abc", clientID: "client-1"),
          ConnectionProfile(id: second, name: "Test", region: .us, environmentID: "", clientID: "")]
     }
 

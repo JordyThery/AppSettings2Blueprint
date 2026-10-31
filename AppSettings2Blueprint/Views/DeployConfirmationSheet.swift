@@ -2,7 +2,7 @@ import JTKit
 import SwiftUI
 
 /// The explicit confirmation before deploying, then the deployment's progress.
-/// Nothing deploys until the box is ticked and Deploy is pressed.
+/// Nothing deploys until the box is checked and Deploy is pressed.
 struct DeployConfirmationSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var model: DeployModel
@@ -45,10 +45,15 @@ struct DeployFlowView: View {
                 title: "Deployment Not Started", icon: "xmark.octagon.fill", color: .red,
                 message: message, close: close
             )
+        case .uncertain(let message):
+            DeployErrorView(
+                title: "Deployment May Have Started", icon: "exclamationmark.triangle.fill", color: .orange,
+                message: message, close: close
+            )
         case .watchFailed(let message):
             DeployErrorView(
                 title: "Deployment Started, Status Unknown", icon: "exclamationmark.triangle.fill", color: .orange,
-                message: "The deployment was started, but checking its status failed. It continues in Jamf; check the blueprint later.\n\n\(message)",
+                message: "The deployment was started, but checking its status failed. It continues in Jamf; check the Blueprint later.\n\n\(message)",
                 close: close
             )
         }
@@ -87,11 +92,19 @@ private struct ConfirmView: View {
         let detail = model.detail
         let warnings = model.allowListWarnings
         VStack(alignment: .leading, spacing: 16) {
-            Label("Deploy blueprint?", systemImage: "paperplane.fill")
+            Label("Deploy Blueprint", systemImage: "paperplane.fill")
                 .font(.title2.weight(.semibold))
-            Text("Devices in these groups receive every component of the blueprint, including its App Settings.")
-                .foregroundStyle(.orange)
+            Label("Devices in these groups receive every component of the Blueprint, including its App Settings.",
+                  systemImage: "exclamationmark.triangle.fill")
+                .labelStyle(.tintedIcon(.orange))
                 .fixedSize(horizontal: false, vertical: true)
+            if let notice = model.changeNotice {
+                Label(notice, systemImage: "arrow.triangle.2.circlepath")
+                    .font(.callout)
+                    .labelStyle(.tintedIcon(.orange))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("deployChangeNotice")
+            }
 
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
@@ -101,8 +114,11 @@ private struct ConfirmView: View {
                 }
                 Text(detail.id).font(.caption.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
                 if model.groups.isEmpty {
-                    Label("No device groups in scope. Add one in Jamf; a blueprint without scope cannot be deployed.", systemImage: "exclamationmark.triangle")
-                        .foregroundStyle(.red)
+                    Label(model.app.isJamfSchool
+                          ? "No device groups in scope. A Blueprint without scope can’t be deployed; set the scope in Jamf School first."
+                          : "No device groups in scope. A Blueprint without scope can’t be deployed; set the scope with Edit Scope… first.",
+                          systemImage: "exclamationmark.triangle")
+                        .labelStyle(.tintedIcon(.red))
                         .font(.callout)
                 }
                 ForEach(model.groups) { group in
@@ -119,7 +135,7 @@ private struct ConfirmView: View {
                     .font(.callout)
                 }
                 if model.app.isJamfSchool && !model.groups.isEmpty {
-                    Text("Jamf School: the API does not provide device group names or member counts. Check the groups in Jamf School before deploying.")
+                    Text("Jamf School: the API doesn’t provide device group names or member counts. Check the groups in Jamf School before deploying.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -131,18 +147,19 @@ private struct ConfirmView: View {
 
             if !warnings.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
-                    Label("macOS allow list without the recommended baseline", systemImage: "exclamationmark.triangle.fill")
+                    Label("macOS Allow List Without the Recommended Baseline", systemImage: "exclamationmark.triangle.fill")
                         .font(.callout.weight(.semibold))
+                        .labelStyle(.tintedIcon(.orange))
                     ForEach(warnings, id: \.self) { Text($0).font(.callout) }
                     Toggle("I understand that binaries not on the allow list will be blocked.", isOn: $model.acknowledgesAllowListRisk)
                 }
-                .foregroundStyle(.orange)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(10)
                 .background(.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
             }
 
             if model.hasUnsavedEditorChanges {
-                Label("The rule set has unsaved edits for this blueprint. They are not part of this deployment; write them first to include them.", systemImage: "pencil.circle")
+                Label("The rule set has unsaved edits for this Blueprint. They aren’t part of this deployment; write them first to include them.", systemImage: "pencil.circle")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -210,12 +227,12 @@ private struct StatusView: View {
             }
             .font(.callout)
             if isFinal && status?.isFinished != true {
-                Text("The deployment had not finished when polling stopped. It continues in Jamf; check the blueprint later.")
+                Text("The deployment hadn’t finished when the app stopped checking. It continues in Jamf; check the Blueprint later.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
             if status?.report?.total == 0 {
-                Text("No devices reported. The scoped groups have no members, or devices have not checked in yet.")
+                Text("No devices reported. The scoped groups have no members, or devices haven’t checked in yet.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -236,14 +253,14 @@ private struct StatusView: View {
                 Text("Deploying “\(name)”").font(.title3.weight(.semibold))
             }
         } else if status?.didSucceed == true {
-            Label("Deployment succeeded", systemImage: "checkmark.seal.fill")
-                .font(.title3.weight(.semibold)).foregroundStyle(.green)
+            Label("Deployment Succeeded", systemImage: "checkmark.seal.fill")
+                .font(.title3.weight(.semibold)).labelStyle(.tintedIcon(.green))
         } else if status?.jobState == "FAILED" {
-            Label("Deployment failed", systemImage: "xmark.octagon.fill")
-                .font(.title3.weight(.semibold)).foregroundStyle(.red)
+            Label("Deployment Failed", systemImage: "xmark.octagon.fill")
+                .font(.title3.weight(.semibold)).labelStyle(.tintedIcon(.red))
         } else {
-            Label("Deployment still running", systemImage: "clock")
-                .font(.title3.weight(.semibold)).foregroundStyle(.orange)
+            Label("Deployment Still Running", systemImage: "clock")
+                .font(.title3.weight(.semibold)).labelStyle(.tintedIcon(.orange))
         }
     }
 

@@ -11,7 +11,7 @@ struct AppListEditor: View {
         let otherList = ruleSet.appListMode == .allow ? ruleSet.deniedApps : ruleSet.allowedApps
         VStack(alignment: .leading, spacing: 10) {
             if ruleSet.platform == .macOS {
-                Banner(style: .error, text: "AllowedApps and DeniedApps are not supported on macOS. These entries are never written; remove them, or switch the rule set to iOS / iPadOS. On macOS, use binary rules instead.")
+                Banner(style: .error, text: "AllowedApps and DeniedApps aren’t supported on macOS. These entries are never written; remove them, or switch the rule set to iOS / iPadOS. On macOS, use binary rules instead.")
             }
             Picker("Mode", selection: document.binding(\.appListMode, "Change App List Mode")) {
                 ForEach(AppListMode.allCases) { Text($0.title).tag($0) }
@@ -21,7 +21,7 @@ struct AppListEditor: View {
             .fixedSize()
             Text(ruleSet.appListMode == .allow
                  ? "Only the listed apps can be shown or launched. Everything else, including Apple apps not listed, is hidden."
-                 : "The listed apps cannot be shown or launched. Everything else is unaffected.")
+                 : "The listed apps can’t be shown or launched. Everything else is unaffected.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
 
@@ -52,7 +52,7 @@ struct AppListEditor: View {
                     ContentUnavailableView(
                         "No Apps",
                         systemImage: "app.dashed",
-                        description: Text("Type a bundle ID above, or add apps from Lookup → App Store or Apple Built-in Apps.")
+                        description: Text("Type a bundle ID above, or add apps from Lookup › App Store or Apple Built-in Apps.")
                     )
                 }
             }
@@ -100,7 +100,26 @@ private struct AppRuleRow: View {
     }
 }
 
-/// A coloured message strip used across the editor tabs.
+/// A colored message strip used across the editor tabs.
+/// A status label as JTKit and `Banner` draw them: the symbol carries the
+/// color, the text stays primary. Orange or green text on a light background
+/// is about 2:1, below the 4.5:1 text needs.
+struct TintedIconLabelStyle: LabelStyle {
+    let color: Color
+
+    func makeBody(configuration: Configuration) -> some View {
+        Label {
+            configuration.title
+        } icon: {
+            configuration.icon.foregroundStyle(color)
+        }
+    }
+}
+
+extension LabelStyle where Self == TintedIconLabelStyle {
+    static func tintedIcon(_ color: Color) -> TintedIconLabelStyle { TintedIconLabelStyle(color: color) }
+}
+
 struct Banner<Actions: View>: View {
     enum Style { case error, warning, info }
     let style: Style

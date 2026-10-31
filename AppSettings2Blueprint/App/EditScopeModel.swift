@@ -2,7 +2,7 @@ import Foundation
 import JTKit
 import Observation
 
-/// Drives Edit Scope: choose a blueprint's device groups, then PATCH the scope
+/// Drives Edit Scope: choose a Blueprint's device groups, then PATCH the scope
 /// only, after a concurrency check and a backup, and verify the read-back.
 @Observable
 final class EditScopeModel {
@@ -10,7 +10,10 @@ final class EditScopeModel {
         case editing
         case saving
         case done(ScopeChangeResult)
+        /// Nothing was sent, or Jamf refused it.
         case failed(String)
+        /// The scope may have changed in Jamf, but couldn’t be verified.
+        case uncertain(String)
     }
 
     /// One row: a group from the device group list, or a scoped ID the list does not contain.
@@ -26,13 +29,16 @@ final class EditScopeModel {
     var selected: Set<String>
     var searchText = ""
     var phase: Phase = .editing
-    /// Required when groups are removed from a blueprint that has been deployed.
+    /// Required when groups are removed from a Blueprint that has been deployed.
     var acknowledgesRemoval = false
+    /// The connection this sheet was opened for; nothing is sent after it changed.
+    private let connectionGeneration: Int
 
     init(app: AppModel, detail: JamfPlatform.BlueprintDetail) {
         self.app = app
         self.detail = detail
         selected = Set(detail.scopeDeviceGroups)
+        connectionGeneration = app.connectionGeneration
     }
 
     var currentGroups: [String] { detail.scopeDeviceGroups }
@@ -73,11 +79,12 @@ final class EditScopeModel {
     var removedGroups: [String] { currentGroups.filter { !selected.contains($0) } }
     var hasChanges: Bool { !addedGroups.isEmpty || !removedGroups.isEmpty }
 
-    /// Removing groups from a deployed blueprint takes its settings off those
-    /// devices at the next deployment.
+    /// Removing groups from a deployed Blueprint takes its settings off those
+    /// devices at the next deployment. Unless it is known never to have been
+    /// deployed, the removal must be acknowledged (also when the state is missing).
     var removalNeedsAcknowledgement: Bool {
-        guard !removedGroups.isEmpty, let state = detail.overview.deploymentState?.state else { return false }
-        return state != .notDeployed
+        guard !removedGroups.isEmpty else { return false }
+        return detail.overview.deploymentState?.state != .notDeployed
     }
 
     func memberCount(_ id: String) -> Int? {
@@ -85,7 +92,7 @@ final class EditScopeModel {
     }
 
     var blockingReason: String? {
-        if app.isReadOnly(detail) { return "This blueprint is assigned to a division and is read-only." }
+        if app.isReadOnly(detail) { return JamfWriteModel.divisionText }
         if app.deviceGroups.isEmpty { return app.isLoadingDeviceGroups ? "Loading device groups…" : "No device groups are available." }
         if selected.isEmpty { return "Choose at least one device group." }
         if !hasChanges { return "The scope is unchanged." }
@@ -95,18 +102,24 @@ final class EditScopeModel {
 
     func save() {
         guard blockingReason == nil else { return }
-        let groups = newGroups
         phase = .saving
-        Task {
-            do {
-                let writer = try app.makeWriter()
-                let result = try await writer.changeScope(loaded: detail, deviceGroups: groups)
-                app.storeDetail(result.detail)
-                phase = .done(result)
-            } catch {
-                if case BlueprintWriter.WriteError.readOnly = error { app.readOnlyBlueprintIDs.insert(detail.id) }
-                phase = .failed(error.localizedDescription)
-            }
+        Task { await performSave() }
+    }
+
+    func performSave() async {
+        let groups = newGroups
+        do {
+            guard app.connectionGeneration == connectionGeneration else { throw ConnectionChanged() }
+            let writer = try app.makeWriter()
+            let result = try await writer.changeScope(loaded: detail, deviceGroups: groups)
+            app.storeDetail(result.detail)
+            phase = .done(result)
+        } catch let error as BlueprintWriter.WriteError where error.mayHaveWritten {
+            app.reloadAfterUncertainWrite(id: detail.id)
+            phase = .uncertain(error.localizedDescription)
+        } catch {
+            if case BlueprintWriter.WriteError.readOnly = error { app.readOnlyBlueprintIDs.insert(detail.id) }
+            phase = .failed(error.localizedDescription)
         }
     }
 }

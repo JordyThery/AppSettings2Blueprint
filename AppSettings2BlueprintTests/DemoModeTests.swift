@@ -45,7 +45,7 @@ final class DemoModeTests {
     private let defaults: UserDefaults
     private let secrets = CountingSecretStore()
     private let profile = ConnectionProfile(name: "Production", region: .eu,
-                                            environmentID: "e77c1408-10c8-4007-b177-abc9157fbcaa", clientID: "client-1")
+                                            environmentID: "12345678-1234-4123-8123-123456789abc", clientID: "client-1")
 
     init() {
         defaults = UserDefaults(suiteName: suiteName)!
@@ -66,7 +66,7 @@ final class DemoModeTests {
         var arguments = [DemoMode.launchArgument, isOn ? "YES" : "NO"]
         if let scenario { arguments += [DemoMode.scenarioArgument, scenario.rawValue] }
         return AppModel(profileStore: store, demo: DemoMode(key: AppModel.demoModeKey, defaults: defaults, arguments: arguments),
-                        session: session)
+                        session: session, defaults: defaults)
     }
 
     @Test("Demo mode lists Contoso's Blueprints and groups without reading or writing a saved connection or secret")
@@ -92,16 +92,16 @@ final class DemoModeTests {
     func testConnectionStaysReal() async throws {
         let realNetwork = MockServer { request in
             if request.method == "POST" {
-                return JTKitTestSupport.MockResponse.json(200, #"{"access_token":"t","expires_in":900,"token_type":"Bearer"}"#)
+                return MockResponse.json(200, #"{"access_token":"t","expires_in":900,"token_type":"Bearer"}"#)
             }
-            return JTKitTestSupport.MockResponse.json(200, #"{"totalCount":3,"results":[]}"#)
+            return MockResponse.json(200, #"{"totalCount":3,"results":[]}"#)
         }
         let model = try makeModel(session: realNetwork.session)
         #expect(model.demo.isOn)
 
         let message = try await model.testConnection(profile, typedSecret: nil)
 
-        #expect(message.contains("3 blueprints"))
+        #expect(message.contains("3 Blueprints"))
         #expect(!realNetwork.requests.isEmpty)
         #expect(realNetwork.requests.allSatisfy { $0.url.host() == "eu.api.jamfcloud.com" })
         #expect(realNetwork.requests.first?.bodyString.contains("real-secret") == true, "the saved secret")
@@ -167,7 +167,7 @@ final class DemoModeTests {
         #expect(model.isReadOnly(detail))
     }
 
-    @Test("The Jamf School scenario is recognised as Jamf School")
+    @Test("The Jamf School scenario is recognized as Jamf School")
     func jamfSchoolScenario() async throws {
         let model = try makeModel(scenario: .jamfSchool)
         model.loadDeviceGroups()

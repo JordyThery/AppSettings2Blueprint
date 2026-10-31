@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// Lookup → App Store: search Apple's App Store for bundle IDs (iOS/iPadOS rules).
+/// Lookup › App Store: search Apple's App Store for bundle IDs (iOS / iPadOS rules).
 struct AppStoreSearchView: View {
     @Environment(AppModel.self) private var app
 
@@ -75,7 +75,7 @@ private struct SearchBar: View {
             TextField("Other", text: $otherStorefront, prompt: Text("cc"))
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 44)
-                .help("Any two-letter storefront code, e.g. BE or NL. Press Return to use it.")
+                .help("Any two-letter storefront code, e.g. BE or NL; press Return to use it")
                 .onSubmit {
                     if let code = AppStoreClient.normalizedCountry(otherStorefront) {
                         model.storefront = code
@@ -177,7 +177,7 @@ private struct SelectionActions: View {
             .help("Save the selected results as an App Settings Utility BundleID-Lookup CSV")
         }
         .controlSize(.small)
-        .alert("Couldn't Export", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
+        .alert("Couldn’t Export", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
             Button("OK") { errorMessage = nil }
         } message: { Text(errorMessage ?? "") }
     }
@@ -258,12 +258,12 @@ private struct AppStoreDetailPane: View {
                     case .loaded:
                         EmptyView()
                     case .unavailable:
-                        Button("Retry") { model.appStore.loadDetail(for: app) }
+                        Button("Try Again") { model.appStore.loadDetail(for: app) }
                     }
                 }
                 if case .unavailable(let reason) = detailState {
                     Label("Details unavailable", systemImage: "exclamationmark.triangle")
-                        .foregroundStyle(.orange)
+                        .labelStyle(.tintedIcon(.orange))
                         .help(reason)
                 }
                 // Same precedence as App Settings Utility's show_app_details: detail

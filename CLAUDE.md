@@ -41,13 +41,15 @@ Extend JTKit instead of adding another copy. If something here would be useful t
 - The Blueprints API applies PATCH as a JSON merge-patch, which replaces arrays wholesale. Always send the complete `steps` array, with everything outside the App Settings component exactly as received (`LosslessJSON` keeps key order and number text). Never reformat or re-sort JSON.
 - Only the `com.jamf.ddm-strict` component is edited. App Settings in other components are shown, not changed.
 - Order of a write: fetch again, check `updated` and the steps are unchanged, back up, PATCH, verify against a read-back. If the Blueprint changed on the server, write nothing.
-- Backups are never overwritten. Write them with `.withoutOverwriting` only, never combined with `.atomic`.
+- Backups are never overwritten. Write them with `.withoutOverwriting` only, never combined with `.atomic`. Folders 0700, files 0600 (they hold other components' secrets). Old backups are removed only by the retention the user chooses in Settings › General (default Forever), never the newest one of a Blueprint.
+- After a write request was sent, a failure (no clear answer, or the read-back failing) is `WriteError.notVerified`/`.outcomeUnknown`: the sheet shows "not verified" with Close only, never Back, so a create can't be repeated.
+- Deploy fetches the Blueprint again just before the POST; if `updated`, steps or scope differ from what was confirmed, it shows the confirmation again, unconfirmed.
 - Never send `divisionId`. Division-assigned Blueprints are read-only (JTKit's `DIVISION_PATCH_NOT_ALLOWED`).
 - The allow-list permits only GET, `POST /auth/token`, Blueprint create, PATCH and deploy. Never add DELETE or undeploy.
 - Writing never deploys. Deploy needs a confirmation listing groups and device count, and a second one for a macOS allow list without `AlwaysAllowManagedApps` or the Apple-signed baseline. Removing groups from a deployed Blueprint needs an extra confirmation.
 - Edit Scope sends only the scope, after the same checks and backup, and verifies the steps are unchanged.
 
-## Verified Jamf behaviour
+## Verified Jamf behavior
 
 - The Jamf UI writes App Settings as component `com.jamf.ddm-strict`, channelType `SYSTEM`, with declaration members in the order `kind, type, payload, channelType`. An empty component has `payload: {}`. New declarations follow the same order.
 - A Blueprint created in the Jamf UI can have `scope: null` and `description: null`, even though POST requires at least one device group.
@@ -78,21 +80,22 @@ What this app waits for from Apple, Jamf or Microsoft, or must recheck: see WATC
 - **Unit tests** (Swift Testing, `AppSettings2BlueprintTests`): scheme `AppSettings2Blueprint`, ⌘U or `xcodebuild test -scheme AppSettings2Blueprint`. No real network: `Support/MockURLProtocol` and `JTKitTestSupport`.
 - **UI tests** (`AppSettings2BlueprintUITests`, own scheme): never run the full suite or `Scripts/run-ui-tests.sh` without test names, unless Jordy asks for it by name (see "Testing" in JTKit's CLAUDE.md). For a single named test: `Scripts/run-ui-tests.sh Class/testName`. Use the script, not the Xcode MCP (Xcode crashed during UI test runs). They drive the Debug build and need no Jamf credentials.
   - On failure: UI tree in `/tmp/as2b-uidump.txt`, screenshots in `/tmp/as2b-uitest-attachments`.
-  - `ScreenshotUITests` regenerates the README screenshots in `docs/`; hands off the Mac while it runs.
+  - `ScreenshotUITests` captures the README screenshots to `/tmp/as2b-uitest-attachments` (`01-ruleset`, `02-localapps`); copy them to `docs/screenshot-ruleset.png` and `docs/screenshot-localapps.png`. Hands off the Mac while it runs.
+  - Every UI test launches with `-JTKitSandbox YES`: no saved connection, Keychain item or real preference is read or written; the app's own settings go to the sandbox suite (`AppModel.defaults`).
   - Launch arguments (`-sidebarSelection`, `-checksForUpdates NO`, `-NSNavLastRootDirectory`) override UserDefaults writes. So persisted app state is read once into `@State`, never bound with `@AppStorage`.
   - XCUI on macOS 27: SwiftUI `Text` exposes its string as `value` (label empty); a SwiftUI `Table` is an outline; TabView tabs are `.tab` elements; confirmation-dialog buttons need sheet/dialog scoping (otherwise the Touch Bar copy matches); undo needs editing to end first (a focused text field keeps its typing on the window's undo stack).
   - Extend the `AppSettingsUITestCase` helpers instead of raw queries. Add accessibility identifiers or labels in the app when an element is hard to find.
-- **Release check** (ROADMAP step 11): `Scripts/release-check.sh` (scheme "AppSettings2Blueprint Release Check"; `--local-jtkit` before a JTKit version is tagged). Own-project build against the published JTKit and sign-in, unit tests, `DemoSmokeUITests` in demo mode (the only UI tests it runs), live checks on jamf-test-a over the Platform API, report. Claude may run it unattended (nohup, poll). Tenants come only from the local allow-list outside git. Never name a tenant in this repo.
+- **Release check**: `Scripts/release-check.sh` (scheme "AppSettings2Blueprint Release Check"; `--local-jtkit` before a JTKit version is tagged). Own-project build against the published JTKit and sign-in, unit tests, `DemoSmokeUITests` in demo mode (the only UI tests it runs), live checks on jamf-test-a over the Platform API, report. Claude may run it unattended (nohup, poll). Tenants come only from the local allow-list outside git. Never name a tenant in this repo.
   - Live checks (`LiveCheckTests.swift`, skipped on ⌘U): an empty **static** `JTKTEST AS …` computer group (checked for 0 members before scoping and again before deploying; never a smart group), a `JTKTEST` Blueprint with one app setting created and written by `BlueprintWriter` with the app's own client and allow-list, deployed, read back, then removed. Backups go to a temporary folder. Deleting test objects is done only by the test code through JTKit's guarded network; the app's own allow-list still never sends DELETE or undeploy.
   - Verified 2026-10-28: a deployed Blueprint can be deleted directly (no undeploy). Jamf removes it in the background; until then the group's DELETE answers 422 `HAS_DEPENDENCIES`, so the check waits and retries only that answer.
-  - The fingerprint compares `connectionProfiles`, `selectedConnectionProfileID`, `demoMode` (single settings: the preferences file also holds window frames), `Backups/` and the Keychain item names.
+  - The fingerprint compares `connectionProfiles`, `selectedConnectionProfileID`, `demoMode`, `sidebarSelection`, `appStoreStorefront`, `includeUserApplicationsFolder`, `backupRetentionDays` (single settings: the preferences file also holds window frames), `Backups/` and the Keychain item names.
 
 ## Releasing
 
-1. Set the version (`MARKETING_VERSION`, now 1.1) and build number (`CURRENT_PROJECT_VERSION`) of the app target.
+1. Set the version (`MARKETING_VERSION`, now 1.2.0) and build number (`CURRENT_PROJECT_VERSION`) of the app target.
 2. CHANGELOG.md: move "Unreleased" under the new version; short, user-facing bullets. Update README.md if features, permissions or hosts changed.
 3. Build from `AppSettings2Blueprint.xcodeproj` against the published JTKit. Hardened Runtime stays on; the app is not sandboxed.
-4. Jordy does the Developer ID signing and notarisation himself. Zip the notarised app he supplies with `ditto -c -k --keepParent` and attach it to `gh release create`, tagged `vX.Y.Z`. The updater reads GitHub's latest release, so the tag must be a version (suffixes like `v1.2.1-hotfix` are understood).
+4. Jordy does the Developer ID signing and notarization himself. Zip the notarized app he supplies with `ditto -c -k --keepParent` and attach it to `gh release create`, tagged `vX.Y.Z`. The updater reads GitHub's latest release, so the tag must be a version (suffixes like `v1.2.1-hotfix` are understood).
 5. A shields release badge fetched before the release exists stays cached: purge GitHub's camo cache after shields' 5-minute cache has expired.
 6. Website: only when the app has its own page on jordythery.be and the release changes the app enough to make that page untrue or incomplete, update the page.
 
@@ -100,4 +103,4 @@ Before any of this, follow the release gate in JTKit/ROADMAP.md.
 
 ## Repo conventions
 
-Public MIT repo under github.com/JordyThery, laid out like his other apps: README with centred `docs/icon.png`, tagline, release/macOS/licence badges, a "Support" section linking buymeacoffee.com/jordythery, and `.github/FUNDING.yml`. Bundle IDs start with `be.jordythery.`.
+Public MIT repo under github.com/JordyThery, laid out like his other apps: README with centered `docs/icon.png`, tagline, release/macOS/license badges, a "Support" section linking buymeacoffee.com/jordythery, and `.github/FUNDING.yml`. Bundle IDs start with `be.jordythery.`.

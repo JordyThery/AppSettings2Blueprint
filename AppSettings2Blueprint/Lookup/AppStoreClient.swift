@@ -227,7 +227,7 @@ nonisolated struct AppStoreClient: Sendable {
         let url = try Self.detailURL(appStoreID: appStoreID, country: country)
         let json = try await getJSON(url)
         guard let detail = AppStoreDetail(lookupResponse: json, appStoreID: appStoreID) else {
-            throw LookupError(message: "The detail response did not contain this app.")
+            throw LookupError(message: "The detail response didn’t contain this app.")
         }
         return detail
     }
@@ -285,7 +285,7 @@ nonisolated struct AppStoreClient: Sendable {
             "\(name)=\(value.addingPercentEncoding(withAllowedCharacters: allowed) ?? value)"
         }.joined(separator: "&")
         guard let url = URL(string: "\(base)?\(encoded)") else {
-            throw LookupError(message: "Could not build the App Store address.")
+            throw LookupError(message: "Couldn’t build the App Store address.")
         }
         return url
     }
@@ -303,7 +303,7 @@ nonisolated struct AppStoreClient: Sendable {
         do {
             return try LosslessJSON(data: data)
         } catch {
-            throw LookupError(message: "The App Store response is not valid JSON.")
+            throw LookupError(message: "The App Store response isn’t valid JSON.")
         }
     }
 }

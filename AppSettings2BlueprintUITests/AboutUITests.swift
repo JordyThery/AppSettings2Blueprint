@@ -25,12 +25,12 @@ final class AboutUITests: AppSettingsUITestCase {
         XCTAssertFalse(about.buttons["Check for Updates…"].exists)
         XCTAssertFalse(about.checkBoxes["Check for updates daily"].exists)
 
-        // The licence is folded away until opened.
+        // The license is folded away until opened.
         let disclosure = about.disclosureTriangles["MIT License"]
-        XCTAssertTrue(disclosure.exists, "The licence disclosure is missing")
+        XCTAssertTrue(disclosure.exists, "The license disclosure is missing")
         disclosure.click()
-        let licence = about.staticTexts.containing(NSPredicate(format: "value CONTAINS %@", "Copyright (c) 2026 Anthony Darlow")).firstMatch
-        XCTAssertTrue(licence.waitForExistence(timeout: 2), "The licence text is missing")
+        let license = about.staticTexts.containing(NSPredicate(format: "value CONTAINS %@", "Copyright (c) 2026 Anthony Darlow")).firstMatch
+        XCTAssertTrue(license.waitForExistence(timeout: 2), "The license text is missing")
 
         // For a visual check of the layout.
         let screenshot = XCTAttachment(screenshot: about.screenshot())

@@ -2,8 +2,8 @@ import AppKit
 import JTKit
 import SwiftUI
 
-/// Step 4 of the save flow: the component before and after as a diff, what else
-/// stays unchanged, and the backup. Nothing is sent until "Write to Blueprint".
+/// The review before a write: the component before and after as a diff, what
+/// else stays unchanged, and the backup. Nothing is sent until "Write to Blueprint".
 struct ReviewChangesSheet: View {
     let model: JamfWriteModel
     let prepared: PreparedWrite
@@ -13,7 +13,7 @@ struct ReviewChangesSheet: View {
     var body: some View {
         let edit = prepared.edit
         let diff = prepared.diff
-        let changed = diff.filter { $0.kind != .unchanged }.count
+        let changed = prepared.changedLineCount
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Review Changes").font(.title3.weight(.semibold))
@@ -25,8 +25,8 @@ struct ReviewChangesSheet: View {
             .padding()
 
             Picker("Show", selection: $showsPatchBody) {
-                Text("Component diff").tag(false)
-                Text("Exact PATCH body").tag(true)
+                Text("Component Diff").tag(false)
+                Text("Exact PATCH Body").tag(true)
             }
             .pickerStyle(.segmented)
             .fixedSize()
@@ -39,7 +39,7 @@ struct ReviewChangesSheet: View {
                 MonospacedTextView(text: (try? LosslessJSON(data: prepared.patchBody))?.serializedString(pretty: true) ?? "")
             } else if changed == 0 {
                 ContentUnavailableView("No Differences", systemImage: "equal.circle",
-                                       description: Text("The blueprint already holds exactly this rule set. Writing would change nothing."))
+                                       description: Text("The Blueprint already holds exactly this rule set. Writing would change nothing."))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 DiffView(lines: diff)
@@ -54,7 +54,7 @@ struct ReviewChangesSheet: View {
                         .buttonStyle(.link)
                 }
                 .font(.caption)
-                Text("Writing sends PATCH with only {\"steps\": [...]}, the complete array, as application/merge-patch+json. The blueprint is checked for changes once more first, then read back and compared. It shows Out of Date until deployed; deploying is a separate step.")
+                Text("Writing sends PATCH with only {\"steps\": [...]}, the complete array, as application/merge-patch+json. The Blueprint is checked for changes once more first, then read back and compared. It shows Out of Date until deployed; deploying is a separate step.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

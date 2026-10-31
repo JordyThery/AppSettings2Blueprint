@@ -12,10 +12,54 @@ nonisolated struct BlueprintBackup: Identifiable, Hashable, Sendable {
 
 /// Writes the full JamfPlatform.BlueprintDetail JSON before every PATCH to
 /// `~/Library/Application Support/AppSettings2Blueprint/Backups/<blueprintId>/<timestamp>.json`.
+/// A backup holds the whole Blueprint as Jamf returned it, other components'
+/// settings included (Wi-Fi passwords, certificates), so folders and files are
+/// readable by the user's account only. Restoring needs those exact bytes, so
+/// nothing in them is masked.
 nonisolated enum BackupStore {
     struct BackupError: Error, LocalizedError {
         let message: String
         var errorDescription: String? { message }
+    }
+
+    /// How long backups are kept (Settings › General). Saved as days; 0 is forever.
+    enum Retention: Int, CaseIterable, Identifiable, Sendable {
+        case forever = 0
+        case oneYear = 365
+        case ninetyDays = 90
+        case thirtyDays = 30
+
+        static let key = "backupRetentionDays"
+
+        var id: Int { rawValue }
+
+        var title: String {
+            switch self {
+            case .forever: "Forever"
+            case .oneYear: "1 Year"
+            case .ninetyDays: "90 Days"
+            case .thirtyDays: "30 Days"
+            }
+        }
+    }
+
+    /// Removes backups older than `retention`, keeping each Blueprint's newest
+    /// one whatever its age (the state before its last write). Returns how
+    /// many were removed.
+    @discardableResult
+    static func prune(_ retention: Retention, root: URL = rootURL, now: Date = Date()) -> Int {
+        guard retention != .forever,
+              let cutoff = Calendar(identifier: .gregorian).date(byAdding: .day, value: -retention.rawValue, to: now),
+              let folders = try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil,
+                                                                         options: [.skipsHiddenFiles])
+        else { return 0 }
+        var removed = 0
+        for folder in folders {
+            for backup in backups(for: folder.lastPathComponent, root: root).dropFirst() where backup.date < cutoff {
+                if (try? FileManager.default.removeItem(at: backup.url)) != nil { removed += 1 }
+            }
+        }
+        return removed
     }
 
     static var rootURL: URL {
@@ -40,8 +84,12 @@ nonisolated enum BackupStore {
     @discardableResult
     static func write(_ detail: JamfPlatform.BlueprintDetail, date: Date = Date(), root: URL = rootURL) throws -> URL {
         let directory = directory(for: detail.id, root: root)
+        let ownerOnly: [FileAttributeKey: Any] = [.posixPermissions: 0o700]
         do {
-            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true, attributes: ownerOnly)
+            // Also folders made by earlier versions, with the default permissions.
+            try FileManager.default.setAttributes(ownerOnly, ofItemAtPath: root.path(percentEncoded: false))
+            try FileManager.default.setAttributes(ownerOnly, ofItemAtPath: directory.path(percentEncoded: false))
             var url = directory.appending(path: "\(date.formatted(fileNameFormat)).json")
             var counter = 2
             while FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) {
@@ -51,9 +99,10 @@ nonisolated enum BackupStore {
             // `.withoutOverwriting` creates the file exclusively, so an existing
             // backup is never replaced. Foundation rejects it combined with `.atomic`.
             try detail.rawData.write(to: url, options: .withoutOverwriting)
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path(percentEncoded: false))
             return url
         } catch {
-            throw BackupError(message: "Could not write backup to \(directory.path(percentEncoded: false)): \(error.localizedDescription)")
+            throw BackupError(message: "Couldn’t write a backup to \(directory.path(percentEncoded: false)): \(error.localizedDescription)")
         }
     }
 
@@ -87,7 +136,7 @@ nonisolated enum BackupStore {
         let data = try Data(contentsOf: backup.url)
         let detail = try JamfPlatform.BlueprintDetail(data: data)
         guard detail.id == backup.blueprintID else {
-            throw BackupError(message: "The backup belongs to blueprint \(detail.id), not \(backup.blueprintID).")
+            throw BackupError(message: "The backup belongs to Blueprint \(detail.id), not \(backup.blueprintID).")
         }
         return detail
     }

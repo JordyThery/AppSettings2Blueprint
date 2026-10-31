@@ -9,7 +9,7 @@ struct BinaryRulesEditor: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 if ruleSet.platform == .iOS {
-                    Banner(style: .error, text: "Binary rules and AlwaysAllowManagedApps are macOS only. These entries are never written; remove them, or switch the rule set to macOS.")
+                    Banner(style: .error, text: "Binary rules and AlwaysAllowManagedApps are macOS-only. These entries are never written; remove them, or switch the rule set to macOS.")
                 }
                 if ruleSet.isMissingAllowListBaseline {
                     Banner(style: .warning, text: "AllowedBinaries is an allow list: anything not listed is blocked. Without AlwaysAllowManagedApps and an Apple-signed baseline, Apple apps and managed apps can be blocked too. Deploying asks for an extra confirmation while this is missing.") {
@@ -27,12 +27,12 @@ struct BinaryRulesEditor: View {
                     Text("false").tag(Bool?.some(false))
                 }
                 .fixedSize()
-                .help("When AllowedBinaries is present, also allow apps installed by MDM.")
+                .help("When AllowedBinaries is present, also allow apps installed by MDM")
 
                 RuleList(document: document, title: "AllowedBinaries", isAllowList: true, rules: ruleSet.allowedBinaries)
                 RuleList(document: document, title: "DeniedBinaries", isAllowList: false, rules: ruleSet.deniedBinaries)
 
-                Text("Add rules from Lookup → Local Mac Apps to pick a match strategy and fill the fields from the app's signature. Each AllowedBinaries entry needs a CDHash or TeamID; each DeniedBinaries entry needs a CDHash, TeamID or SigningID. A binary matches only when every field in the entry matches. The device always runs system-critical processes.")
+                Text("Add rules from Lookup › Local Mac Apps to pick a match strategy and fill the fields from the app’s signature. Each AllowedBinaries entry needs a CDHash or TeamID; each DeniedBinaries entry needs a CDHash, TeamID or SigningID. A binary matches only when every field in the entry matches. The device always runs system-critical processes.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -100,7 +100,7 @@ private struct BinaryRuleRow: View {
                 }
                 Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 4) {
                     field("CDHash", binding.cdHash, prompt: "40 hex characters")
-                    field("TeamID", binding.teamID, prompt: "e.g. UBF8T346G9 or *APPLE*")
+                    field("TeamID", binding.teamID, prompt: "e.g. ABCDE12345 or *APPLE*")
                     field("SigningID", binding.signingID, prompt: "e.g. com.microsoft.Outlook")
                     field("PathPrefix", binding.pathPrefix, prompt: "e.g. /Applications/Example.app/")
                     GridRow {

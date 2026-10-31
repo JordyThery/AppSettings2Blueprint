@@ -23,7 +23,7 @@ nonisolated struct AppleBuiltInApps: Decodable, Sendable {
         // Parsed and formatted in GMT so the day never shifts with the local time zone.
         let parse = Date.ISO8601FormatStyle(timeZone: .gmt).year().month().day().dateSeparator(.dash)
         guard let date = try? parse.parse(verified) else { return verified }
-        var style = Date.FormatStyle(date: .long, time: .omitted, locale: Locale(identifier: "en_GB"))
+        var style = Date.FormatStyle(date: .long, time: .omitted, locale: Locale(identifier: "en_US"))
         style.timeZone = .gmt
         return date.formatted(style)
     }

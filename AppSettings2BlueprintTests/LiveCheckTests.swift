@@ -4,7 +4,7 @@ import JTKitLiveCheck
 import Testing
 @testable import AppSettings2Blueprint
 
-// Live checks (JTKit ROADMAP step 11), run only by Scripts/release-check.sh,
+// Live checks, run only by Scripts/release-check.sh,
 // which switches them on (JTKIT_LIVE=1) and passes the credentials it read
 // from the login Keychain. ⌘U skips them. The tenant is named by role only:
 // jamf-test-a over the Jamf Platform API. Every request goes through
@@ -82,15 +82,15 @@ struct LiveTenant: Sendable {
     }
 
     func delete(resource: String, id: String) async throws {
-        let path = Ledger.Item(target: "", resource: resource, id: "", name: "").resource == "blueprints"
+        let path = resource == "blueprints"
             ? "\(JamfPlatform.Blueprints.path)/\(JamfPlatform.pathSegment(id))"
             : "\(JamfPlatform.Client.deviceGroupsPath)/\(JamfPlatform.pathSegment(id))"
         do {
             _ = try await api.send(HTTPRequest(method: "DELETE", path: path, repeating: .safe))
         } catch let error as JamfPlatform.APIError where error.status == 404 {
-            // Not counted from the answer: JTKit's read-back (0.12.6) marks it
-            // removed only once the object is gone (Jamf answered 404 for a
-            // group it still listed, 2026-10-30); a leftover fails the run.
+            // Not counted from the answer: JTKit's read-back marks it removed
+            // only once the object is gone (Jamf can answer 404 for a group it
+            // still lists); a leftover fails the run.
         }
     }
 
@@ -261,7 +261,7 @@ struct LiveCleanupTests {
             try run.adoptForSweep(role: LiveTenant.role, service: LiveTenant.service,
                                   resource: object.resource, id: object.id, name: object.name)
         }
-        let blueprints = Ledger.Item(target: "", resource: "blueprints", id: "", name: "").resource
+        let blueprints = "blueprints"
         let outstanding = run.ledger.outstanding.filter { $0.target == ledgerTarget }
         for item in outstanding.filter({ $0.resource == blueprints }) + outstanding.filter({ $0.resource != blueprints }) {
             do {
