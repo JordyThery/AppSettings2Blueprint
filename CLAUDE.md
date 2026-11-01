@@ -93,7 +93,7 @@ What this app waits for from Apple, Jamf or Microsoft, or must recheck: see WATC
 ## Releasing
 
 1. Set the version (`MARKETING_VERSION`, now 1.2.0) and build number (`CURRENT_PROJECT_VERSION`) of the app target.
-2. CHANGELOG.md: move "Unreleased" under the new version; short, user-facing bullets. Update README.md if features, permissions or hosts changed.
+2. CHANGELOG.md: move "Unreleased" under the new version; short, user-facing bullets. Update README.md if features, permissions or hosts changed. Release notes (CHANGELOG entries and GitHub release notes) are for the end user: professional and concise, saying what changed for them, and never mentioning the release check, reviews, tests, test targets, AI tools, JTKit step numbers or how a problem was found (decided by Jordy on 2026-11-01).
 3. Build from `AppSettings2Blueprint.xcodeproj` against the published JTKit. Hardened Runtime stays on; the app is not sandboxed.
 4. Jordy does the Developer ID signing and notarization himself. Zip the notarized app he supplies with `ditto -c -k --keepParent` and attach it to `gh release create`, tagged `vX.Y.Z`. The updater reads GitHub's latest release, so the tag must be a version (suffixes like `v1.2.1-hotfix` are understood).
 5. A shields release badge fetched before the release exists stays cached: purge GitHub's camo cache after shields' 5-minute cache has expired.
