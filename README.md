@@ -110,6 +110,10 @@ The App Store endpoints, the SigningState requirement strings, the composed-iden
 
 If AppSettings2Blueprint saves you time, you can [buy me a coffee](https://buymeacoffee.com/jordythery). ☕️
 
+## Disclaimer
+
+This tool is provided as-is, without warranty of any kind. Use it at your own risk. This is a personal project. It is not affiliated with or endorsed by my employer, Jamf or Apple. Issues and pull requests are appreciated. Support is best-effort.
+
 ## License
 
 [MIT](LICENSE). Material ported from App Settings Utility is covered by its own MIT license; see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
