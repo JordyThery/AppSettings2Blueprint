@@ -26,11 +26,11 @@ It isn’t a policy advisor: it shows what each identifier matches; you decide w
 
 Download the latest notarized build from [Releases](https://github.com/JordyThery/AppSettings2Blueprint/releases/latest), unzip it, and move **AppSettings2Blueprint.app** to `/Applications`. Requires **macOS 15 or later**. The app checks for new releases once a day; **Check for Updates…** in the app menu checks right away.
 
-To look around first, choose **Demo Mode** in the connection picker or the Connection menu (or **Try Demo Mode** when no connection is set up). It shows a sample organization’s Blueprints and device groups; writes and deployments work on the sample data only, nothing is sent to Jamf, and window titles end in “— Demo”.
+To look around first, choose **Demo Mode** in the connection picker or the Connection menu (or **Try Demo Mode** when no connection is set up). It shows a sample organization’s Blueprints and device groups; writes and deployments work on the sample data only, nothing is sent to Jamf, and window titles end in “— Demo”. App Store lookups still contact Apple, and backups made in Demo Mode go to a temporary folder. **Test Connection** always uses the real connection, even in Demo Mode.
 
 ## Permissions
 
-In [Jamf Account](https://account.jamf.com), create an API integration scoped to the **platform environment** and grant it:
+In [Jamf Account](https://account.jamf.com), create an API integration scoped to the **platform environment**, or to the organization if you want **Load Environments** to list its environments, and grant it:
 
 | Capability | Actions | Needed for |
 | --- | --- | --- |
@@ -46,7 +46,7 @@ The Lookup section needs no Jamf permissions and no macOS privacy permission: th
 
 ## Getting started
 
-1. Open **Settings** (⌘,) › **Connections** and add a connection with the region, **Client ID** and **Client Secret**. Click **Load Environments** to pick the **Environment ID** (organization-scoped integrations), or copy it from the integration’s details in Jamf Account, then click **Test Connection**.
+1. Open **Settings** (⌘,) › **Connections** and add a connection with the region, **Client ID** and **Client Secret**. Click **Load Environments** to pick the **Environment ID** (organization-scoped integrations), or copy it from the integration’s details in Jamf Account, then click **Test Connection**, which signs in and checks that reading Blueprints and device groups works.
 2. Collect identifiers under **Lookup** and add them to the rule set.
 3. Build the rules in the **Editor**; the JSON preview shows the declarations that will be written.
 4. Click **Write to Jamf…**, choose a new or an existing Blueprint, review the diff and write.
@@ -83,9 +83,19 @@ The app contacts only these hosts:
 | `uclient-api.itunes.apple.com` | App Store app details | The App Store ID and storefront |
 | `is1`–`is5-ssl.mzstatic.com` | App Store search results | Requests for app icons, from the URLs Apple returns |
 | `api.github.com` | Once a day, and on **Check for Updates…** | A request for the latest release; turn the daily check off in **Settings › Updates** |
-| `github.com`, `objects.githubusercontent.com` | Only on **Download** in the update sheet | A request for the release zip |
+| `github.com` and GitHub’s download host (`*.githubusercontent.com`) | Only on **Download** in the update sheet | A request for the release zip |
 
-Lookups never include Jamf data or credentials. Client secrets are stored in the Keychain. The activity log (**Window › Activity Log**, ⇧⌘L) shows sign-ins, Jamf API calls and App Store lookups as they happen, is kept in memory with secrets redacted, and can be exported. Backups contain only Blueprint JSON. The app runs with the Hardened Runtime and is Developer ID signed and notarized.
+Lookups never include Jamf data or credentials. Client secrets are stored in the Keychain. The activity log (**Window › Activity Log**, ⇧⌘L) shows sign-ins, Jamf API calls and App Store lookups as they happen, is kept in memory with secrets redacted, and can be exported with identifiers masked (**File › Export Activity Log for Bug Report…**) or unmasked (**File › Export Activity Log Unmasked…**). Backups contain only Blueprint JSON. The app runs with the Hardened Runtime and is Developer ID signed and notarized.
+
+## Where data is stored
+
+| What | Where |
+| --- | --- |
+| Connections (name, region, Client ID, Environment ID) and settings | The app’s preferences, `~/Library/Preferences/be.jordythery.appsettings2blueprint.plist` |
+| Client secrets | Your login Keychain |
+| Blueprint backups | `~/Library/Application Support/AppSettings2Blueprint/Backups/<Blueprint ID>/` |
+| Activity log | Memory only, until you export it |
+| Rule sets | JSON or CSV files wherever you save them |
 
 ## Known limitations
 
@@ -95,7 +105,7 @@ Lookups never include Jamf data or credentials. Client secrets are stored in the
 
 ## Building
 
-Open `AppSettings2Blueprint.xcodeproj` in Xcode 27 or later and build the `AppSettings2Blueprint` scheme (⌘R). Depends on [JTKit](https://github.com/JordyThery/JTKit), Jordy’s own shared package; no third-party dependencies. Unit tests (Swift Testing) run with ⌘U; UI tests with `Scripts/run-ui-tests.sh`, which writes a failing test’s UI hierarchy to `/tmp/as2b-uidump.txt` and exports screenshots to `/tmp/as2b-uitest-attachments`.
+Open `AppSettings2Blueprint.xcodeproj` in Xcode 27 or later and build the `AppSettings2Blueprint` scheme (⌘R). The app’s only package dependency is [JTKit](https://github.com/JordyThery/JTKit), the shared package of these apps; Xcode fetches it on first build. Resolving it also downloads Microsoft’s MSAL, which JTKit uses for Intune sign-in and which this app doesn’t link or ship. Unit tests (Swift Testing) run with ⌘U; UI tests with `Scripts/run-ui-tests.sh`, which writes a failing test’s UI hierarchy to `/tmp/as2b-uidump.txt` and exports screenshots to `/tmp/as2b-uitest-attachments`.
 
 ## Credits
 
