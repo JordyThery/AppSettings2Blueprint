@@ -34,6 +34,8 @@ final class JamfWriteModel {
     }
 
     let app: AppModel
+    /// This sheet's waits before a retry, with Stop in its banner.
+    let waits = RequestWaits()
     var mode: Mode = .existing
     var phase: Phase = .choosing
     /// The connection this sheet was opened for; nothing is sent after it changed.
@@ -72,6 +74,15 @@ final class JamfWriteModel {
         guard case .choosing = phase, app.ruleSet.linkedBlueprint == nil, canCreateBlueprints,
               case .finished = app.listState, app.overviews.isEmpty else { return }
         mode = .new
+    }
+
+    /// Fetches the chosen Blueprint when nothing has fetched it yet, e.g. one
+    /// the rule set is linked to that isn't in the list, so the sheet shows it
+    /// or its error instead of waiting.
+    func loadSelectedDetailIfNeeded() {
+        guard mode == .existing, let id = selectedBlueprintID, app.details[id] == nil,
+              app.detailErrors[id] == nil, !app.loadingDetailIDs.contains(id) else { return }
+        app.loadDetail(id: id)
     }
 
     /// A new Blueprint needs device groups, which a Jamf School environment
@@ -129,7 +140,7 @@ final class JamfWriteModel {
         case .existing:
             guard let id = selectedBlueprintID else { return "Choose a Blueprint." }
             guard let detail = selectedDetail else {
-                return app.detailErrors[id] == nil ? "Loading the Blueprint…" : "The Blueprint couldn’t be loaded."
+                return app.detailErrors[id] == nil ? "Loading the Blueprint…" : "The Blueprint couldn’t be loaded. Try again."
             }
             if app.isReadOnly(detail) { return Self.divisionText }
             if detail.scopeDeviceGroups.isEmpty { return Self.noScopeText(isJamfSchool: app.isJamfSchool) }
@@ -151,6 +162,9 @@ final class JamfWriteModel {
     /// prepares; Create Blueprint writes at once, with no review, so Return in
     /// the Name field must not press it.
     var primaryButtonIsDefault: Bool { mode == .existing }
+
+    /// After Stop during a wait before a retry, when nothing was sent yet.
+    static let stoppedText = "You stopped waiting for Jamf, so nothing was written."
 
     /// JTKit's sentence for a division-assigned Blueprint.
     static let divisionText = "This Blueprint is assigned to a division and can’t be changed through the API."
@@ -201,7 +215,7 @@ final class JamfWriteModel {
                 let prepared = try await writer.prepare(
                     loaded: loaded, declarations: declarations, target: target(for: effectivePlacement(for: loaded))
                 )
-                app.storeDetail(prepared.latest)
+                app.storeDetail(prepared.latest, generation: connectionGeneration)
                 phase = .review(prepared)
             case .new:
                 phase = .writing
@@ -240,12 +254,22 @@ final class JamfWriteModel {
 
     private func makeWriter() throws -> BlueprintWriter {
         guard app.connectionGeneration == connectionGeneration else { throw ConnectionChanged() }
-        return try app.makeWriter()
+        return try app.makeWriter(waits: waits)
     }
 
+    /// The connection is still the one this sheet was opened for.
+    var isCurrentConnection: Bool { app.connectionGeneration == connectionGeneration }
+
+    /// The connection this sheet's requests went to, for the deploy that
+    /// follows a write from it.
+    var generation: Int { connectionGeneration }
+
+    /// Shows the result; stores and links it only while the connection is
+    /// still the one it was written to.
     private func finish(_ result: WriteResult, componentPath: [LosslessJSON.PathComponent]) {
-        app.storeDetail(result.detail)
-        link(id: result.detail.id, name: result.detail.overview.name, componentPath: componentPath)
+        if app.storeDetail(result.detail, generation: connectionGeneration) {
+            link(id: result.detail.id, name: result.detail.overview.name, componentPath: componentPath)
+        }
         phase = .done(result)
     }
 
@@ -267,23 +291,27 @@ final class JamfWriteModel {
     }
 
     private func fail(_ error: Error, componentPath: [LosslessJSON.PathComponent]?) {
-        if case BlueprintWriter.WriteError.readOnly = error, let id = selectedBlueprintID {
+        if case BlueprintWriter.WriteError.readOnly = error, let id = selectedBlueprintID, isCurrentConnection {
             app.readOnlyBlueprintIDs.insert(id)
+        }
+        // Back then reviews against the Blueprint as it is now.
+        if case let BlueprintWriter.WriteError.changedOnServer(_, _, _, latest) = error {
+            app.storeDetail(latest, generation: connectionGeneration)
         }
         if let writeError = error as? BlueprintWriter.WriteError, writeError.mayHaveWritten {
             switch writeError {
             case let .notVerified(name, id, _, _):
                 // The write succeeded: link the rule set as after a verified write,
                 // and fetch the Blueprint again instead of trusting the cached copy.
-                if let componentPath { link(id: id, name: name, componentPath: componentPath) }
-                app.reloadAfterUncertainWrite(id: id)
+                if let componentPath, isCurrentConnection { link(id: id, name: name, componentPath: componentPath) }
+                app.reloadAfterUncertainWrite(id: id, generation: connectionGeneration)
             default:
-                app.reloadAfterUncertainWrite(id: mode == .existing ? selectedBlueprintID : nil)
+                app.reloadAfterUncertainWrite(id: mode == .existing ? selectedBlueprintID : nil, generation: connectionGeneration)
             }
             phase = .uncertain(writeError.localizedDescription)
             return
         }
-        if error is CancellationError { phase = .choosing; return }
+        if error is CancellationError { phase = .failed(Self.stoppedText); return }
         phase = .failed(error.localizedDescription)
     }
 }

@@ -50,16 +50,19 @@ nonisolated enum PlatformAPIClient {
 
     /// - Parameters:
     ///   - log: JTKit's activity log; nil records nothing (tests).
+    ///   - waits: where waits before a retry are shown while they last.
     ///   - sleep: the wait before a retry, injectable for tests.
     /// - Throws: `JamfPlatform.APIError` when the Environment ID isn't a UUID.
     static func make(
         credentials: PlatformCredentials,
         session: URLSession = .shared,
         log: ActivityLog?,
+        waits: RequestWaits? = nil,
         sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
     ) throws -> JamfPlatform.Client {
         let secret = credentials.clientSecret
-        return try make(connection: credentials.connection, secret: { secret }, session: session, log: log, sleep: sleep)
+        return try make(connection: credentials.connection, secret: { secret }, session: session, log: log,
+                        waits: waits, sleep: sleep)
     }
 
     /// The same client for a JTKit connection, e.g. demo mode's
@@ -69,13 +72,15 @@ nonisolated enum PlatformAPIClient {
         secret: @escaping @Sendable () throws -> String,
         session: URLSession,
         log: ActivityLog?,
+        waits: RequestWaits? = nil,
         sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
     ) throws -> JamfPlatform.Client {
         let recorder = RequestRecorder(
             session: session,
             log: log,
             service: ConnectionService.jamfPlatform.displayName,
-            connection: connection.name.isEmpty ? nil : connection.name
+            connection: connection.name.isEmpty ? nil : connection.name,
+            waits: waits
         )
         return try JamfPlatform.Client(
             connection: connection,

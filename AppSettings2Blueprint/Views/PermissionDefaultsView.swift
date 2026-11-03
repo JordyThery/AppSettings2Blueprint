@@ -52,13 +52,9 @@ private struct PermissionDefaultRow: View {
                 HStack {
                     Text(entry.displayName ?? "App").font(.callout.weight(.medium))
                     Spacer()
-                    Button {
+                    IconButton(title: "Remove \(entry.displayName ?? "Entry")", systemImage: "trash", help: "Remove entry") {
                         document.remove(\.permissionDefaults, id: entry.id, "Remove Permission Defaults")
-                    } label: {
-                        Image(systemName: "trash")
                     }
-                    .buttonStyle(.borderless)
-                    .help("Remove entry")
                 }
                 TextField(platform == .macOS ? "Composed identifier" : "Bundle ID", text: binding.appIdentifier, axis: .vertical)
                     .textFieldStyle(.roundedBorder)

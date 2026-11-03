@@ -96,7 +96,7 @@ struct LiveTenant: Sendable {
 
     /// Deletes a test group once no Blueprint uses it any more. Jamf removes a
     /// deleted Blueprint in the background, and until then refuses the
-    /// group's delete with 422 HAS_DEPENDENCIES (seen 2026-10-28); only that
+    /// group's delete with 422 HAS_DEPENDENCIES; only that
     /// answer is retried, for up to two minutes.
     func deleteGroupWhenFree(id: String) async throws {
         let deadline = Date().addingTimeInterval(120)

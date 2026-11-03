@@ -12,10 +12,13 @@ struct DeployConfirmationSheet: View {
     }
 
     var body: some View {
-        DeployFlowView(model: model, close: {
-            model.stopWatching()
-            dismiss()
-        })
+        VStack(spacing: 0) {
+            RetryWaitBanner(waits: model.waits)
+            DeployFlowView(model: model, close: {
+                model.stopWatching()
+                dismiss()
+            })
+        }
         .frame(width: 560)
         .task { if model.app.deviceGroups.isEmpty && !model.app.isJamfSchool { model.app.loadDeviceGroups() } }
     }
@@ -71,7 +74,9 @@ private struct DeployErrorView: View {
         VStack(alignment: .leading, spacing: 12) {
             Label(title, systemImage: icon)
                 .font(.title3.weight(.semibold))
-                .foregroundStyle(color)
+                .labelStyle(.tintedIcon(color))
+                .accessibilityAddTraits(.isHeader)
+                .announcesOnAppear(title)
             Text(message)
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
@@ -108,7 +113,7 @@ private struct ConfirmView: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
-                    Text(detail.overview.name).font(.headline)
+                    Text(detail.overview.name).font(.headline).accessibilityAddTraits(.isHeader)
                     Spacer()
                     if let state = detail.overview.deploymentState?.state { DeploymentStateBadge(state: state) }
                 }
@@ -124,6 +129,7 @@ private struct ConfirmView: View {
                 ForEach(model.groups) { group in
                     HStack {
                         Image(systemName: "person.3")
+                            .accessibilityHidden(true)
                         Text(group.name)
                         Spacer()
                         if let count = group.memberCount {
@@ -247,10 +253,24 @@ private struct StatusView: View {
 
     @ViewBuilder
     private var header: some View {
+        headerContent
+            .accessibilityAddTraits(.isHeader)
+            .announcesOnAppear(headerText)
+    }
+
+    private var headerText: String {
+        if !isFinal { return "Deploying “\(name)”" }
+        if status?.didSucceed == true { return "Deployment Succeeded" }
+        if status?.jobState == "FAILED" { return "Deployment Failed" }
+        return "Deployment Still Running"
+    }
+
+    @ViewBuilder
+    private var headerContent: some View {
         if !isFinal {
             HStack(spacing: 10) {
                 ProgressView().controlSize(.small)
-                Text("Deploying “\(name)”").font(.title3.weight(.semibold))
+                Text("Deploying “\(name)”").font(.title3.weight(.semibold)).accessibilityAddTraits(.isHeader)
             }
         } else if status?.didSucceed == true {
             Label("Deployment Succeeded", systemImage: "checkmark.seal.fill")

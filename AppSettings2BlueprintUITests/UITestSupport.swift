@@ -94,7 +94,7 @@ class AppSettingsUITestCase: XCTestCase {
         app.textFields.matching(NSPredicate(format: "placeholderValue BEGINSWITH %@", prefix)).firstMatch
     }
 
-    /// The live component JSON from the rule builder's preview.
+    /// The live component JSON from the editor's preview.
     var componentJSON: String {
         let view = app.textViews["componentJSON"].firstMatch
         XCTAssertTrue(view.waitForExistence(timeout: 5), "The JSON preview is not visible")
@@ -184,7 +184,7 @@ class AppSettingsUITestCase: XCTestCase {
     /// The rule set row is a static "Editor" destination; the document name is its subtitle.
     func openRuleSet() {
         openSidebar("Editor")
-        XCTAssertTrue(app.textViews["componentJSON"].waitForExistence(timeout: 10), "The rule builder did not open")
+        XCTAssertTrue(app.textViews["componentJSON"].waitForExistence(timeout: 10), "The editor did not open")
     }
 
     /// Selects an editor tab by (the start of) its title.

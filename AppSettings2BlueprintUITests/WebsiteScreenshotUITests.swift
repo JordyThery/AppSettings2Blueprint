@@ -32,7 +32,7 @@ final class WebsiteScreenshotUITests: JTKitUITestCase {
 
         // A macOS rule set: Firefox and the Apple baseline allowed, two Apple apps denied.
         openSidebar("Editor")
-        XCTAssertTrue(app.textViews["componentJSON"].waitForExistence(timeout: 10), "The rule builder did not open")
+        XCTAssertTrue(app.textViews["componentJSON"].waitForExistence(timeout: 10), "The editor did not open")
         tap(app.menuButtons["New"].firstMatch, timeout: 10)
         tap(app.menuItems["macOS Rule Set"])
         let discard = dialogButton("Discard and Start New")
@@ -79,11 +79,7 @@ final class WebsiteScreenshotUITests: JTKitUITestCase {
         tap(sheet.radioButtons["Existing Blueprint"], timeout: 10)
         tap(text(macBlueprint, in: sheet), timeout: 20)
         let review = sheet.buttons["Review Changes…"]
-        guard review.waitForEnabled(timeout: 20) else {
-            // Known for the next release: the sheet can stay on "Loading the Blueprint…".
-            print("WEBSITE-SCREENSHOT-SKIPPED as2b-write: Review Changes… never became available")
-            return
-        }
+        XCTAssertTrue(review.waitForEnabled(timeout: 20), "Review Changes… never became available")
         review.click()
         XCTAssertTrue(sheet.buttons["Write to Blueprint"].waitForExistence(timeout: 20), "The review didn't open")
         sleep(1)

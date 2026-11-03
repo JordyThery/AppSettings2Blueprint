@@ -31,7 +31,7 @@ import SwiftUI
         )
         .environment(model.demo)
 
-        // JTKit's Settings window: General (Appearance, Backups), Connections, Updates.
+        // JTKit's Settings window: General (Backups), Connections, Updates.
         SettingsWindow(updates: model.updates, opensTabsByName: true) {
             BackupSettingsSection()
                 .environment(model)
@@ -108,6 +108,23 @@ private struct AppCommands: Commands {
     let model: AppModel
     @Environment(\.openWindow) private var openWindow
 
+    /// The Settings window is the key window.
+    private var isSettingsInFront: Bool {
+        NSApp.keyWindow?.identifier?.rawValue == "com_apple_SwiftUI_Settings_window"
+    }
+
+    /// Opens the main window when it's closed; it shows the editor and runs the command.
+    private func editor(_ command: AppModel.EditorCommand) {
+        openWindow(id: WindowID.main)
+        model.editorCommand = command
+    }
+
+    /// Opens the main window when it's closed; it shows Blueprints and runs the command.
+    private func blueprint(_ command: AppModel.BlueprintCommand) {
+        openWindow(id: WindowID.main)
+        model.requestBlueprintCommand(command)
+    }
+
     var body: some Commands {
         AppInfoCommands(appName: "AppSettings2Blueprint") {
             // The update sheet is presented on the main window.
@@ -121,6 +138,45 @@ private struct AppCommands: Commands {
             itemTitle: \.menuTitle
         ) {
             DemoModeToggle(demo: model.demo)
+        }
+        // The editor's header buttons, in the File menu.
+        CommandGroup(replacing: .newItem) {
+            Button("New macOS Rule Set") { editor(.new(.macOS)) }
+                .keyboardShortcut("n", modifiers: .command)
+            Button("New iOS / iPadOS Rule Set") { editor(.new(.iOS)) }
+                .keyboardShortcut("n", modifiers: [.command, .option])
+            Divider()
+            Button("Open Rule Set…") { editor(.open) }
+                .keyboardShortcut("o", modifiers: .command)
+        }
+        CommandGroup(replacing: .saveItem) {
+            Button("Save Rule Set…") {
+                // Settings has its own saving: ⌘S there never opens the rule set's save panel.
+                guard !isSettingsInFront else { return }
+                editor(.save)
+            }
+                .keyboardShortcut("s", modifiers: .command)
+                .disabled(model.ruleSet.hasErrors)
+            Button("Import CSV…") { editor(.importCSV) }
+                .keyboardShortcut("i", modifiers: [.command, .shift])
+        }
+        // Writing and the selected Blueprint's actions.
+        CommandMenu("Blueprint") {
+            Button("Write to Jamf…") { editor(.writeToJamf) }
+                .keyboardShortcut("j", modifiers: [.command, .shift])
+                .disabled(model.ruleSet.hasErrors || !model.hasActiveConnection)
+            Divider()
+            let detail = model.selectedDetail
+            Button("Reload Blueprint") { blueprint(.reload) }
+                .keyboardShortcut("r", modifiers: [.command, .option])
+                .disabled(detail == nil)
+            Button("Edit Scope…") { blueprint(.editScope) }
+                .disabled(detail.map(model.isReadOnly) ?? true || model.isJamfSchool)
+            Button("Backups…") { blueprint(.backups) }
+                .disabled(detail == nil)
+            Button("Deploy…") { blueprint(.deploy) }
+                .keyboardShortcut("d", modifiers: [.command, .shift])
+                .disabled(detail?.scopeDeviceGroups.isEmpty ?? true)
         }
         CommandGroup(after: .toolbar) {
             Button("Refresh Blueprints") { model.refresh() }

@@ -12,16 +12,13 @@ struct JSONPreviewView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Component JSON").font(.headline)
+                    Text("Component JSON").font(.headline).accessibilityAddTraits(.isHeader)
                     Text("\(channels.count) declaration\(channels.count == 1 ? "" : "s"): \(channels.joined(separator: " + "))")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button("Copy", systemImage: "doc.on.doc") {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(text, forType: .string)
-                }
+                CopyButton(title: "Copy") { text }
             }
             .padding(10)
             if document.hasErrors {

@@ -18,10 +18,17 @@ final class AppModel {
     /// JTKit's demo mode: Contoso's sample tenant, answered inside the app.
     /// Saved under `demoMode`.
     let demo: DemoMode
+    /// Demo mode's connection for Settings › Connections: with it, Use This
+    /// Connection there leaves demo mode, as the toolbar picker does.
+    @ObservationIgnored let demoChoice: DemoConnectionChoice
     /// JTKit's activity log (Window › Activity Log, ⇧⌘L), filled by the Jamf
     /// client and the App Store lookups.
     let activityLog: ActivityLog
     let updates: UpdateChecker
+    /// Waits before a retry of the app's own loads (lists, details). Each
+    /// sheet has its own (`service(waits:)`), shown there with Stop, so Stop
+    /// ends only that sheet's wait. JTKit waits at most 60 s each time.
+    let waits = RequestWaits()
     /// Where the app's own settings are saved (sidebar selection, storefront,
     /// scan folders): the real preferences, or a sandbox run's own suite.
     @ObservationIgnored let defaults: UserDefaults
@@ -50,8 +57,57 @@ final class AppModel {
     var searchText = ""
     /// Fetch Blueprint by ID…, from the toolbar or the View menu.
     var isShowingFetchByID = false
+
+    /// A menu-bar command for the editor (File menu, Blueprint › Write to
+    /// Jamf…). The window shows the editor, which carries it out with its own
+    /// confirmations and clears it.
+    enum EditorCommand: Equatable {
+        case new(RulePlatform), open, save, importCSV, writeToJamf
+    }
+    var editorCommand: EditorCommand?
+
+    /// A menu-bar command for the selected Blueprint (Blueprint menu); the
+    /// window shows Blueprints, whose detail pane carries it out.
+    enum BlueprintCommand: Equatable {
+        case reload, backups, editScope, deploy
+    }
+
+    /// A command and the Blueprint it was chosen for.
+    struct BlueprintCommandRequest: Equatable {
+        let command: BlueprintCommand
+        let blueprintID: String
+    }
+
+    /// Dropped when another Blueprint is selected, its detail fails to load,
+    /// or the connection changes: it never runs for a different Blueprint.
+    private(set) var blueprintCommand: BlueprintCommandRequest?
+
+    /// For the selected Blueprint; nothing when none is selected.
+    func requestBlueprintCommand(_ command: BlueprintCommand) {
+        guard let id = selectedBlueprintID else { return }
+        blueprintCommand = BlueprintCommandRequest(command: command, blueprintID: id)
+    }
+
+    /// The command waiting for this Blueprint, once its detail is loaded;
+    /// taking it clears it.
+    func takeBlueprintCommand(for id: String) -> BlueprintCommand? {
+        guard let request = blueprintCommand, request.blueprintID == id, details[id] != nil else { return nil }
+        blueprintCommand = nil
+        return request.command
+    }
+
+    /// Drops a command waiting for `id` (its detail couldn't be loaded).
+    private func dropBlueprintCommand(for id: String) {
+        if blueprintCommand?.blueprintID == id { blueprintCommand = nil }
+    }
+
+    /// The selected Blueprint's detail, when it's loaded.
+    var selectedDetail: JamfPlatform.BlueprintDetail? {
+        selectedBlueprintID.flatMap { details[$0] }
+    }
     var selectedBlueprintID: String? {
         didSet {
+            if let request = blueprintCommand, request.blueprintID != selectedBlueprintID { blueprintCommand = nil }
             if let selectedBlueprintID, details[selectedBlueprintID] == nil { loadDetail(id: selectedBlueprintID) }
         }
     }
@@ -63,10 +119,30 @@ final class AppModel {
     /// The network for real connections; demo mode has its own.
     @ObservationIgnored let session: URLSession
     private var listTask: Task<Void, Never>?
-    /// Incremented on every profile switch. Async work compares it before storing
-    /// results, so a load started against the old tenant can’t repopulate the new
-    /// one; the write, deploy and scope sheets compare it before sending.
-    @ObservationIgnored private(set) var connectionGeneration = 0
+    /// Incremented on every connection or demo switch. Async work compares it
+    /// before storing results, so a load started against the old tenant can’t
+    /// repopulate the new one; the write, deploy, scope and restore sheets
+    /// compare it before sending and again before storing what came back.
+    private(set) var connectionGeneration = 0
+
+    /// What decides the tenant: demo mode, or the connection in use and its
+    /// region, Environment ID and client ID. Its name doesn't.
+    struct ConnectionKey: Equatable {
+        var demo: Bool
+        var profileID: UUID?
+        var region: JamfRegion?
+        var environmentID: String?
+        var clientID: String?
+    }
+
+    var connectionKey: ConnectionKey {
+        let profile = profileStore.selectedProfile
+        return ConnectionKey(demo: demo.isOn, profileID: profile?.id, region: profile?.region,
+                             environmentID: profile?.environmentID, clientID: profile?.clientID)
+    }
+
+    /// The key the loaded data belongs to.
+    @ObservationIgnored private var appliedConnectionKey: ConnectionKey?
 
     static let demoModeKey = "demoMode"
 
@@ -87,6 +163,7 @@ final class AppModel {
     ) {
         self.profileStore = profileStore
         self.demo = demo ?? DemoMode(key: Self.demoModeKey, arguments: [DemoMode.launchArgument, "NO"])
+        demoChoice = DemoConnectionChoice(mode: self.demo, connections: [.demoJamfPlatform])
         self.session = session
         self.defaults = defaults
         realBackupRoot = backupRoot
@@ -98,6 +175,10 @@ final class AppModel {
         let lookups = self.demo.isSandbox ? DemoNetwork(servers: [:]).session : URLSession(configuration: .ephemeral)
         appStore = AppStoreModel(client: AppStoreClient(session: lookups, log: log), defaults: defaults)
         let logger = Logger(subsystem: "be.jordythery.appsettings2blueprint", category: "updates")
+        defer {
+            appliedConnectionKey = connectionKey
+            watchConnection()
+        }
         updates = UpdateChecker(
             configuration: UpdateConfiguration(owner: "JordyThery", repository: "AppSettings2Blueprint", appName: "AppSettings2Blueprint"),
             activity: { logger.info("\($0, privacy: .public)") }
@@ -139,18 +220,17 @@ final class AppModel {
     /// credentials change. In demo mode no saved connection or Keychain item
     /// is read, and nothing is sent to a tenant.
     func currentClient() throws -> JamfPlatform.Client {
+        applyConnectionChange()
         if demo.isOn {
             if let demoClient { return demoClient }
             let source = demo.jamfPlatform()
             let made = try PlatformAPIClient.make(connection: source.connection, secret: source.secret,
-                                                  session: source.session, log: activityLog)
+                                                  session: source.session, log: activityLog, waits: waits)
             demoClient = made
             return made
         }
-        guard let profile = profileStore.selectedProfile,
-              let credentials = profileStore.credentials(for: profile) else {
-            throw APIError.missingCredentials
-        }
+        guard let profile = profileStore.selectedProfile else { throw APIError.missingCredentials }
+        let credentials = try profileStore.credentials(for: profile)
         if let client, client.credentials == credentials {
             return client.client
         }
@@ -159,7 +239,26 @@ final class AppModel {
         return newClient
     }
 
-    /// The Blueprints API for the selected profile.
+    /// A client of its own for one sheet, whose waits before a retry show
+    /// in that sheet (`waits`). Same connection as `currentClient()`.
+    /// - Throws: `ConnectionChanged` while a switch is made but not applied
+    ///   yet: the sheet compared the generation of the old connection, so no
+    ///   client is built for another one.
+    func service(waits: RequestWaits) throws -> JamfPlatform.Blueprints {
+        guard connectionKey == appliedConnectionKey else { throw ConnectionChanged() }
+        if demo.isOn {
+            let source = demo.jamfPlatform()
+            return JamfPlatform.Blueprints(client: try PlatformAPIClient.make(
+                connection: source.connection, secret: source.secret, session: source.session,
+                log: activityLog, waits: waits))
+        }
+        guard let profile = profileStore.selectedProfile else { throw APIError.missingCredentials }
+        let credentials = try profileStore.credentials(for: profile)
+        return JamfPlatform.Blueprints(client: try PlatformAPIClient.make(
+            credentials: credentials, session: session, log: activityLog, waits: waits))
+    }
+
+    /// The Platform API’s Blueprints for the selected profile.
     func currentService() throws -> JamfPlatform.Blueprints {
         JamfPlatform.Blueprints(client: try currentClient())
     }
@@ -167,7 +266,7 @@ final class AppModel {
     /// A client for a real connection, on the real network, also while demo
     /// mode is on (Settings › Connections' Test Connection).
     func makeClient(credentials: PlatformCredentials) throws -> JamfPlatform.Client {
-        try PlatformAPIClient.make(credentials: credentials, session: session, log: activityLog)
+        try PlatformAPIClient.make(credentials: credentials, session: session, log: activityLog, waits: waits)
     }
 
     // MARK: Backups
@@ -183,11 +282,11 @@ final class AppModel {
     var backupRetention: BackupStore.Retention {
         get {
             access(keyPath: \.backupRetention)
-            return BackupStore.Retention(rawValue: defaults.integer(forKey: BackupStore.Retention.key)) ?? .forever
+            return BackupStore.Retention(rawValue: defaults.integer(forKey: BackupStore.retentionKey)) ?? .forever
         }
         set {
             withMutation(keyPath: \.backupRetention) {
-                defaults.set(newValue.rawValue, forKey: BackupStore.Retention.key)
+                defaults.set(newValue.rawValue, forKey: BackupStore.retentionKey)
             }
             BackupStore.prune(newValue, root: backupRoot)
         }
@@ -195,8 +294,9 @@ final class AppModel {
 
     /// A writer for the current connection that backs up into `backupRoot`,
     /// then removes backups older than the retention allows.
-    func makeWriter() throws -> BlueprintWriter {
-        var writer = BlueprintWriter(service: try currentService())
+    /// - Parameter waits: the sheet's own waits; nil uses the shared client.
+    func makeWriter(waits: RequestWaits? = nil) throws -> BlueprintWriter {
+        var writer = BlueprintWriter(service: try waits.map(service(waits:)) ?? currentService())
         let root = backupRoot
         let retention = backupRetention
         writer.backup = { detail in
@@ -207,9 +307,36 @@ final class AppModel {
         return writer
     }
 
-    /// Called when the user switches profile: clears everything loaded from the old tenant.
+    /// Applies a switch made anywhere (toolbar picker, Connection menu,
+    /// Settings, demo toggle), also while the main window is closed: the
+    /// observation fires before the change, and the check runs right after it
+    /// on the main actor, before SwiftUI draws again.
+    private func watchConnection() {
+        withObservationTracking {
+            _ = connectionKey
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.applyConnectionChange()
+                self?.watchConnection()
+            }
+        }
+    }
+
+    /// Clears the old tenant's data when the tenant changed since it was loaded.
+    func applyConnectionChange() {
+        let key = connectionKey
+        guard key != appliedConnectionKey else { return }
+        appliedConnectionKey = key
+        connectionDidChange()
+    }
+
+    /// Clears everything
+    /// loaded from the old tenant, including the rule set's link to one of
+    /// its Blueprints (that ID means nothing on the new one).
     func connectionDidChange() {
         connectionGeneration += 1
+        ruleSet.linkedBlueprint = nil
+        blueprintCommand = nil
         listTask?.cancel()
         client = nil
         overviews = []
@@ -289,7 +416,10 @@ final class AppModel {
                     return
                 }
                 if let detail = answer.detail { store(detail) }
-                if let error = answer.error { detailErrors[answer.id] = error }
+                if let error = answer.error {
+                    detailErrors[answer.id] = error
+                    dropBlueprintCommand(for: answer.id)
+                }
                 enqueue()
             }
         }
@@ -300,10 +430,21 @@ final class AppModel {
         store(detail)
     }
 
+    /// As `storeDetail(_:)`, only when the connection is still the one the
+    /// request went to (`generation`); a result that arrives after a switch
+    /// is shown in its sheet only. True when it was stored.
+    @discardableResult
+    func storeDetail(_ detail: JamfPlatform.BlueprintDetail, generation: Int) -> Bool {
+        guard generation == connectionGeneration else { return false }
+        store(detail)
+        return true
+    }
+
     /// After a write that may have reached Jamf but couldn’t be verified: the
     /// cached copy is out of date, so it is dropped and fetched again (a new
     /// Blueprint is added to the list that way).
-    func reloadAfterUncertainWrite(id: String?) {
+    func reloadAfterUncertainWrite(id: String?, generation: Int? = nil) {
+        if let generation, generation != connectionGeneration { return }
         if let id {
             details[id] = nil
             loadDetail(id: id)
@@ -330,6 +471,9 @@ final class AppModel {
                 overviews = list
                 let ids = Set(list.map(\.id))
                 details = details.filter { ids.contains($0.key) }
+                // A Blueprint fetched by ID that the list doesn't return: its
+                // detail is gone, so it can't stay selected.
+                if let selected = selectedBlueprintID, !ids.contains(selected) { selectedBlueprintID = nil }
                 detailErrors = [:]
                 listState = .finished(Date())
                 // Also tells whether this is a Jamf School environment.
@@ -357,6 +501,7 @@ final class AppModel {
             } catch {
                 guard generation == connectionGeneration else { return }
                 detailErrors[id] = error.localizedDescription
+                dropBlueprintCommand(for: id)
             }
         }
     }

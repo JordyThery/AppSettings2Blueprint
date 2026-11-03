@@ -17,7 +17,12 @@ final class ProfileStore {
     @ObservationIgnored private let defaults: UserDefaults
 
     var selectedProfileID: UUID? {
-        didSet { defaults.set(selectedProfileID?.uuidString, forKey: Self.selectedKey) }
+        didSet {
+            // Under the live-check switch the release check's connections are
+            // in memory only, and so is the choice between them.
+            guard !LiveLaunch.isSwitched else { return }
+            defaults.set(selectedProfileID?.uuidString, forKey: Self.selectedKey)
+        }
     }
 
     /// - Parameters:
@@ -29,9 +34,10 @@ final class ProfileStore {
         connections = ConnectionStore(
             storage: UserDefaultsConnectionStorage(key: Self.profilesKey, defaults: defaults),
             secrets: [.main: SecretLocation(store: secrets)],
-            log: { logger.error("\($0, privacy: .public)") }
+            log: { logger.error("\($0, privacy: .public)") },
+            liveRecord: ConnectionProfile.init(live:)
         )
-        let storedSelection = defaults.string(forKey: Self.selectedKey).flatMap(UUID.init)
+        let storedSelection = LiveLaunch.isSwitched ? nil : defaults.string(forKey: Self.selectedKey).flatMap(UUID.init)
         // A stored selection that no longer matches a profile would read as "no connection".
         if let storedSelection, connections.record(id: storedSelection) != nil {
             selectedProfileID = storedSelection
@@ -55,11 +61,10 @@ final class ProfileStore {
         selectedProfileID.flatMap(connections.record(id:))
     }
 
-    /// A new profile for + in Settings › Connections. The first one becomes active.
+    /// A new profile for + in Settings › Connections. JTKit makes it the one
+    /// in use once it's saved, when none is.
     func newProfile() -> ConnectionProfile {
-        let profile = ConnectionProfile.newProfile()
-        if selectedProfile == nil { selectedProfileID = profile.id }
-        return profile
+        ConnectionProfile.newProfile()
     }
 
     /// After a profile was deleted in Settings: when it was the active one, the
@@ -68,17 +73,26 @@ final class ProfileStore {
         if selectedProfile == nil { selectedProfileID = profiles.first?.id }
     }
 
-    /// The stored client secret, or nil when there is none or the Keychain
-    /// can't be read (the error code goes to the log).
-    func secret(for profile: ConnectionProfile) -> String? {
-        connections.secret(for: profile.connection)
+    /// The stored client secret, nil when there is none.
+    /// - Throws: `SecretStoreError` when the Keychain refused or is locked:
+    ///   that isn't the same as "no secret".
+    func readSecret(for profile: ConnectionProfile) throws -> String? {
+        try connections.readSecret(for: profile.connection)
     }
 
-    /// Nil when the profile is incomplete or has no stored secret.
-    func credentials(for profile: ConnectionProfile) -> PlatformCredentials? {
-        guard profile.isComplete, let secret = secret(for: profile), !secret.isEmpty else {
-            return nil
+    /// What a sign-in needs.
+    /// - Throws: `APIError.missingCredentials` when the profile is incomplete
+    ///   or has no stored secret, `APIError.keychainUnreadable` when the
+    ///   Keychain can't read it.
+    func credentials(for profile: ConnectionProfile) throws -> PlatformCredentials {
+        guard profile.isComplete else { throw APIError.missingCredentials }
+        let secret: String?
+        do {
+            secret = try readSecret(for: profile)
+        } catch let error as SecretStoreError {
+            throw APIError.keychainUnreadable(connection: profile.menuTitle, status: error.status)
         }
+        guard let secret, !secret.isEmpty else { throw APIError.missingCredentials }
         return PlatformCredentials(profile: profile, secret: secret)
     }
 }

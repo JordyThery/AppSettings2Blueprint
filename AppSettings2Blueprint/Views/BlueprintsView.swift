@@ -81,7 +81,11 @@ private struct BlueprintListView: View {
                 }
             case .failed(let message):
                 Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                    .accessibilityLabel("Warning")
                 Text(message).lineLimit(2).help(message)
+                    .font(.callout)
+                    .foregroundStyle(.primary)
+                    .announcesOnAppear(message)
             }
             Spacer()
         }
@@ -132,7 +136,7 @@ private struct BlueprintDetailPane: View {
                         .help("Backups written before each change; restore one")
                     if !model.isJamfSchool {
                         Button("Edit Scope…", systemImage: "person.3") { isEditingScope = true }
-                            .help(model.isReadOnly(detail) ? "The Blueprint is assigned to a division and is read-only" : "Choose the device groups this Blueprint is scoped to")
+                            .help(model.isReadOnly(detail) ? "This Blueprint is assigned to a division and can’t be changed through the API" : "Choose the device groups this Blueprint is scoped to")
                             .disabled(model.isReadOnly(detail))
                     }
                     Button("Deploy…", systemImage: "paperplane") { isDeploying = true }
@@ -154,6 +158,17 @@ private struct BlueprintDetailPane: View {
             }
             .sheet(isPresented: $isEditingScope) {
                 EditScopeSheet(app: model, detail: detail)
+            }
+            // Blueprint menu commands, also when they opened this pane.
+            .onChange(of: model.blueprintCommand, initial: true) {
+                // Only a command chosen for this Blueprint.
+                guard let command = model.takeBlueprintCommand(for: blueprintID) else { return }
+                switch command {
+                case .reload: model.loadDetail(id: blueprintID)
+                case .backups: isShowingBackups = true
+                case .editScope: if !model.isJamfSchool && !model.isReadOnly(detail) { isEditingScope = true }
+                case .deploy: if !detail.scopeDeviceGroups.isEmpty { isDeploying = true }
+                }
             }
         } else if let error = model.detailErrors[blueprintID] {
             ContentUnavailableView {
@@ -182,7 +197,7 @@ private struct AppSettingsSummary: View {
     var body: some View {
         content
             .confirmationDialog(
-                "Replace the current rule set?",
+                "Replace the Current Rule Set?",
                 isPresented: Binding(get: { pendingLoad != nil }, set: { if !$0 { pendingLoad = nil } }),
                 presenting: pendingLoad
             ) { location in

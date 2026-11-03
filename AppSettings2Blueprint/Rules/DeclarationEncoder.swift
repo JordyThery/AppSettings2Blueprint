@@ -7,7 +7,7 @@ import JTKit
 ///   iPad, the same declaration on the USER channel, as Apple's schema requires.
 /// - macOS: a SYSTEM declaration for Allowed (binaries) and a USER declaration for
 ///   Privacy, because Apple's schema allows binaries only on the system channel
-///   and privacy defaults only on the user channel.
+///   and permission defaults only on the user channel.
 ///
 /// Keys a platform does not support are never written, whatever the model holds.
 /// Declaration members follow the server's order: kind, type, payload, channelType.

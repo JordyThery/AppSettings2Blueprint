@@ -28,6 +28,8 @@ final class DeployModel {
         let memberCount: Int?
     }
 
+    /// This sheet's waits before a retry, with Stop in its banner.
+    let waits = RequestWaits()
     let app: AppModel
     private(set) var detail: JamfPlatform.BlueprintDetail
     var phase: Phase = .confirming
@@ -44,10 +46,12 @@ final class DeployModel {
     /// The connection this sheet was opened for; nothing is sent after it changed.
     private let connectionGeneration: Int
 
-    init(app: AppModel, detail: JamfPlatform.BlueprintDetail) {
+    /// - Parameter generation: the connection the Blueprint was read from,
+    ///   e.g. the write sheet's; the current one by default.
+    init(app: AppModel, detail: JamfPlatform.BlueprintDetail, generation: Int? = nil) {
         self.app = app
         self.detail = detail
-        connectionGeneration = app.connectionGeneration
+        connectionGeneration = generation ?? app.connectionGeneration
     }
 
     var groups: [GroupRow] {
@@ -108,7 +112,7 @@ final class DeployModel {
         let previous: String?
         do {
             guard app.connectionGeneration == connectionGeneration else { throw ConnectionChanged() }
-            blueprints = try app.currentService()
+            blueprints = try app.service(waits: waits)
             // Deploy only what was confirmed: another admin may have changed
             // the scope or the steps since the sheet opened.
             let latest = try await blueprints.detail(id: detail.id)
@@ -123,10 +127,13 @@ final class DeployModel {
                 try await blueprints.deploy(id: detail.id)
             } catch let error as JamfPlatform.APIError where !BlueprintWriter.wasNotWritten(error) {
                 phase = .uncertain("Jamf didn’t answer clearly, so the deployment may or may not have started: \(error.localizedDescription)\n\nCheck the Blueprint’s deployment state before deploying again.")
-                app.reloadAfterUncertainWrite(id: detail.id)
+                app.reloadAfterUncertainWrite(id: detail.id, generation: connectionGeneration)
                 return
             }
         } catch is CancellationError {
+            // Stop during a wait before a retry: the deploy is retried only
+            // after a 429, which started nothing.
+            if !Task.isCancelled { phase = .failed("You stopped waiting for Jamf, so the deployment wasn’t started.") }
             return
         } catch let error as JamfPlatform.APIError where error.status == 409 {
             phase = .failed("Jamf didn’t start the deployment: the Blueprint isn’t valid for deployment.\n\n\(error.localizedDescription)")
@@ -144,10 +151,12 @@ final class DeployModel {
             let final = outcome.value ?? JamfPlatform.DeploymentStatus()
             if let fresh = try? await blueprints.detail(id: detail.id) {
                 detail = fresh
-                app.storeDetail(fresh)
+                app.storeDetail(fresh, generation: connectionGeneration)
             }
             phase = .finished(final)
         } catch is CancellationError {
+            // Stop during a wait while checking; closing the sheet cancels the task.
+            if !Task.isCancelled { phase = .watchFailed("You stopped waiting for Jamf.") }
             return
         } catch {
             phase = .watchFailed(error.localizedDescription)
@@ -163,7 +172,7 @@ final class DeployModel {
     /// Back to the confirmation with the Blueprint as it is now, unconfirmed.
     private func showChanged(_ latest: JamfPlatform.BlueprintDetail) {
         detail = latest
-        app.storeDetail(latest)
+        app.storeDetail(latest, generation: connectionGeneration)
         isConfirmed = false
         acknowledgesAllowListRisk = false
         changeNotice = "“\(latest.overview.name)” was changed in Jamf after this confirmation opened, so nothing was deployed. Check the groups and warnings below, then confirm again."

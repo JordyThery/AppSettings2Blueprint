@@ -41,7 +41,7 @@ final class RuleSetDocument {
     /// A short confirmation, e.g. "Added 3 apps".
     var statusMessage: String?
 
-    /// The window's undo manager, attached by the rule builder view.
+    /// The window's undo manager, attached by the editor.
     @ObservationIgnored weak var undoManager: UndoManager?
 
     var isDirty: Bool { ruleSet != savedRuleSet }

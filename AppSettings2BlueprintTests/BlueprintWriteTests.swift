@@ -502,7 +502,7 @@ struct DeployModelTests {
     @Test func baselinePresentNeedsNoWarning() throws {
         let model = DeployModel(app: TestApp.model(), detail: try detail(declarations: #"[{"kind":"CONFIGURATION","type":"com.apple.configuration.app.settings","payload":{"Allowed":{"AllowedBinaries":[{"TeamID":"*APPLE*","SigningState":"Apple"},{"TeamID":"ABCDE12345"}],"AlwaysAllowManagedApps":true}},"channelType":"SYSTEM"}]"#))
         #expect(model.allowListWarnings.isEmpty)
-        #expect(model.blockingReason != nil, "Nothing deploys before the confirmation is ticked")
+        #expect(model.blockingReason != nil, "Nothing deploys before the confirmation is checked")
         model.isConfirmed = true
         #expect(model.blockingReason == nil)
     }

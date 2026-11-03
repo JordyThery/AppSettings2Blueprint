@@ -15,6 +15,8 @@ struct RestoreBackupSheet: View {
     @State private var message: (text: String, isError: Bool)?
     /// The connection the sheet was opened for; nothing is sent after it changed.
     @State private var connectionGeneration: Int?
+    /// This sheet's waits before a retry, with Stop in its banner.
+    @State private var waits = RequestWaits()
 
     private var selectedBackup: BlueprintBackup? {
         backups.first { $0.id == selection }
@@ -28,8 +30,9 @@ struct RestoreBackupSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            RetryWaitBanner(waits: waits)
             VStack(alignment: .leading, spacing: 4) {
-                Text("Restore from Backup").font(.title3.weight(.semibold))
+                Text("Restore from Backup").font(.title3.weight(.semibold)).accessibilityAddTraits(.isHeader)
                 Text("A backup of “\(detail.overview.name)” is written before every change. Restoring sends the backup’s steps with PATCH; the current state in Jamf is backed up first.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
@@ -83,13 +86,18 @@ struct RestoreBackupSheet: View {
             }
             .padding()
         }
-        .frame(width: 560, height: 420)
+        // Resizable, for many backups.
+        .frame(minWidth: 560, idealWidth: 560, maxWidth: .infinity, minHeight: 420, idealHeight: 420, maxHeight: .infinity)
+        .resizableSheet(minWidth: 560, minHeight: 420)
+        .onChange(of: message?.text) { _, text in
+            if let text { AccessibilityNotification.Announcement(text).post() }
+        }
         .onAppear {
             backups = BackupStore.backups(for: detail.id, root: model.backupRoot)
             if connectionGeneration == nil { connectionGeneration = model.connectionGeneration }
         }
         .confirmationDialog(
-            "Restore “\(detail.overview.name)” from this backup?",
+            "Restore “\(detail.overview.name)” from This Backup?",
             isPresented: $isConfirming,
             titleVisibility: .visible
         ) {
@@ -110,16 +118,24 @@ struct RestoreBackupSheet: View {
             defer { isRestoring = false }
             do {
                 guard model.connectionGeneration == connectionGeneration else { throw ConnectionChanged() }
-                let result = try await model.makeWriter().restore(backup, loaded: loaded)
-                model.storeDetail(result.detail)
+                let result = try await model.makeWriter(waits: waits).restore(backup, loaded: loaded)
+                if let connectionGeneration { model.storeDetail(result.detail, generation: connectionGeneration) }
                 message = result.isVerified
                     ? ("Restored and verified. Devices receive the restored state at the next deployment.", false)
                     : (result.problems.joined(separator: " "), true)
             } catch let error as BlueprintWriter.WriteError where error.mayHaveWritten {
-                model.reloadAfterUncertainWrite(id: detail.id)
+                model.reloadAfterUncertainWrite(id: detail.id, generation: connectionGeneration ?? -1)
                 message = (error.localizedDescription, true)
+            } catch is CancellationError {
+                message = ("You stopped waiting for Jamf, so nothing was restored.", true)
             } catch {
-                if case BlueprintWriter.WriteError.readOnly = error { model.readOnlyBlueprintIDs.insert(detail.id) }
+                if case BlueprintWriter.WriteError.readOnly = error, model.connectionGeneration == connectionGeneration {
+                    model.readOnlyBlueprintIDs.insert(detail.id)
+                }
+                // The next restore starts from the Blueprint as it is now.
+                if case let BlueprintWriter.WriteError.changedOnServer(_, _, _, latest) = error, let connectionGeneration {
+                    model.storeDetail(latest, generation: connectionGeneration)
+                }
                 message = (error.localizedDescription, true)
             }
             // A backup of the state before the restore was written either way.

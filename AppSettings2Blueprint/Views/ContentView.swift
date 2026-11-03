@@ -28,7 +28,8 @@ struct ContentView: View {
                     RuleSetStatusToast(selection: $selection)
                 }
         }
-        .navigationTitle("AppSettings2Blueprint")
+        // The section, e.g. "Editor" (JTKit adds " — Demo" in Demo Mode).
+        .navigationTitle(selection?.title ?? "AppSettings2Blueprint")
         .toolbar {
             ToolbarItem(placement: .navigation) {
                 ProfilePicker()
@@ -66,19 +67,29 @@ struct ContentView: View {
         .sheet(isPresented: $updates.isPresented) {
             UpdateView()
         }
-        .onChange(of: model.profileStore.selectedProfile) {
-            model.connectionDidChange()
+        // The model clears the old tenant's data on a switch; the list is
+        // loaded again here while it's shown (BlueprintsView lists it when it
+        // opens later).
+        .onChange(of: model.connectionGeneration) {
             if selection == .blueprints && model.hasActiveConnection { model.refresh() }
         }
-        .onChange(of: model.demo.isOn) {
-            model.connectionDidChange()
-            if selection == .blueprints && model.hasActiveConnection { model.refresh() }
+        .onAppear {
+            model.applyConnectionChange()
+            showSectionForCommand()
         }
+        // A menu command shows its section, which then carries it out.
+        .onChange(of: model.editorCommand) { showSectionForCommand() }
+        .onChange(of: model.blueprintCommand) { showSectionForCommand() }
         // Rule set edits from any view share the window's undo history.
         .onAppear { model.ruleSet.undoManager = undoManager }
         .onChange(of: undoManager) { model.ruleSet.undoManager = undoManager }
         .onChange(of: selection) { model.saveSidebarSelection(selection) }
         .background(WindowEditedMarker(isEdited: model.ruleSet.isDirty))
+    }
+
+    private func showSectionForCommand() {
+        if model.editorCommand != nil { selection = .ruleSet }
+        if model.blueprintCommand != nil { selection = .blueprints }
     }
 
     @ViewBuilder
@@ -124,6 +135,7 @@ private struct RuleSetStatusToast: View {
         if let message = model.ruleSet.statusMessage {
             HStack(spacing: 10) {
                 Image(systemName: "checklist")
+                    .accessibilityHidden(true)
                 Text(message)
                     .lineLimit(2)
                 if selection != .ruleSet {
@@ -132,14 +144,9 @@ private struct RuleSetStatusToast: View {
                         model.ruleSet.statusMessage = nil
                     }
                 }
-                Button {
+                IconButton(title: "Dismiss", systemImage: "xmark") {
                     model.ruleSet.statusMessage = nil
-                } label: {
-                    Image(systemName: "xmark")
                 }
-                .buttonStyle(.borderless)
-                .accessibilityLabel("Dismiss")
-                .help("Dismiss")
             }
             .font(.callout)
             .padding(.horizontal, 14)
@@ -150,6 +157,12 @@ private struct RuleSetStatusToast: View {
             .accessibilityIdentifier("ruleSetStatus")
             .padding(.bottom, 16)
             .task(id: message) {
+                AccessibilityNotification.Announcement(message).post()
+                // Stays until dismissed for VoiceOver, Switch Control and
+                // keyboard users, who need time to reach Show Rule Set.
+                let workspace = NSWorkspace.shared
+                guard !workspace.isVoiceOverEnabled, !workspace.isSwitchControlEnabled,
+                      !NSApplication.shared.isFullKeyboardAccessEnabled else { return }
                 try? await Task.sleep(for: .seconds(6))
                 if model.ruleSet.statusMessage == message { model.ruleSet.statusMessage = nil }
             }
@@ -198,8 +211,8 @@ private struct FetchByIDSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Fetch Blueprint by ID")
-                .font(.headline)
-            Text("Loads GET /blueprints/v1/blueprints/{id}.")
+                .font(.headline).accessibilityAddTraits(.isHeader)
+            Text("Loads one Blueprint by its ID, also one the list doesn’t show, so you can see its JSON.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
             TextField("Blueprint ID", text: $blueprintID)

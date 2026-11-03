@@ -1,4 +1,5 @@
 import AppKit
+import JTKit
 import SwiftUI
 
 /// Lookup › App Store: search Apple's App Store for bundle IDs (iOS / iPadOS rules).
@@ -98,8 +99,10 @@ private struct ResultsTable: View {
             HStack {
                 Image(systemName: "line.3.horizontal.decrease")
                     .foregroundStyle(.secondary)
-                TextField("Filter by developer", text: $model.developerFilter)
-                    .textFieldStyle(.plain)
+                    .accessibilityHidden(true)
+                TextField("Filter by Developer", text: $model.developerFilter, prompt: Text("Filter by Developer"))
+                    .textFieldStyle(.roundedBorder)
+                    .frame(maxWidth: 280)
                 SelectionActions()
             }
             .padding(.horizontal, 10)
@@ -120,7 +123,7 @@ private struct ResultsTable: View {
                 TableColumn("Bundle ID") { app in
                     Text(app.bundleID ?? "Unavailable")
                         .font(.body.monospaced())
-                        .foregroundStyle(app.bundleID == nil ? .tertiary : .primary)
+                        .foregroundStyle(app.bundleID == nil ? .secondary : .primary)
                 }
                 .width(min: 140, ideal: 220)
                 TableColumn("App Store ID") { app in
@@ -199,11 +202,18 @@ private struct StatusBar: View {
                 Text("\(count) result\(count == 1 ? "" : "s") from the \((model.resultsStorefront ?? "").uppercased()) storefront")
                 if !failed.isEmpty {
                     Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                        .accessibilityLabel("Warning")
                     Text("\(failed.map(\.shortName).joined(separator: ", ")) search failed; results may be incomplete.")
+                        .font(.callout)
+                        .foregroundStyle(.primary)
                 }
             case .failed(let message):
                 Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                    .accessibilityLabel("Warning")
                 Text("Search failed: \(message)")
+                    .font(.callout)
+                    .foregroundStyle(.primary)
+                    .announcesOnAppear("Search failed: \(message)")
             }
             Spacer()
         }
@@ -227,7 +237,7 @@ private struct AppStoreDetailPane: View {
                     AppIcon(url: app.artworkURL, size: 48)
                     VStack(alignment: .leading, spacing: 4) {
                         Text(app.name)
-                            .font(.title3.weight(.semibold))
+                            .font(.title3.weight(.semibold)).accessibilityAddTraits(.isHeader)
                             .textSelection(.enabled)
                         PlatformBadges(platforms: app.platformBadges)
                     }
@@ -248,7 +258,7 @@ private struct AppStoreDetailPane: View {
                 Divider()
 
                 HStack {
-                    Text("Details").font(.headline)
+                    Text("Details").font(.headline).accessibilityAddTraits(.isHeader)
                     Spacer()
                     switch detailState {
                     case nil:
@@ -306,12 +316,10 @@ struct CompactValueRow: View {
                         .textSelection(.enabled)
                     Spacer(minLength: 4)
                     if copyable {
-                        Button { copy(value) } label: { Image(systemName: "doc.on.doc") }
-                            .buttonStyle(.borderless)
-                            .help("Copy \(label)")
+                        CopyButton(title: "Copy \(label)", iconOnly: true) { value }
                     }
                 } else {
-                    Text("Unavailable").foregroundStyle(.tertiary)
+                    Text("Unavailable").foregroundStyle(.secondary)
                     Spacer()
                 }
             }
@@ -325,13 +333,8 @@ struct PlatformBadges: View {
     var body: some View {
         HStack(spacing: 4) {
             ForEach(platforms) { platform in
-                Text(platform.shortName)
-                    .font(.caption2.weight(.semibold))
+                StatusBadge(platform.shortName, style: .neutral)
                     .fixedSize()
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 1)
-                    .background(.tint.opacity(0.15), in: Capsule())
-                    .foregroundStyle(.tint)
             }
         }
     }

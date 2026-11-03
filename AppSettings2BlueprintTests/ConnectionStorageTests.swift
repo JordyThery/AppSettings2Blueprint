@@ -98,7 +98,7 @@ final class ConnectionStorageTests {
         try saveTheOldWay(oldProfiles)
         let store = ProfileStore(defaults: defaults, secrets: secrets)
 
-        #expect(store.credentials(for: oldProfiles[0])?.clientSecret == "old-secret")
+        #expect(try store.credentials(for: oldProfiles[0]).clientSecret == "old-secret")
 
         try store.connections.save(oldProfiles[1], secrets: [.main: "new-secret"])
         #expect(secrets.all[second.uuidString] == "new-secret")
@@ -109,13 +109,13 @@ final class ConnectionStorageTests {
         #expect(ProfileStore.keychain.label == "AppSettings2Blueprint client secret")
     }
 
-    @Test func theFirstNewProfileBecomesActive() throws {
+    @Test("A new connection isn't chosen before it's saved (JTKit chooses it then), so a canceled one leaves nothing behind")
+    func aNewProfileIsntSelectedUnsaved() {
         let store = ProfileStore(defaults: defaults, secrets: secrets)
-        let profile = store.newProfile()
-        try store.connections.save(profile)
+        _ = store.newProfile()
 
-        #expect(store.selectedProfile == profile)
-        #expect(defaults.string(forKey: "selectedConnectionProfileID") == profile.id.uuidString)
+        #expect(store.selectedProfileID == nil)
+        #expect(defaults.string(forKey: "selectedConnectionProfileID") == nil)
     }
 
     @Test func deletingTheActiveProfileMakesTheFirstRemainingOneActive() throws {

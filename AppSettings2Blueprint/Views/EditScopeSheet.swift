@@ -12,7 +12,8 @@ struct EditScopeSheet: View {
     }
 
     var body: some View {
-        Group {
+        VStack(spacing: 0) {
+            RetryWaitBanner(waits: model.waits)
             switch model.phase {
             case .editing:
                 EditScopeForm(model: model, cancel: { dismiss() })
@@ -28,6 +29,8 @@ struct EditScopeSheet: View {
                 VStack(alignment: .leading, spacing: 12) {
                     Label("Scope Not Changed", systemImage: "xmark.octagon.fill")
                         .font(.title3.weight(.semibold))
+                        .accessibilityAddTraits(.isHeader)
+                        .announcesOnAppear("Scope Not Changed")
                         .labelStyle(.tintedIcon(.red))
                     Text(message)
                         .textSelection(.enabled)
@@ -36,6 +39,7 @@ struct EditScopeSheet: View {
                     HStack {
                         Spacer()
                         Button("Close", role: .cancel) { dismiss() }
+                            .keyboardShortcut(.cancelAction)
                         Button("Back") { model.phase = .editing }.keyboardShortcut(.defaultAction)
                     }
                 }
@@ -45,6 +49,8 @@ struct EditScopeSheet: View {
                 VStack(alignment: .leading, spacing: 12) {
                     Label("Scope Changed, Not Verified", systemImage: "exclamationmark.triangle.fill")
                         .font(.title3.weight(.semibold))
+                        .accessibilityAddTraits(.isHeader)
+                        .announcesOnAppear("Scope Changed, Not Verified")
                         .labelStyle(.tintedIcon(.orange))
                     Text(message)
                         .textSelection(.enabled)
@@ -58,7 +64,9 @@ struct EditScopeSheet: View {
                 .padding(16)
             }
         }
-        .frame(width: 640, height: 560)
+        // Resizable, for long group lists.
+        .frame(minWidth: 640, idealWidth: 640, maxWidth: .infinity, minHeight: 560, idealHeight: 560, maxHeight: .infinity)
+        .resizableSheet(minWidth: 640, minHeight: 560)
         .task { if model.app.deviceGroups.isEmpty { model.app.loadDeviceGroups() } }
     }
 }
@@ -70,7 +78,7 @@ private struct EditScopeForm: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Edit Scope").font(.title3.weight(.semibold))
+                Text("Edit Scope").font(.title3.weight(.semibold)).accessibilityAddTraits(.isHeader)
                 Text("“\(model.detail.overview.name)”").foregroundStyle(.secondary)
             }
             TextField("Filter device groups", text: $model.searchText)
@@ -181,17 +189,21 @@ private struct ScopeResultView: View {
             if result.isVerified {
                 Label("Scope Changed and Verified", systemImage: "checkmark.seal.fill")
                     .font(.title3.weight(.semibold))
+                    .accessibilityAddTraits(.isHeader)
+                    .announcesOnAppear("Scope Changed and Verified")
                     .labelStyle(.tintedIcon(.green))
                 Text("Jamf returned the new scope, and the steps are unchanged.")
                     .foregroundStyle(.secondary)
             } else {
                 Label("Scope Changed, but the Read-Back Differs", systemImage: "exclamationmark.triangle.fill")
                     .font(.title3.weight(.semibold))
+                    .accessibilityAddTraits(.isHeader)
+                    .announcesOnAppear("Scope Changed, but the Read-Back Differs")
                     .labelStyle(.tintedIcon(.orange))
                 ForEach(result.problems, id: \.self) { Text($0) }
             }
             HStack(spacing: 8) {
-                Text("“\(result.detail.overview.name)”").font(.headline)
+                Text("“\(result.detail.overview.name)”").font(.headline).accessibilityAddTraits(.isHeader)
                 if let state = result.detail.overview.deploymentState?.state { DeploymentStateBadge(state: state) }
             }
             Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {

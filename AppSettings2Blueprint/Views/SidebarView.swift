@@ -8,6 +8,17 @@ enum SidebarItem: String, Hashable {
     case localApps
     case ruleSet
     case blueprints
+
+    /// The window title while the section is shown.
+    var title: String {
+        switch self {
+        case .appStore: "App Store"
+        case .builtInApps: "Apple Built-in Apps"
+        case .localApps: "Local Mac Apps"
+        case .ruleSet: "Editor"
+        case .blueprints: "Blueprints"
+        }
+    }
 }
 
 struct SidebarView: View {
@@ -56,6 +67,8 @@ private struct RuleSetSidebarRow: View {
                             .background(.red.opacity(0.2), in: Capsule())
                             .foregroundStyle(.red)
                             .help("\(errors) error\(errors == 1 ? "" : "s")")
+                            // Said, not only shown in red.
+                            .accessibilityLabel("\(errors) error\(errors == 1 ? "" : "s")")
                     }
                 }
                 HStack(spacing: 4) {
@@ -66,6 +79,8 @@ private struct RuleSetSidebarRow: View {
                     if document.isDirty {
                         Circle().fill(.secondary).frame(width: 6, height: 6)
                             .help("Unsaved changes")
+                            .accessibilityElement()
+                            .accessibilityLabel("Unsaved changes")
                     }
                 }
             }
@@ -75,25 +90,13 @@ private struct RuleSetSidebarRow: View {
     }
 }
 
-/// Deployment state of a blueprint as a small colored capsule.
+/// Deployment state of a Blueprint: JTKit's badge, the state's name in the
+/// primary color on a wash of the state's color.
 struct DeploymentStateBadge: View {
     let state: JamfPlatform.BlueprintState
 
     var body: some View {
-        Text(state.displayName)
-            .font(.caption2.weight(.semibold))
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(color.opacity(0.18), in: Capsule())
-            .foregroundStyle(color)
-    }
-
-    private var color: Color {
-        switch state {
-        case .deployed: .green
-        case .outOfDate: .orange
-        case .notDeployed: .secondary
-        case .other: .blue
-        }
+        StatusBadge(state.displayName, style: state.badgeStyle)
+            .accessibilityLabel("Deployment state: \(state.displayName)")
     }
 }

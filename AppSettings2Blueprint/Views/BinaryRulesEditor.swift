@@ -52,7 +52,7 @@ private struct RuleList: View {
         let keyPath: WritableKeyPath<RuleSet, [BinaryRule]> = isAllowList ? \.allowedBinaries : \.deniedBinaries
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(title).font(.headline)
+                Text(title).font(.headline).accessibilityAddTraits(.isHeader)
                 Text("\(rules.count)").foregroundStyle(.secondary)
                 Spacer()
                 Button("Add Empty Rule", systemImage: "plus") {
@@ -90,13 +90,10 @@ private struct BinaryRuleRow: View {
                         Text("Rule").font(.callout.weight(.medium)).foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Button {
+                    IconButton(title: "Remove Rule \(rule.isAppleBaseline ? "Recommended Baseline" : rule.sourceDescription ?? "")",
+                               systemImage: "trash", help: "Remove rule") {
                         document.remove(keyPath, id: rule.id, "Remove Binary Rule")
-                    } label: {
-                        Image(systemName: "trash")
                     }
-                    .buttonStyle(.borderless)
-                    .help("Remove rule")
                 }
                 Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 4) {
                     field("CDHash", binding.cdHash, prompt: "40 hex characters")

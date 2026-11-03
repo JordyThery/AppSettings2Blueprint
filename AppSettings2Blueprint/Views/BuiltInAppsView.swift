@@ -50,8 +50,8 @@ struct BuiltInAppsView: View {
                 }
                 .disabled(selection.isEmpty)
                 .help("Add the selected bundle IDs to the iOS / iPadOS app list; duplicates are skipped")
-                Button("Copy Bundle IDs", systemImage: "doc.on.doc") {
-                    copy(apps.filter { selection.contains($0.id) }.map(\.bundleId))
+                CopyButton(title: "Copy Bundle IDs") {
+                    apps.filter { selection.contains($0.id) }.map(\.bundleId).joined(separator: "\n")
                 }
                 .disabled(selection.isEmpty)
                 Button("Export CSV…", systemImage: "tablecells") {
@@ -82,6 +82,7 @@ struct BuiltInAppsView: View {
                 TableColumn("Built-in") { app in
                     if app.builtIn {
                         Image(systemName: "checkmark").foregroundStyle(.secondary)
+                            .accessibilityLabel("Built-in")
                     }
                 }
                 .width(60)
@@ -118,15 +119,17 @@ struct BuiltInAppsView: View {
 private struct SourceFooter: View {
     let list: AppleBuiltInApps
 
+    private var sourceLine: AttributedString {
+        let markdown = "Source: Apple’s list of app bundle IDs, verified \(list.verifiedDisplay), as embedded in [App Settings Utility](https://github.com/cantscript/AppSettingsUtility) by Anthony Darlow (MIT)."
+        return (try? AttributedString(markdown: markdown))
+            ?? AttributedString("Source: Apple’s list of app bundle IDs, verified \(list.verifiedDisplay), as embedded in App Settings Utility by Anthony Darlow (MIT).")
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            HStack(spacing: 4) {
-                Text("Source: Apple’s list of app bundle IDs, verified \(list.verifiedDisplay), as embedded in")
-                if let repository = URL(string: "https://github.com/cantscript/AppSettingsUtility") {
-                    Link("App Settings Utility", destination: repository)
-                }
-                Text("by Anthony Darlow (MIT).")
-            }
+            // One text with the link inside, so it wraps instead of being cut off.
+            Text(sourceLine)
+                .fixedSize(horizontal: false, vertical: true)
             if let appleURL = URL(string: list.appleSource) {
                 Link(list.appleSource, destination: appleURL)
             }

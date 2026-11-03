@@ -58,7 +58,7 @@ struct AddBinaryRuleSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Add \(binary.name) to a Binary Rule")
-                .font(.headline)
+                .font(.headline).accessibilityAddTraits(.isHeader)
             Picker("List", selection: $toAllowList) {
                 Text("AllowedBinaries").tag(true)
                 Text("DeniedBinaries").tag(false)
@@ -75,6 +75,7 @@ struct AddBinaryRuleSheet: View {
                         HStack(alignment: .top, spacing: 8) {
                             Image(systemName: strategy == option ? "largecircle.fill.circle" : "circle")
                                 .foregroundStyle(strategy == option ? Color.accentColor : .secondary)
+                                .accessibilityHidden(true)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("\(option.title) — \(option.fields)\(option == .appFromDeveloper ? " (recommended)" : "")")
                                     .font(.callout.weight(.medium))
@@ -88,7 +89,9 @@ struct AddBinaryRuleSheet: View {
                     }
                     .buttonStyle(.plain)
                     .disabled(!available)
-                    .opacity(available ? 1 : 0.5)
+                    // A radio button for VoiceOver: which option is chosen.
+                    .accessibilityElement(children: .combine)
+                    .accessibilityAddTraits(strategy == option ? [.isSelected] : [])
                 }
             }
 
@@ -165,7 +168,7 @@ struct AddBinaryRuleSheet: View {
                 Text(label).frame(width: 90, alignment: .leading)
                 Text(value ?? "Unavailable")
                     .font(.callout.monospaced())
-                    .foregroundStyle(value == nil ? .tertiary : .secondary)
+                    .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
@@ -187,7 +190,7 @@ struct CSVImportSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Import \(document.format.title)")
-                .font(.headline)
+                .font(.headline).accessibilityAddTraits(.isHeader)
             Text("\(document.rowCount) row\(document.rowCount == 1 ? "" : "s").")
                 .foregroundStyle(.secondary)
             switch document {

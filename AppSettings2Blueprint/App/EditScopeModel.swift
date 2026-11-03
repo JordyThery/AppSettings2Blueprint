@@ -25,7 +25,11 @@ final class EditScopeModel {
     }
 
     let app: AppModel
-    let detail: JamfPlatform.BlueprintDetail
+    /// This sheet's waits before a retry, with Stop in its banner.
+    let waits = RequestWaits()
+    /// The Blueprint as last read; replaced when Jamf reports it changed, so
+    /// Back starts from the current scope.
+    private(set) var detail: JamfPlatform.BlueprintDetail
     var selected: Set<String>
     var searchText = ""
     var phase: Phase = .editing
@@ -110,15 +114,23 @@ final class EditScopeModel {
         let groups = newGroups
         do {
             guard app.connectionGeneration == connectionGeneration else { throw ConnectionChanged() }
-            let writer = try app.makeWriter()
+            let writer = try app.makeWriter(waits: waits)
             let result = try await writer.changeScope(loaded: detail, deviceGroups: groups)
-            app.storeDetail(result.detail)
+            app.storeDetail(result.detail, generation: connectionGeneration)
             phase = .done(result)
         } catch let error as BlueprintWriter.WriteError where error.mayHaveWritten {
-            app.reloadAfterUncertainWrite(id: detail.id)
+            app.reloadAfterUncertainWrite(id: detail.id, generation: connectionGeneration)
             phase = .uncertain(error.localizedDescription)
+        } catch is CancellationError {
+            phase = .failed("You stopped waiting for Jamf, so the scope wasn’t changed.")
         } catch {
-            if case BlueprintWriter.WriteError.readOnly = error { app.readOnlyBlueprintIDs.insert(detail.id) }
+            if case BlueprintWriter.WriteError.readOnly = error, app.connectionGeneration == connectionGeneration {
+                app.readOnlyBlueprintIDs.insert(detail.id)
+            }
+            if case let BlueprintWriter.WriteError.changedOnServer(_, _, _, latest) = error {
+                detail = latest
+                app.storeDetail(latest, generation: connectionGeneration)
+            }
             phase = .failed(error.localizedDescription)
         }
     }
