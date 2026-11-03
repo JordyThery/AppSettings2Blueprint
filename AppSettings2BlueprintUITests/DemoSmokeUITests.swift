@@ -21,6 +21,11 @@ final class DemoSmokeUITests: JTKitUITestCase {
     override func didLaunch() {
         let main = app.windows.firstMatch
         XCTAssertTrue(main.waitForExistence(timeout: 20), "The main window did not open")
+        // A click on the title bar first: in a fresh test runner, a key press
+        // sent before any click (⌘, for Settings) crashes the runner in
+        // CoreGraphics (CGS_REQUIRE_INIT). The release check runs each test
+        // in its own runner.
+        main.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0)).withOffset(CGVector(dx: 0, dy: 8)).click()
         if main.frame.width < 1200 {
             let zoom = app.menuBars.menuItems["Zoom"].firstMatch
             if zoom.exists { zoom.click() }
@@ -73,13 +78,13 @@ final class DemoSmokeUITests: JTKitUITestCase {
                       "Blueprints in Write to Jamf stayed on Loading…")
         tap(sheet.buttons["Review Changes…"], timeout: 20)
         tap(sheet.buttons["Write to Blueprint"], timeout: 20)
-        XCTAssertTrue(text("Written and Verified", in: sheet).waitForExistence(timeout: 20), "The write wasn't verified")
+        XCTAssertTrue(heading("Written and Verified", in: sheet).waitForExistence(timeout: 20), "The write wasn't verified")
 
         tap(sheet.buttons["Deploy…"], timeout: 10)
         let confirm = sheet.checkBoxes.matching(NSPredicate(format: "label BEGINSWITH 'I confirm deploying' OR title BEGINSWITH 'I confirm deploying'")).firstMatch
         tap(confirm, timeout: 20)
         tap(sheet.buttons["Deploy"], timeout: 10)
-        XCTAssertTrue(text("Deployment Succeeded", in: sheet).waitForExistence(timeout: 90), "The deployment didn't succeed")
+        XCTAssertTrue(heading("Deployment Succeeded", in: sheet).waitForExistence(timeout: 90), "The deployment didn't succeed")
         tap(sheet.buttons["Done"])
         XCTAssertTrue(sheet.waitForNonExistence(timeout: 10), "The sheet did not close")
     }
@@ -150,6 +155,12 @@ final class DemoSmokeUITests: JTKitUITestCase {
         openSidebar("Blueprints")
         XCTAssertTrue(text(ipadBlueprint, in: app).waitForExistence(timeout: 20),
                       "Contoso's Blueprints aren't listed", file: file, line: line)
+    }
+
+    /// A title marked as a heading, which exposes its string as the label.
+    /// Found by subscript: a predicate query's firstMatch doesn't find it.
+    private func heading(_ string: String, in root: XCUIElement) -> XCUIElement {
+        root.staticTexts[string]
     }
 
     /// A SwiftUI text, which exposes its string as the value (label empty).
