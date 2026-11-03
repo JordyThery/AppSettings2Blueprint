@@ -33,7 +33,7 @@ final class DemoSmokeUITests: JTKitUITestCase {
     }
 
     func test1Launch() {
-        XCTAssertTrue(window(titled: appName).waitForExistence(timeout: 20), "The main window did not open")
+        XCTAssertTrue(app.windows["main"].waitForExistence(timeout: 20), "The main window did not open")
         openBlueprints()
     }
 
@@ -125,10 +125,40 @@ final class DemoSmokeUITests: JTKitUITestCase {
         // The first connection is in use; a second one isn't until it's chosen.
         addConnection("JTKTEST Second", in: settings)
         tap(settings.buttons["Use This Connection"], timeout: 5)
-        let main = window(titled: appName)
+        let main = app.windows["main"]
         let leftDemo = XCTNSPredicateExpectation(predicate: NSPredicate(format: "NOT (title CONTAINS %@)", Self.demoTitleSuffix), object: main)
         XCTAssertEqual(XCTWaiter.wait(for: [leftDemo], timeout: 10), .completed, "Use This Connection didn't leave demo mode")
         close(settings)
+    }
+
+    /// The menu bar runs the editor's and the Blueprint pane's commands, and
+    /// the window title names the section.
+    func test9MenuCommandsAndTitles() {
+        let main = app.windows["main"]
+        openBlueprints()
+        XCTAssertTrue(main.title.hasPrefix("Blueprints"), "The window title is “\(main.title)”")
+        tap(text(ipadBlueprint, in: main), timeout: 20)
+
+        // Blueprint › Deploy… opens the deploy confirmation.
+        tap(app.menuBars.menuBarItems["Blueprint"])
+        tap(app.menuItems["Deploy…"], timeout: 5)
+        XCTAssertTrue(app.sheets.firstMatch.waitForExistence(timeout: 10), "Deploy… didn't open the confirmation")
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(app.sheets.firstMatch.waitForNonExistence(timeout: 10), "The confirmation didn't close")
+
+        // ⌥⌘N: a new iOS / iPadOS rule set, in the editor.
+        app.typeKey("n", modifierFlags: [.command, .option])
+        let iOS = main.radioButtons["iOS / iPadOS"]
+        XCTAssertTrue(iOS.waitForExistence(timeout: 10), "⌥⌘N didn't open the editor")
+        XCTAssertEqual(iOS.value as? Int, 1, "⌥⌘N didn't start an iOS / iPadOS rule set")
+        XCTAssertTrue(main.title.hasPrefix("Editor"), "The window title is “\(main.title)”")
+
+        // ⇧⌘J: Write to Jamf…. (Its resizing can't be tested here: a
+        // synthesized drag doesn't resize any window, the main one included.)
+        app.typeKey("j", modifierFlags: [.command, .shift])
+        let sheet = app.sheets.firstMatch
+        XCTAssertTrue(sheet.waitForExistence(timeout: 10), "⇧⌘J didn't open Write to Jamf")
+        tap(sheet.buttons["Cancel"])
     }
 
     /// Adds a connection with made-up values and saves it; its editor stays open.

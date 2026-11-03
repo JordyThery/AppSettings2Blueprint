@@ -57,6 +57,26 @@ final class AppModel {
     var searchText = ""
     /// Fetch Blueprint by ID…, from the toolbar or the View menu.
     var isShowingFetchByID = false
+
+    /// A menu-bar command for the editor (File menu, Blueprint › Write to
+    /// Jamf…). The window shows the editor, which carries it out with its own
+    /// confirmations and clears it.
+    enum EditorCommand: Equatable {
+        case new(RulePlatform), open, save, importCSV, writeToJamf
+    }
+    var editorCommand: EditorCommand?
+
+    /// A menu-bar command for the selected Blueprint (Blueprint menu); the
+    /// window shows Blueprints, whose detail pane carries it out.
+    enum BlueprintCommand: Equatable {
+        case reload, backups, editScope, deploy
+    }
+    var blueprintCommand: BlueprintCommand?
+
+    /// The selected Blueprint's detail, when it's loaded.
+    var selectedDetail: JamfPlatform.BlueprintDetail? {
+        selectedBlueprintID.flatMap { details[$0] }
+    }
     var selectedBlueprintID: String? {
         didSet {
             if let selectedBlueprintID, details[selectedBlueprintID] == nil { loadDetail(id: selectedBlueprintID) }

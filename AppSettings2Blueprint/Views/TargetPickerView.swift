@@ -44,7 +44,9 @@ struct TargetPickerView: View {
             }
             }
         }
-        .frame(width: 820, height: 620)
+        // Resizable: the review's diff and the Blueprint list can use the room.
+        .frame(minWidth: 820, idealWidth: 820, maxWidth: .infinity, minHeight: 620, idealHeight: 620, maxHeight: .infinity)
+        .resizableSheet(minWidth: 820, minHeight: 620)
         .task {
             if model.app.deviceGroups.isEmpty && !model.app.isJamfSchool { model.app.loadDeviceGroups() }
             if model.app.overviews.isEmpty { model.app.refresh() }

@@ -37,10 +37,7 @@ struct RawJSONView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
-                Button("Copy", systemImage: "doc.on.doc") {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(String(decoding: data, as: UTF8.self), forType: .string)
-                }
+                CopyButton(title: "Copy") { String(decoding: data, as: UTF8.self) }
                 Button("Save…", systemImage: "square.and.arrow.down") {
                     save(data)
                 }

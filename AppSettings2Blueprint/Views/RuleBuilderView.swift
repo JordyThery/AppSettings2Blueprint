@@ -56,11 +56,17 @@ struct RuleBuilderView: View {
         }
         .onAppear(perform: selectVisibleTab)
         .onChange(of: document.ruleSet.platform) { selectVisibleTab() }
+        // File and Blueprint menu commands, also when they opened the editor.
+        .onChange(of: model.editorCommand, initial: true) { _, command in
+            guard let command else { return }
+            model.editorCommand = nil
+            perform(command)
+        }
         .confirmationDialog(
             // Switching platform keeps the entries; the other actions discard them.
             {
-                if case .switchPlatform = pendingAction { return "Switch platform?" }
-                return "Discard unsaved changes?"
+                if case .switchPlatform = pendingAction { return "Switch Platform?" }
+                return "Discard Unsaved Changes?"
             }(),
             isPresented: Binding(get: { pendingAction != nil }, set: { if !$0 { pendingAction = nil } }),
             presenting: pendingAction
@@ -153,21 +159,17 @@ struct RuleBuilderView: View {
             Spacer()
             Menu("New", systemImage: "doc.badge.plus") {
                 ForEach(RulePlatform.allCases) { platform in
-                    Button("\(platform.displayName) Rule Set") {
-                        if document.isDirty { pendingAction = .new(platform) } else { document.newRuleSet(platform: platform) }
-                    }
+                    Button("\(platform.displayName) Rule Set") { perform(.new(platform)) }
                 }
             }
             .fixedSize()
-            Button("Open…", systemImage: "folder") {
-                if document.isDirty { pendingAction = .open } else { openFile() }
-            }
-            Button("Save…", systemImage: "square.and.arrow.down", action: saveFile)
+            Button("Open…", systemImage: "folder") { perform(.open) }
+            Button("Save…", systemImage: "square.and.arrow.down") { perform(.save) }
                 .disabled(document.hasErrors)
                 .help(document.hasErrors ? "Fix the errors below before saving" : "Save the rule set as an .appsettings.json file")
-            Button("Import CSV…", systemImage: "tablecells", action: importCSV)
+            Button("Import CSV…", systemImage: "tablecells") { perform(.importCSV) }
                 .help("Import an App Settings Utility CSV (BundleID-Lookup or Local-Mac-Apps)")
-            Button("Write to Jamf…", systemImage: "square.and.arrow.up.on.square") { isWritingToJamf = true }
+            Button("Write to Jamf…", systemImage: "square.and.arrow.up.on.square") { perform(.writeToJamf) }
                 .disabled(document.hasErrors || !model.hasActiveConnection)
                 .help(!model.hasActiveConnection
                       ? "Add a Jamf connection in Settings first"
@@ -228,6 +230,25 @@ struct RuleBuilderView: View {
     }
 
     // MARK: Files
+
+    /// A header button or its menu command; the same checks either way.
+    private func perform(_ command: AppModel.EditorCommand) {
+        let document = model.ruleSet
+        switch command {
+        case .new(let platform):
+            if document.isDirty { pendingAction = .new(platform) } else { document.newRuleSet(platform: platform) }
+        case .open:
+            if document.isDirty { pendingAction = .open } else { openFile() }
+        case .save:
+            guard !document.hasErrors else { return }
+            saveFile()
+        case .importCSV:
+            importCSV()
+        case .writeToJamf:
+            guard !document.hasErrors, model.hasActiveConnection else { return }
+            isWritingToJamf = true
+        }
+    }
 
     private func openFile() {
         let panel = NSOpenPanel()

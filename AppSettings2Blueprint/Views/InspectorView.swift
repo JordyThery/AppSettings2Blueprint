@@ -209,10 +209,7 @@ struct ValueRow: View {
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 if copyable {
-                    IconButton(title: "Copy \(label)", systemImage: "doc.on.doc") {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(value, forType: .string)
-                    }
+                    CopyButton(title: "Copy \(label)", iconOnly: true) { value }
                 }
             } else {
                 Text("Unavailable")

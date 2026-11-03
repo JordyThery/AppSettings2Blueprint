@@ -83,6 +83,7 @@ private struct BlueprintListView: View {
                 Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
                     .accessibilityLabel("Warning")
                 Text(message).lineLimit(2).help(message)
+                    .font(.callout)
                     .foregroundStyle(.primary)
                     .announcesOnAppear(message)
             }
@@ -158,6 +159,17 @@ private struct BlueprintDetailPane: View {
             .sheet(isPresented: $isEditingScope) {
                 EditScopeSheet(app: model, detail: detail)
             }
+            // Blueprint menu commands, also when they opened this pane.
+            .onChange(of: model.blueprintCommand, initial: true) { _, command in
+                guard let command else { return }
+                model.blueprintCommand = nil
+                switch command {
+                case .reload: model.loadDetail(id: blueprintID)
+                case .backups: isShowingBackups = true
+                case .editScope: if !model.isJamfSchool && !model.isReadOnly(detail) { isEditingScope = true }
+                case .deploy: if !detail.scopeDeviceGroups.isEmpty { isDeploying = true }
+                }
+            }
         } else if let error = model.detailErrors[blueprintID] {
             ContentUnavailableView {
                 Label("Couldn’t Load Blueprint", systemImage: "exclamationmark.triangle")
@@ -185,7 +197,7 @@ private struct AppSettingsSummary: View {
     var body: some View {
         content
             .confirmationDialog(
-                "Replace the current rule set?",
+                "Replace the Current Rule Set?",
                 isPresented: Binding(get: { pendingLoad != nil }, set: { if !$0 { pendingLoad = nil } }),
                 presenting: pendingLoad
             ) { location in

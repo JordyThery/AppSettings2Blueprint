@@ -10,6 +10,15 @@
 - Blueprints without a last-modified time (some made in the Jamf UI) are no longer reported as changed in Jamf when only their deployment state changed.
 - Changing a saved connection’s region keeps its stored client secret, so **Test Connection** and **Load Environments** work without typing it again.
 - The review diff in Write to Jamf shows each line in full again; long lines scroll sideways.
+- **Menu commands and shortcuts**: the File menu has New macOS Rule Set (⌘N), New iOS / iPadOS Rule Set (⌥⌘N), Open Rule Set… (⌘O), Save Rule Set… (⌘S) and Import CSV… (⇧⌘I). A new Blueprint menu has Write to Jamf… (⇧⌘J), Reload Blueprint (⌥⌘R), Edit Scope…, Backups… and Deploy… (⇧⌘D) for the selected Blueprint.
+- The window title shows the section you’re in, such as Editor or Blueprints.
+- The Write to Jamf, Edit Scope and Restore from Backup sheets can be resized.
+- Copy buttons confirm with “Copied”. Error messages in the status bars and the warning about denying Apple’s own apps, the App Store among them, are easier to read.
+- Switching the connection or Demo Mode from the Connection menu or Settings now also clears the previous connection’s Blueprints while the main window is closed. Renaming the connection in use keeps the editor’s link to its Blueprint.
+- A write, scope change, restore or deployment that finishes after you switched connections is shown in its sheet only, and isn’t added to the new connection’s Blueprints.
+- When you stop waiting for Jamf during a write, the sheet says you stopped it and offers only Close.
+- Edit Scope checks that nobody changed the scope in Jamf since the sheet opened. After “changed in Jamf”, Back starts from the Blueprint as it is now.
+- Stop in a sheet ends only that sheet’s wait.
 
 ## 1.2.0 (2026-10-31)
 

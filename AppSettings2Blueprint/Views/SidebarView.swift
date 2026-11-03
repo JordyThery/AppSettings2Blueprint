@@ -8,6 +8,17 @@ enum SidebarItem: String, Hashable {
     case localApps
     case ruleSet
     case blueprints
+
+    /// The window title while the section is shown.
+    var title: String {
+        switch self {
+        case .appStore: "App Store"
+        case .builtInApps: "Apple Built-in Apps"
+        case .localApps: "Local Mac Apps"
+        case .ruleSet: "Editor"
+        case .blueprints: "Blueprints"
+        }
+    }
 }
 
 struct SidebarView: View {

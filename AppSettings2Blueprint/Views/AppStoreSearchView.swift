@@ -100,8 +100,9 @@ private struct ResultsTable: View {
                 Image(systemName: "line.3.horizontal.decrease")
                     .foregroundStyle(.secondary)
                     .accessibilityHidden(true)
-                TextField("Filter by developer", text: $model.developerFilter)
-                    .textFieldStyle(.plain)
+                TextField("Filter by Developer", text: $model.developerFilter, prompt: Text("Filter by Developer"))
+                    .textFieldStyle(.roundedBorder)
+                    .frame(maxWidth: 280)
                 SelectionActions()
             }
             .padding(.horizontal, 10)
@@ -203,12 +204,14 @@ private struct StatusBar: View {
                     Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
                         .accessibilityLabel("Warning")
                     Text("\(failed.map(\.shortName).joined(separator: ", ")) search failed; results may be incomplete.")
+                        .font(.callout)
                         .foregroundStyle(.primary)
                 }
             case .failed(let message):
                 Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
                     .accessibilityLabel("Warning")
                 Text("Search failed: \(message)")
+                    .font(.callout)
                     .foregroundStyle(.primary)
                     .announcesOnAppear("Search failed: \(message)")
             }
@@ -313,7 +316,7 @@ struct CompactValueRow: View {
                         .textSelection(.enabled)
                     Spacer(minLength: 4)
                     if copyable {
-                        IconButton(title: "Copy \(label)", systemImage: "doc.on.doc") { copy(value) }
+                        CopyButton(title: "Copy \(label)", iconOnly: true) { value }
                     }
                 } else {
                     Text("Unavailable").foregroundStyle(.secondary)

@@ -86,7 +86,9 @@ struct RestoreBackupSheet: View {
             }
             .padding()
         }
-        .frame(width: 560, height: 420)
+        // Resizable, for many backups.
+        .frame(minWidth: 560, idealWidth: 560, maxWidth: .infinity, minHeight: 420, idealHeight: 420, maxHeight: .infinity)
+        .resizableSheet(minWidth: 560, minHeight: 420)
         .onChange(of: message?.text) { _, text in
             if let text { AccessibilityNotification.Announcement(text).post() }
         }
@@ -95,7 +97,7 @@ struct RestoreBackupSheet: View {
             if connectionGeneration == nil { connectionGeneration = model.connectionGeneration }
         }
         .confirmationDialog(
-            "Restore “\(detail.overview.name)” from this backup?",
+            "Restore “\(detail.overview.name)” from This Backup?",
             isPresented: $isConfirming,
             titleVisibility: .visible
         ) {

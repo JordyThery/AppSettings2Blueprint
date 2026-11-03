@@ -19,7 +19,7 @@ struct ReviewChangesSheet: View {
                 Text("Review Changes").font(.title3.weight(.semibold)).accessibilityAddTraits(.isHeader)
                 Text("“\(prepared.name)” · \(placementText(edit.target)) · \(changed) changed line\(changed == 1 ? "" : "s")")
                     .foregroundStyle(.secondary)
-                Text("\(edit.unchangedComponentCount) other component\(edit.unchangedComponentCount == 1 ? "" : "s") unchanged, byte for byte\(edit.otherAppSettings.isEmpty ? "" : "; \(edit.otherAppSettings.count) App Settings declaration\(edit.otherAppSettings.count == 1 ? "" : "s") elsewhere left as they are").")
+                Text(othersText(edit))
                     .font(.callout)
             }
             .padding()
@@ -71,6 +71,24 @@ struct ReviewChangesSheet: View {
             }
             .padding()
         }
+    }
+
+    /// What else the write leaves alone, e.g. "The Blueprint’s 3 other
+    /// components stay exactly as they are."
+    private func othersText(_ edit: AppSettingsEdit) -> String {
+        let count = edit.unchangedComponentCount
+        var text = switch count {
+        case 0: "The Blueprint has no other components."
+        case 1: "The Blueprint’s other component stays exactly as it is."
+        default: "The Blueprint’s \(count) other components stay exactly as they are."
+        }
+        let elsewhere = edit.otherAppSettings.count
+        if elsewhere > 0 {
+            text += elsewhere == 1
+                ? " So does the App Settings declaration in a component this app doesn’t edit."
+                : " So do the \(elsewhere) App Settings declarations in components this app doesn’t edit."
+        }
+        return text
     }
 
     private func placementText(_ target: AppSettingsTarget) -> String {

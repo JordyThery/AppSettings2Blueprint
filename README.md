@@ -52,6 +52,8 @@ The Lookup section needs no Jamf permissions and no macOS privacy permission: th
 4. Click **Write to Jamf…**, choose a new or an existing Blueprint, review the diff and write.
 5. Deploy from the write sheet or from **Jamf › Blueprints › Deploy…**. **Edit Scope…** in the same place changes a Blueprint’s device groups. **Fetch by ID** in the toolbar loads one Blueprint by its ID.
 
+The editor’s buttons are also in the **File** menu: New macOS Rule Set (⌘N), New iOS / iPadOS Rule Set (⌥⌘N), Open Rule Set… (⌘O), Save Rule Set… (⌘S) and Import CSV… (⇧⌘I). The **Blueprint** menu has Write to Jamf… (⇧⌘J) and, for the selected Blueprint, Reload Blueprint (⌥⌘R), Edit Scope…, Backups… and Deploy… (⇧⌘D). Refresh Blueprints is ⌘R. The Write to Jamf, Edit Scope and Restore from Backup sheets can be resized.
+
 On macOS, Apple accepts binary rules only in the system channel and Privacy only in the user channel, so a macOS rule set is written as up to two declarations in the same component. For Shared iPad, check **Shared iPad** in the editor: the iOS declaration is then written to the user channel, as Apple requires.
 
 ## Jamf School
@@ -67,9 +69,9 @@ The Jamf Platform API applies Blueprint updates as a JSON merge-patch, which rep
 - If a write was sent but Jamf’s answer is unclear, or reading the Blueprint back fails, the app says so and doesn’t offer to send it again (a second create would make a second Blueprint).
 - The full Blueprint is backed up first, to `~/Library/Application Support/AppSettings2Blueprint/Backups/<Blueprint ID>/`. Backups are never overwritten and **Backups…** restores them. A backup holds the whole Blueprint as Jamf returned it, including the settings of its other components (such as Wi-Fi passwords), as plain JSON readable only by your user account. They’re kept forever unless you choose a shorter time in **Settings › General › Backups**; the newest backup of each Blueprint is always kept.
 - Every write is verified against a read-back of the Blueprint.
-- When Jamf asks the app to wait before trying again (at most 60 seconds), the sheet shows the wait with **Stop**. Stopping sends nothing more; a request that may already have reached Jamf is reported as such.
+- When Jamf asks the app to wait before trying again (at most 60 seconds), the sheet shows the wait with **Stop**, which ends only that sheet’s wait. Stopping sends nothing more; a request that may already have reached Jamf is reported as such, with Close only. Results that arrive after you switched connections are shown in their sheet only.
 - `divisionId` is never sent; division-assigned Blueprints are read-only.
-- **Edit Scope…** sends only the scope, after the same checks and backup, and verifies that the steps are unchanged. Removing groups from a deployed Blueprint needs an extra confirmation.
+- **Edit Scope…** sends only the scope, after the same checks and backup (including that nobody changed the scope since the sheet opened), and verifies that the steps are unchanged. Removing groups from a deployed Blueprint needs an extra confirmation.
 - Writing never deploys. Deploying needs a confirmation listing the device groups and device count, and a second one for a macOS allow list without `AlwaysAllowManagedApps` or the Apple-signed baseline. Just before deploying, the Blueprint is fetched again; if its scope or steps changed since the confirmation, nothing is deployed and the confirmation is shown again.
 - The HTTP layer refuses everything except GET, `POST /auth/token`, Blueprint create, update and deploy. No DELETE, no undeploy; deploy is retried on 429 only.
 

@@ -56,11 +56,26 @@ struct AppListEditor: View {
                     )
                 }
             }
-            Text("Include com.apple.webapp to \(ruleSet.appListMode == .allow ? "allow" : "deny") all web clips. Denying system apps can disable other features; denying the App Store can stop users accepting user-based VPP terms.")
-                .font(.caption)
+            // The warnings in a banner while they apply, in readable text; the tip stays below.
+            if let warning = deniedSystemAppsWarning {
+                Banner(style: .warning, text: warning)
+            }
+            Text("Include com.apple.webapp to \(ruleSet.appListMode == .allow ? "allow" : "deny") all web clips.")
+                .font(.callout)
                 .foregroundStyle(.secondary)
         }
         .padding(10)
+    }
+
+    /// Shown while DeniedApps holds Apple's own apps.
+    private var deniedSystemAppsWarning: String? {
+        let ruleSet = document.ruleSet
+        guard ruleSet.appListMode == .deny else { return nil }
+        let ids = ruleSet.deniedApps.map(\.bundleID)
+        guard ids.contains(where: { $0.hasPrefix("com.apple.") }) else { return nil }
+        let appStore = ids.contains("com.apple.AppStore")
+            ? " Denying the App Store can also stop users accepting user-based VPP terms." : ""
+        return "Denying Apple’s own apps can disable other features that rely on them.\(appStore)"
     }
 
     private func add() {

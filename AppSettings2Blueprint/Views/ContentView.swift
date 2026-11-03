@@ -28,7 +28,8 @@ struct ContentView: View {
                     RuleSetStatusToast(selection: $selection)
                 }
         }
-        .navigationTitle("AppSettings2Blueprint")
+        // The section, e.g. "Editor" (JTKit adds " — Demo" in Demo Mode).
+        .navigationTitle(selection?.title ?? "AppSettings2Blueprint")
         .toolbar {
             ToolbarItem(placement: .navigation) {
                 ProfilePicker()
@@ -72,12 +73,23 @@ struct ContentView: View {
         .onChange(of: model.connectionGeneration) {
             if selection == .blueprints && model.hasActiveConnection { model.refresh() }
         }
-        .onAppear { model.applyConnectionChange() }
+        .onAppear {
+            model.applyConnectionChange()
+            showSectionForCommand()
+        }
+        // A menu command shows its section, which then carries it out.
+        .onChange(of: model.editorCommand) { showSectionForCommand() }
+        .onChange(of: model.blueprintCommand) { showSectionForCommand() }
         // Rule set edits from any view share the window's undo history.
         .onAppear { model.ruleSet.undoManager = undoManager }
         .onChange(of: undoManager) { model.ruleSet.undoManager = undoManager }
         .onChange(of: selection) { model.saveSidebarSelection(selection) }
         .background(WindowEditedMarker(isEdited: model.ruleSet.isDirty))
+    }
+
+    private func showSectionForCommand() {
+        if model.editorCommand != nil { selection = .ruleSet }
+        if model.blueprintCommand != nil { selection = .blueprints }
     }
 
     @ViewBuilder
@@ -200,7 +212,7 @@ private struct FetchByIDSheet: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Fetch Blueprint by ID")
                 .font(.headline).accessibilityAddTraits(.isHeader)
-            Text("Loads GET /blueprints/v1/blueprints/{id}.")
+            Text("Loads one Blueprint by its ID, also one the list doesn’t show, so you can see its JSON.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
             TextField("Blueprint ID", text: $blueprintID)

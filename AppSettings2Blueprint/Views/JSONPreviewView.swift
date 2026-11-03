@@ -18,10 +18,7 @@ struct JSONPreviewView: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button("Copy", systemImage: "doc.on.doc") {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(text, forType: .string)
-                }
+                CopyButton(title: "Copy") { text }
             }
             .padding(10)
             if document.hasErrors {

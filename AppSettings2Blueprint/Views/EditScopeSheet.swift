@@ -64,7 +64,9 @@ struct EditScopeSheet: View {
                 .padding(16)
             }
         }
-        .frame(width: 640, height: 560)
+        // Resizable, for long group lists.
+        .frame(minWidth: 640, idealWidth: 640, maxWidth: .infinity, minHeight: 560, idealHeight: 560, maxHeight: .infinity)
+        .resizableSheet(minWidth: 640, minHeight: 560)
         .task { if model.app.deviceGroups.isEmpty { model.app.loadDeviceGroups() } }
     }
 }
