@@ -20,7 +20,7 @@ Apple’s `com.apple.configuration.app.settings` declaration (iOS, iPadOS, macOS
 
 It isn’t a policy advisor: it shows what each identifier matches; you decide what to allow or deny.
 
-![The editor with a deny list and the live JSON preview](docs/screenshot-ruleset.png)
+![The editor with a macOS rule set of allowed and denied binaries and the live JSON preview](docs/screenshot-ruleset.png)
 
 ## Installation
 
