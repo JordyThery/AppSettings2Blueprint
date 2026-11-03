@@ -160,9 +160,9 @@ private struct BlueprintDetailPane: View {
                 EditScopeSheet(app: model, detail: detail)
             }
             // Blueprint menu commands, also when they opened this pane.
-            .onChange(of: model.blueprintCommand, initial: true) { _, command in
-                guard let command else { return }
-                model.blueprintCommand = nil
+            .onChange(of: model.blueprintCommand, initial: true) {
+                // Only a command chosen for this Blueprint.
+                guard let command = model.takeBlueprintCommand(for: blueprintID) else { return }
                 switch command {
                 case .reload: model.loadDetail(id: blueprintID)
                 case .backups: isShowingBackups = true

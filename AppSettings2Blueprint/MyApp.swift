@@ -108,6 +108,11 @@ private struct AppCommands: Commands {
     let model: AppModel
     @Environment(\.openWindow) private var openWindow
 
+    /// The Settings window is the key window.
+    private var isSettingsInFront: Bool {
+        NSApp.keyWindow?.identifier?.rawValue == "com_apple_SwiftUI_Settings_window"
+    }
+
     /// Opens the main window when it's closed; it shows the editor and runs the command.
     private func editor(_ command: AppModel.EditorCommand) {
         openWindow(id: WindowID.main)
@@ -117,7 +122,7 @@ private struct AppCommands: Commands {
     /// Opens the main window when it's closed; it shows Blueprints and runs the command.
     private func blueprint(_ command: AppModel.BlueprintCommand) {
         openWindow(id: WindowID.main)
-        model.blueprintCommand = command
+        model.requestBlueprintCommand(command)
     }
 
     var body: some Commands {
@@ -145,7 +150,11 @@ private struct AppCommands: Commands {
                 .keyboardShortcut("o", modifiers: .command)
         }
         CommandGroup(replacing: .saveItem) {
-            Button("Save Rule Set…") { editor(.save) }
+            Button("Save Rule Set…") {
+                // Settings has its own saving: ⌘S there never opens the rule set's save panel.
+                guard !isSettingsInFront else { return }
+                editor(.save)
+            }
                 .keyboardShortcut("s", modifiers: .command)
                 .disabled(model.ruleSet.hasErrors)
             Button("Import CSV…") { editor(.importCSV) }

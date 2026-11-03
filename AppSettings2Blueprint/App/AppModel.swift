@@ -71,7 +71,35 @@ final class AppModel {
     enum BlueprintCommand: Equatable {
         case reload, backups, editScope, deploy
     }
-    var blueprintCommand: BlueprintCommand?
+
+    /// A command and the Blueprint it was chosen for.
+    struct BlueprintCommandRequest: Equatable {
+        let command: BlueprintCommand
+        let blueprintID: String
+    }
+
+    /// Dropped when another Blueprint is selected, its detail fails to load,
+    /// or the connection changes: it never runs for a different Blueprint.
+    private(set) var blueprintCommand: BlueprintCommandRequest?
+
+    /// For the selected Blueprint; nothing when none is selected.
+    func requestBlueprintCommand(_ command: BlueprintCommand) {
+        guard let id = selectedBlueprintID else { return }
+        blueprintCommand = BlueprintCommandRequest(command: command, blueprintID: id)
+    }
+
+    /// The command waiting for this Blueprint, once its detail is loaded;
+    /// taking it clears it.
+    func takeBlueprintCommand(for id: String) -> BlueprintCommand? {
+        guard let request = blueprintCommand, request.blueprintID == id, details[id] != nil else { return nil }
+        blueprintCommand = nil
+        return request.command
+    }
+
+    /// Drops a command waiting for `id` (its detail couldn't be loaded).
+    private func dropBlueprintCommand(for id: String) {
+        if blueprintCommand?.blueprintID == id { blueprintCommand = nil }
+    }
 
     /// The selected Blueprint's detail, when it's loaded.
     var selectedDetail: JamfPlatform.BlueprintDetail? {
@@ -79,6 +107,7 @@ final class AppModel {
     }
     var selectedBlueprintID: String? {
         didSet {
+            if let request = blueprintCommand, request.blueprintID != selectedBlueprintID { blueprintCommand = nil }
             if let selectedBlueprintID, details[selectedBlueprintID] == nil { loadDetail(id: selectedBlueprintID) }
         }
     }
@@ -212,8 +241,11 @@ final class AppModel {
 
     /// A client of its own for one sheet, whose waits before a retry show
     /// in that sheet (`waits`). Same connection as `currentClient()`.
+    /// - Throws: `ConnectionChanged` while a switch is made but not applied
+    ///   yet: the sheet compared the generation of the old connection, so no
+    ///   client is built for another one.
     func service(waits: RequestWaits) throws -> JamfPlatform.Blueprints {
-        applyConnectionChange()
+        guard connectionKey == appliedConnectionKey else { throw ConnectionChanged() }
         if demo.isOn {
             let source = demo.jamfPlatform()
             return JamfPlatform.Blueprints(client: try PlatformAPIClient.make(
@@ -304,6 +336,7 @@ final class AppModel {
     func connectionDidChange() {
         connectionGeneration += 1
         ruleSet.linkedBlueprint = nil
+        blueprintCommand = nil
         listTask?.cancel()
         client = nil
         overviews = []
@@ -383,7 +416,10 @@ final class AppModel {
                     return
                 }
                 if let detail = answer.detail { store(detail) }
-                if let error = answer.error { detailErrors[answer.id] = error }
+                if let error = answer.error {
+                    detailErrors[answer.id] = error
+                    dropBlueprintCommand(for: answer.id)
+                }
                 enqueue()
             }
         }
@@ -465,6 +501,7 @@ final class AppModel {
             } catch {
                 guard generation == connectionGeneration else { return }
                 detailErrors[id] = error.localizedDescription
+                dropBlueprintCommand(for: id)
             }
         }
     }

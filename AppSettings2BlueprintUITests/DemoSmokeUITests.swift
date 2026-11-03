@@ -111,6 +111,12 @@ final class DemoSmokeUITests: JTKitUITestCase {
         openSettings()
         let settings = settingsWindow
         tap(settings.toolbars.buttons["Connections"])
+        // ⌘S in Settings never opens the rule set's save panel. The panel
+        // isn't in the app's UI tree, but it's modal: adding a connection
+        // right after would fail while it's open (checked without the fix).
+        settings.click()
+        app.typeKey("s", modifierFlags: .command)
+        sleep(2)
         addConnection("JTKTEST Region", in: settings)
 
         let region = settings.popUpButtons.firstMatch

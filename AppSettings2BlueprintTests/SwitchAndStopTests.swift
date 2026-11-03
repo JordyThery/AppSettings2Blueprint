@@ -255,6 +255,82 @@ extension MockNetworkTests {
         }
     }
 
+    @Suite("A switch that isn't applied yet")
+    @MainActor
+    struct PendingSwitchTests {
+        @Test("A sheet opened before a switch builds no client for the new connection, even before the switch is applied")
+        func pendingSwitchStopsSheets() async throws {
+            MockURLProtocol.install { $0.path == "/auth/token" ? token : .json(200, appSettingsBlueprintJSON) }
+            let app = editedModel()
+            let write = JamfWriteModel(app: app)
+            write.selectedBlueprintID = blueprintID
+            let deploy = DeployModel(app: app, detail: fixture)
+            deploy.isConfirmed = true
+            let scope = EditScopeModel(app: app, detail: fixture)
+            let generation = app.connectionGeneration
+            let second = try addSecondConnection(to: app)
+            app.profileStore.selectedProfileID = second.id
+            // The switch is made; the model applies it on its next turn.
+            #expect(app.connectionGeneration == generation)
+            #expect(throws: ConnectionChanged.self) { _ = try app.service(waits: RequestWaits()) }
+
+            await write.performPrepare()
+            await deploy.performDeploy()
+            await scope.performSave()
+            for phase in ["\(write.phase)", "\(deploy.phase)", "\(scope.phase)"] {
+                #expect(phase.contains("failed"), "expected failed, got \(phase)")
+            }
+            #expect(MockURLProtocol.requests.isEmpty, "nothing was sent to either connection")
+        }
+    }
+
+    @Suite("Blueprint menu commands belong to their Blueprint")
+    @MainActor
+    struct BlueprintCommandTests {
+        @Test("Selecting another Blueprint drops the command")
+        func otherSelectionDropsCommand() {
+            let app = TestApp.model(connected: true)
+            app.storeDetail(fixture)
+            app.selectedBlueprintID = blueprintID
+            app.requestBlueprintCommand(.deploy)
+            #expect(app.takeBlueprintCommand(for: "other") == nil, "not for another Blueprint")
+            app.selectedBlueprintID = "aaaaaaaa-0000-4000-8000-000000000001"
+            #expect(app.blueprintCommand == nil)
+            #expect(app.takeBlueprintCommand(for: blueprintID) == nil)
+        }
+
+        @Test("A command waits for its Blueprint's detail, and runs once")
+        func waitsForDetail() {
+            let app = TestApp.model(connected: true)
+            app.selectedBlueprintID = blueprintID
+            app.requestBlueprintCommand(.editScope)
+            #expect(app.takeBlueprintCommand(for: blueprintID) == nil, "not before the detail is loaded")
+            app.storeDetail(fixture)
+            #expect(app.takeBlueprintCommand(for: blueprintID) == .editScope)
+            #expect(app.takeBlueprintCommand(for: blueprintID) == nil)
+        }
+
+        @Test("A detail that fails to load drops the command")
+        func failedDetailDropsCommand() async throws {
+            MockURLProtocol.install { $0.path == "/auth/token" ? token : .json(404, "{}") }
+            let app = TestApp.model(connected: true)
+            app.selectedBlueprintID = blueprintID
+            app.requestBlueprintCommand(.backups)
+            await waitUntil { app.detailErrors[blueprintID] != nil }
+            #expect(app.blueprintCommand == nil)
+            // Loaded later (Try Again), it doesn't open Backups by itself.
+            app.storeDetail(fixture)
+            #expect(app.takeBlueprintCommand(for: blueprintID) == nil)
+        }
+
+        @Test("Without a selected Blueprint nothing is requested")
+        func noSelection() {
+            let app = TestApp.model(connected: true)
+            app.requestBlueprintCommand(.reload)
+            #expect(app.blueprintCommand == nil)
+        }
+    }
+
     @Suite("The model applies connection switches")
     @MainActor
     struct SwitchTests {
