@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.3.0
+## 1.3.0 (2026-11-03)
 
 - **Waiting for Jamf is shown**: when Jamf asks the app to wait before trying again, the write, scope, restore and deploy sheets say how long, with **Stop**. A wait lasts at most 60 seconds.
 - A Keychain that is locked or refuses access is now reported as such, instead of as an incomplete connection.
