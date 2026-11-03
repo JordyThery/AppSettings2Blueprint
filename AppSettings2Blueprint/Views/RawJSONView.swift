@@ -83,10 +83,16 @@ struct BlueprintHeader: View {
                 }
             }
             let groups = detail.scopeDeviceGroups
-            Text(groups.isEmpty ? "No device groups in scope" : "Scope: \(groups.map(model.groupName).joined(separator: ", "))")
-                .font(.caption)
-                .foregroundStyle(groups.isEmpty ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
-                .lineLimit(2)
+            if groups.isEmpty {
+                Label("No device groups in scope", systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .labelStyle(.tintedIcon(.orange))
+            } else {
+                Text("Scope: \(groups.map(model.groupName).joined(separator: ", "))")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
             if let updated = detail.overview.updated {
                 Text("Updated \(detail.overview.updatedDate?.formatted(date: .abbreviated, time: .standard) ?? updated)")
                     .font(.caption)
@@ -102,7 +108,7 @@ struct BlueprintHeader: View {
             }
             Text(detail.id)
                 .font(.caption2.monospaced())
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(.secondary)
                 .textSelection(.enabled)
         }
         .frame(maxWidth: .infinity, alignment: .leading)

@@ -1,8 +1,9 @@
 import XCTest
 
-/// Captures the README screenshots (docs/screenshot-*.png). Regenerate them with
-/// `Scripts/run-ui-tests.sh ScreenshotUITests`; the images land in
-/// /tmp/as2b-uitest-attachments. Keep hands off the Mac while it runs.
+/// Captures the README screenshots with `Scripts/run-ui-tests.sh ScreenshotUITests`
+/// to /tmp/as2b-uitest-attachments ("01-ruleset", "02-localapps"); copy them to
+/// docs/screenshot-ruleset.png and docs/screenshot-localapps.png. Keep hands
+/// off the Mac while it runs.
 final class ScreenshotUITests: AppSettingsUITestCase {
     private func capture(_ name: String) {
         let shot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())

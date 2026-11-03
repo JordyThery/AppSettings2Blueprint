@@ -275,6 +275,7 @@ private struct NotesBanner: View {
     var body: some View {
         HStack(alignment: .top) {
             Image(systemName: "info.circle.fill").foregroundStyle(.blue)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 ForEach(notes, id: \.self) { Text($0) }
             }
@@ -319,7 +320,8 @@ private struct IssuesBar: View {
             .font(.callout)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .accessibilityElement(children: .combine)
+            // The counts are read as one element; Show All stays its own button.
+            .accessibilityElement(children: .contain)
             .accessibilityIdentifier("issuesSummary")
             if isExpanded && !issues.isEmpty {
                 ScrollView {
@@ -345,6 +347,7 @@ struct IssueLabel: View {
         } icon: {
             Image(systemName: issue.severity == .error ? "xmark.octagon.fill" : "exclamationmark.triangle.fill")
                 .foregroundStyle(issue.severity == .error ? .red : .orange)
+                .accessibilityLabel(issue.severity == .error ? "Error" : "Warning")
         }
         .font(.callout)
         .textSelection(.enabled)

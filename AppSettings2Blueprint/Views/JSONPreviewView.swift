@@ -12,7 +12,7 @@ struct JSONPreviewView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Component JSON").font(.headline)
+                    Text("Component JSON").font(.headline).accessibilityAddTraits(.isHeader)
                     Text("\(channels.count) declaration\(channels.count == 1 ? "" : "s"): \(channels.joined(separator: " + "))")
                         .font(.caption)
                         .foregroundStyle(.secondary)

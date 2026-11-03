@@ -62,7 +62,7 @@ nonisolated struct PreservedDeclarationParts: Codable, Hashable, Sendable {
 
 /// One App Settings rule set: the content of one com.apple.configuration.app.settings
 /// declaration (on macOS, a SYSTEM declaration for binaries and a USER declaration
-/// for privacy defaults).
+/// for permission defaults).
 nonisolated struct RuleSet: Codable, Hashable, Sendable {
     var name = "Untitled Rule Set"
     var platform: RulePlatform = .iOS
@@ -148,7 +148,7 @@ nonisolated struct PreservedJSON: Codable, Hashable, Sendable {
     init(from decoder: any Decoder) throws {
         let text = try decoder.singleValueContainer().decode(String.self)
         guard let object = try LosslessJSON(string: text).objectValue else {
-            throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath, debugDescription: "Preserved JSON is not an object"))
+            throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath, debugDescription: "The preserved JSON isn’t an object."))
         }
         self.object = object
     }

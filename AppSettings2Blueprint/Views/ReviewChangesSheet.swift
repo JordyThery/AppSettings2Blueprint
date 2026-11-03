@@ -16,7 +16,7 @@ struct ReviewChangesSheet: View {
         let changed = prepared.changedLineCount
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Review Changes").font(.title3.weight(.semibold))
+                Text("Review Changes").font(.title3.weight(.semibold)).accessibilityAddTraits(.isHeader)
                 Text("“\(prepared.name)” · \(placementText(edit.target)) · \(changed) changed line\(changed == 1 ? "" : "s")")
                     .foregroundStyle(.secondary)
                 Text("\(edit.unchangedComponentCount) other component\(edit.unchangedComponentCount == 1 ? "" : "s") unchanged, byte for byte\(edit.otherAppSettings.isEmpty ? "" : "; \(edit.otherAppSettings.count) App Settings declaration\(edit.otherAppSettings.count == 1 ? "" : "s") elsewhere left as they are").")
@@ -49,6 +49,7 @@ struct ReviewChangesSheet: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 6) {
                     Image(systemName: "externaldrive.badge.checkmark").foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
                     Text("Backup written: \(prepared.backupURL.lastPathComponent)")
                     Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([prepared.backupURL]) }
                         .buttonStyle(.link)
@@ -81,9 +82,13 @@ struct ReviewChangesSheet: View {
     }
 }
 
-/// Lines of a diff, with removed lines in red and added lines in green.
+/// Lines of a diff, with removed lines in red and added lines in green. Lines
+/// never wrap: long ones scroll sideways, and every row is at least as wide as
+/// the visible area, so the colored rows reach the edge.
 struct DiffView: View {
     let lines: [DiffLine]
+    /// The visible width, measured; the rows' minimum width.
+    @State private var viewportWidth: CGFloat = 0
 
     var body: some View {
         ScrollView([.vertical, .horizontal]) {
@@ -93,17 +98,31 @@ struct DiffView: View {
                         Text(marker(line.kind))
                             .foregroundStyle(color(line.kind))
                             .frame(width: 12)
+                            .accessibilityLabel(markerName(line.kind))
                         Text(line.text.isEmpty ? " " : line.text)
                             .foregroundStyle(line.kind == .unchanged ? .secondary : .primary)
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
                     }
-                    .font(.system(size: NSFont.smallSystemFontSize + 1, design: .monospaced))
+                    .font(.callout.monospaced())
                     .padding(.horizontal, 8)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(minWidth: viewportWidth, alignment: .leading)
                     .background(color(line.kind).opacity(line.kind == .unchanged ? 0 : 0.12))
+                    .accessibilityElement(children: .combine)
                 }
             }
             .textSelection(.enabled)
             .padding(.vertical, 6)
+        }
+        .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { viewportWidth = $0 }
+        .accessibilityIdentifier("reviewDiff")
+    }
+
+    private func markerName(_ kind: DiffLine.Kind) -> String {
+        switch kind {
+        case .unchanged: "Unchanged"
+        case .removed: "Removed"
+        case .added: "Added"
         }
     }
 

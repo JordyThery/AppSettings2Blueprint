@@ -98,7 +98,7 @@ final class ConnectionStorageTests {
         try saveTheOldWay(oldProfiles)
         let store = ProfileStore(defaults: defaults, secrets: secrets)
 
-        #expect(store.credentials(for: oldProfiles[0])?.clientSecret == "old-secret")
+        #expect(try store.credentials(for: oldProfiles[0]).clientSecret == "old-secret")
 
         try store.connections.save(oldProfiles[1], secrets: [.main: "new-secret"])
         #expect(secrets.all[second.uuidString] == "new-secret")

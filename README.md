@@ -26,7 +26,7 @@ It isn’t a policy advisor: it shows what each identifier matches; you decide w
 
 Download the latest notarized build from [Releases](https://github.com/JordyThery/AppSettings2Blueprint/releases/latest), unzip it, and move **AppSettings2Blueprint.app** to `/Applications`. Requires **macOS 15 or later**. The app checks for new releases once a day; **Check for Updates…** in the app menu checks right away.
 
-To look around first, choose **Demo Mode** in the connection picker or the Connection menu (or **Try Demo Mode** when no connection is set up). It shows a sample organization’s Blueprints and device groups; writes and deployments work on the sample data only, nothing is sent to Jamf, and window titles end in “— Demo”. App Store lookups still contact Apple, and backups made in Demo Mode go to a temporary folder. **Test Connection** always uses the real connection, even in Demo Mode.
+To look around first, choose **Demo Mode** in the connection picker or the Connection menu (or **Try Demo Mode** when no connection is set up). It shows a sample organization’s Blueprints and device groups; writes and deployments work on the sample data only, nothing is sent to Jamf, and window titles end in “— Demo”. App Store lookups still contact Apple, and backups made in Demo Mode go to a temporary folder. **Test Connection** always uses the real connection, even in Demo Mode. Choosing a saved connection, in the picker, the Connection menu or with **Use This Connection** in Settings, leaves Demo Mode.
 
 ## Permissions
 
@@ -63,10 +63,11 @@ Jamf School environments work through the same Platform API: create the API inte
 The Jamf Platform API applies Blueprint updates as a JSON merge-patch, which replaces arrays wholesale, so a careless write could delete parts of a Blueprint. The app guards against this:
 
 - Every rule set write sends the complete `steps` array, with everything outside the App Settings component exactly as received — key order and number formatting preserved.
-- The Blueprint is fetched again before the review and just before the PATCH; if it changed in Jamf, nothing is written.
+- The Blueprint is fetched again before the review and just before the PATCH; if it changed in Jamf, nothing is written. A Blueprint without a last-modified time counts as changed when its steps or scope differ.
 - If a write was sent but Jamf’s answer is unclear, or reading the Blueprint back fails, the app says so and doesn’t offer to send it again (a second create would make a second Blueprint).
 - The full Blueprint is backed up first, to `~/Library/Application Support/AppSettings2Blueprint/Backups/<Blueprint ID>/`. Backups are never overwritten and **Backups…** restores them. A backup holds the whole Blueprint as Jamf returned it, including the settings of its other components (such as Wi-Fi passwords), as plain JSON readable only by your user account. They’re kept forever unless you choose a shorter time in **Settings › General › Backups**; the newest backup of each Blueprint is always kept.
 - Every write is verified against a read-back of the Blueprint.
+- When Jamf asks the app to wait before trying again (at most 60 seconds), the sheet shows the wait with **Stop**. Stopping sends nothing more; a request that may already have reached Jamf is reported as such.
 - `divisionId` is never sent; division-assigned Blueprints are read-only.
 - **Edit Scope…** sends only the scope, after the same checks and backup, and verifies that the steps are unchanged. Removing groups from a deployed Blueprint needs an extra confirmation.
 - Writing never deploys. Deploying needs a confirmation listing the device groups and device count, and a second one for a macOS allow list without `AlwaysAllowManagedApps` or the Apple-signed baseline. Just before deploying, the Blueprint is fetched again; if its scope or steps changed since the confirmation, nothing is deployed and the confirmation is shown again.

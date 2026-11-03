@@ -1,7 +1,6 @@
 import XCTest
 
-/// Drives the rule builder end to end: the walkthrough from the milestone 4
-/// review, without a Jamf connection. Every test starts from a fresh launch.
+/// Drives the editor end to end, without a Jamf connection. Every test starts from a fresh launch.
 final class RuleBuilderUITests: AppSettingsUITestCase {
     /// Typing, duplicates, both lists, undo and redo.
     func testIOSAppList() {

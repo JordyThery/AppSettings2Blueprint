@@ -18,10 +18,16 @@ final class AppModel {
     /// JTKit's demo mode: Contoso's sample tenant, answered inside the app.
     /// Saved under `demoMode`.
     let demo: DemoMode
+    /// Demo mode's connection for Settings › Connections: with it, Use This
+    /// Connection there leaves demo mode, as the toolbar picker does.
+    @ObservationIgnored let demoChoice: DemoConnectionChoice
     /// JTKit's activity log (Window › Activity Log, ⇧⌘L), filled by the Jamf
     /// client and the App Store lookups.
     let activityLog: ActivityLog
     let updates: UpdateChecker
+    /// Waits before a retry (a 429 or server error), shown with Stop in the
+    /// write, scope and deploy sheets. JTKit waits at most 60 s each time.
+    let waits = RequestWaits()
     /// Where the app's own settings are saved (sidebar selection, storefront,
     /// scan folders): the real preferences, or a sandbox run's own suite.
     @ObservationIgnored let defaults: UserDefaults
@@ -87,6 +93,7 @@ final class AppModel {
     ) {
         self.profileStore = profileStore
         self.demo = demo ?? DemoMode(key: Self.demoModeKey, arguments: [DemoMode.launchArgument, "NO"])
+        demoChoice = DemoConnectionChoice(mode: self.demo, connections: [.demoJamfPlatform])
         self.session = session
         self.defaults = defaults
         realBackupRoot = backupRoot
@@ -143,14 +150,12 @@ final class AppModel {
             if let demoClient { return demoClient }
             let source = demo.jamfPlatform()
             let made = try PlatformAPIClient.make(connection: source.connection, secret: source.secret,
-                                                  session: source.session, log: activityLog)
+                                                  session: source.session, log: activityLog, waits: waits)
             demoClient = made
             return made
         }
-        guard let profile = profileStore.selectedProfile,
-              let credentials = profileStore.credentials(for: profile) else {
-            throw APIError.missingCredentials
-        }
+        guard let profile = profileStore.selectedProfile else { throw APIError.missingCredentials }
+        let credentials = try profileStore.credentials(for: profile)
         if let client, client.credentials == credentials {
             return client.client
         }
@@ -159,7 +164,7 @@ final class AppModel {
         return newClient
     }
 
-    /// The Blueprints API for the selected profile.
+    /// The Platform API’s Blueprints for the selected profile.
     func currentService() throws -> JamfPlatform.Blueprints {
         JamfPlatform.Blueprints(client: try currentClient())
     }
@@ -167,7 +172,7 @@ final class AppModel {
     /// A client for a real connection, on the real network, also while demo
     /// mode is on (Settings › Connections' Test Connection).
     func makeClient(credentials: PlatformCredentials) throws -> JamfPlatform.Client {
-        try PlatformAPIClient.make(credentials: credentials, session: session, log: activityLog)
+        try PlatformAPIClient.make(credentials: credentials, session: session, log: activityLog, waits: waits)
     }
 
     // MARK: Backups
@@ -207,9 +212,12 @@ final class AppModel {
         return writer
     }
 
-    /// Called when the user switches profile: clears everything loaded from the old tenant.
+    /// Called when the user switches profile or demo mode: clears everything
+    /// loaded from the old tenant, including the rule set's link to one of
+    /// its Blueprints (that ID means nothing on the new one).
     func connectionDidChange() {
         connectionGeneration += 1
+        ruleSet.linkedBlueprint = nil
         listTask?.cancel()
         client = nil
         overviews = []

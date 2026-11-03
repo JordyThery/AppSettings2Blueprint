@@ -28,8 +28,9 @@ struct RestoreBackupSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            RetryWaitBanner(waits: model.waits)
             VStack(alignment: .leading, spacing: 4) {
-                Text("Restore from Backup").font(.title3.weight(.semibold))
+                Text("Restore from Backup").font(.title3.weight(.semibold)).accessibilityAddTraits(.isHeader)
                 Text("A backup of “\(detail.overview.name)” is written before every change. Restoring sends the backup’s steps with PATCH; the current state in Jamf is backed up first.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
@@ -84,6 +85,9 @@ struct RestoreBackupSheet: View {
             .padding()
         }
         .frame(width: 560, height: 420)
+        .onChange(of: message?.text) { _, text in
+            if let text { AccessibilityNotification.Announcement(text).post() }
+        }
         .onAppear {
             backups = BackupStore.backups(for: detail.id, root: model.backupRoot)
             if connectionGeneration == nil { connectionGeneration = model.connectionGeneration }
@@ -118,6 +122,8 @@ struct RestoreBackupSheet: View {
             } catch let error as BlueprintWriter.WriteError where error.mayHaveWritten {
                 model.reloadAfterUncertainWrite(id: detail.id)
                 message = (error.localizedDescription, true)
+            } catch is CancellationError {
+                message = ("You stopped waiting for Jamf, so nothing was restored.", true)
             } catch {
                 if case BlueprintWriter.WriteError.readOnly = error { model.readOnlyBlueprintIDs.insert(detail.id) }
                 message = (error.localizedDescription, true)

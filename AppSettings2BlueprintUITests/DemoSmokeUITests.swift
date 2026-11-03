@@ -58,7 +58,7 @@ final class DemoSmokeUITests: JTKitUITestCase {
         // arrives, instead of staying on "Loading…".
         openSidebar("Editor")
         let json = app.textViews["componentJSON"].firstMatch
-        XCTAssertTrue(json.waitForExistence(timeout: 10), "The rule builder did not open")
+        XCTAssertTrue(json.waitForExistence(timeout: 10), "The editor did not open")
         type("com.apple.news\n", into: app.textFields["newBundleID"])
         let shown = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "value CONTAINS 'DeniedApps' AND value CONTAINS 'com.apple.news'"), object: json)
@@ -97,6 +97,50 @@ final class DemoSmokeUITests: JTKitUITestCase {
         XCTAssertTrue(window(titled: "Activity Log").waitForExistence(timeout: 10))
         openSettings()
         checkDemoTitles()
+    }
+
+    /// A saved connection whose region changes keeps its stored secret (Test
+    /// Connection stays available), and Use This Connection in Settings leaves
+    /// demo mode, as the toolbar picker does. Made-up values, in memory only.
+    func test8RegionChangeAndUseThisConnection() {
+        openSettings()
+        let settings = settingsWindow
+        tap(settings.toolbars.buttons["Connections"])
+        addConnection("JTKTEST Region", in: settings)
+
+        let region = settings.popUpButtons.firstMatch
+        tap(region)
+        tap(region.menuItems["Europe"], timeout: 5)
+        XCTAssertTrue(settings.buttons["Save"].waitForEnabled(timeout: 5), "The region didn't change")
+        XCTAssertFalse((settings.secureTextFields.firstMatch.placeholderValue ?? "").contains("Required after this change"),
+                       "Changing the region asks for the secret again")
+        XCTAssertTrue(settings.buttons["Test Connection"].isEnabled, "Test Connection is unavailable after a region change")
+        tap(settings.buttons["Save"])
+
+        // The first connection is in use; a second one isn't until it's chosen.
+        addConnection("JTKTEST Second", in: settings)
+        tap(settings.buttons["Use This Connection"], timeout: 5)
+        let main = window(titled: appName)
+        let leftDemo = XCTNSPredicateExpectation(predicate: NSPredicate(format: "NOT (title CONTAINS %@)", Self.demoTitleSuffix), object: main)
+        XCTAssertEqual(XCTWaiter.wait(for: [leftDemo], timeout: 10), .completed, "Use This Connection didn't leave demo mode")
+        close(settings)
+    }
+
+    /// Adds a connection with made-up values and saves it; its editor stays open.
+    private func addConnection(_ name: String, in settings: XCUIElement) {
+        tap(settings.buttons["Add Connection"].exists ? settings.buttons["Add Connection"] : settings.menuButtons["Add Connection"])
+        let labelled = settings.textFields["Name"].firstMatch
+        let nameField = labelled.waitForExistence(timeout: 2)
+            ? labelled
+            : settings.textFields.matching(NSPredicate(format: "value BEGINSWITH 'New '")).firstMatch
+        XCTAssertTrue(nameField.waitForExistence(timeout: 5), "The new connection's editor didn't open")
+        nameField.click()
+        nameField.typeKey("a", modifierFlags: .command)
+        nameField.typeText(name)
+        type(UUID().uuidString, into: settings.textFields.matching(NSPredicate(format: "placeholderValue == 'From Jamf Account'")).firstMatch)
+        if let clientID = settings.textFields.allElementsBoundByIndex.last { type("jtktest-client", into: clientID) }
+        type("jtktest-secret", into: settings.secureTextFields.firstMatch)
+        tap(settings.buttons["Save"])
     }
 
     // MARK: Helpers

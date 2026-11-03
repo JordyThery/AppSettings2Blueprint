@@ -31,7 +31,7 @@ import SwiftUI
         )
         .environment(model.demo)
 
-        // JTKit's Settings window: General (Appearance, Backups), Connections, Updates.
+        // JTKit's Settings window: General (Backups), Connections, Updates.
         SettingsWindow(updates: model.updates, opensTabsByName: true) {
             BackupSettingsSection()
                 .environment(model)

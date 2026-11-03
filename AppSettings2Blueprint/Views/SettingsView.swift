@@ -3,7 +3,7 @@ import JTKit
 import SwiftUI
 
 /// The Connections tab of JTKit's Settings window (`SettingsWindow`), between
-/// its General tab (Appearance) and its Updates tab: JTKit's shared list and
+/// its General tab and its Updates tab: JTKit's shared list and
 /// editor for the saved Jamf Platform API connections.
 struct ConnectionsTab: View {
     @Environment(AppModel.self) private var model
@@ -14,7 +14,7 @@ struct ConnectionsTab: View {
             store: store.connections,
             services: [.jamfPlatform],
             allowsChangingService: false,
-            roles: [.active(selection: $store.selectedProfileID)],
+            roles: [.active(selection: $store.selectedProfileID, demo: model.demoChoice)],
             footer: "Requires an API client with blueprints:read, blueprints:create, blueprints:update, blueprints:deploy and device-groups:read. Load Environments lists the environments an organization-scope integration can see; otherwise copy the Environment ID from the integration’s details in Jamf Account. The client secret is stored in your login Keychain.",
             newRecord: { _ in store.newProfile() },
             didDelete: { _ in store.profileWasDeleted() },
@@ -24,7 +24,7 @@ struct ConnectionsTab: View {
     }
 }
 
-/// The app's section of JTKit's General tab, below Appearance: what backups
+/// The app's section of JTKit's General tab: what backups
 /// hold, how long they're kept, and where they are.
 struct BackupSettingsSection: View {
     @Environment(AppModel.self) private var model
@@ -59,7 +59,7 @@ extension AppModel {
     /// not. A secret typed in the editor is used instead of the stored one.
     /// Always the real connection on the real network, also in demo mode.
     func testConnection(_ profile: ConnectionProfile, typedSecret: String?) async throws -> String {
-        let secret = typedSecret ?? profileStore.secret(for: profile) ?? ""
+        let secret = try typedSecret ?? storedSecret(for: profile)
         let client = try makeClient(credentials: PlatformCredentials(profile: profile, secret: secret))
         try await client.signIn()
         let results = await client.checkPermissions(Self.readChecks)
@@ -69,10 +69,20 @@ extension AppModel {
         return "Connected · \(count) · device groups OK"
     }
 
+    /// The saved secret for Test Connection and Load Environments; empty when
+    /// none is saved. A Keychain that can't be read is reported as such.
+    private func storedSecret(for profile: ConnectionProfile) throws -> String {
+        do {
+            return try profileStore.readSecret(for: profile) ?? ""
+        } catch let error as SecretStoreError {
+            throw APIError.keychainUnreadable(connection: profile.menuTitle, status: error.status)
+        }
+    }
+
     /// Load Environments in Settings: the environments the editor's
     /// integration can see. No Environment ID is needed for this.
     func environments(for profile: ConnectionProfile, typedSecret: String?) async throws -> [JamfPlatform.Environment] {
-        let secret = (typedSecret ?? profileStore.secret(for: profile) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let secret = try (typedSecret ?? storedSecret(for: profile)).trimmingCharacters(in: .whitespacesAndNewlines)
         let credentials = PlatformCredentials(profile: profile, secret: secret)
         let recorder = RequestRecorder(session: session, log: activityLog, service: ConnectionService.jamfPlatform.displayName,
                                        connection: credentials.connectionName.isEmpty ? nil : credentials.connectionName)

@@ -82,6 +82,7 @@ struct BuiltInAppsView: View {
                 TableColumn("Built-in") { app in
                     if app.builtIn {
                         Image(systemName: "checkmark").foregroundStyle(.secondary)
+                            .accessibilityLabel("Built-in")
                     }
                 }
                 .width(60)

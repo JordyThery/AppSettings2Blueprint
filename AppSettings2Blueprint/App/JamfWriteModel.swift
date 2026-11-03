@@ -74,6 +74,15 @@ final class JamfWriteModel {
         mode = .new
     }
 
+    /// Fetches the chosen Blueprint when nothing has fetched it yet, e.g. one
+    /// the rule set is linked to that isn't in the list, so the sheet shows it
+    /// or its error instead of waiting.
+    func loadSelectedDetailIfNeeded() {
+        guard mode == .existing, let id = selectedBlueprintID, app.details[id] == nil,
+              app.detailErrors[id] == nil, !app.loadingDetailIDs.contains(id) else { return }
+        app.loadDetail(id: id)
+    }
+
     /// A new Blueprint needs device groups, which a Jamf School environment
     /// doesn’t list; there, only existing Blueprints can be written.
     var canCreateBlueprints: Bool { !app.isJamfSchool }
@@ -129,7 +138,7 @@ final class JamfWriteModel {
         case .existing:
             guard let id = selectedBlueprintID else { return "Choose a Blueprint." }
             guard let detail = selectedDetail else {
-                return app.detailErrors[id] == nil ? "Loading the Blueprint…" : "The Blueprint couldn’t be loaded."
+                return app.detailErrors[id] == nil ? "Loading the Blueprint…" : "The Blueprint couldn’t be loaded. Try again."
             }
             if app.isReadOnly(detail) { return Self.divisionText }
             if detail.scopeDeviceGroups.isEmpty { return Self.noScopeText(isJamfSchool: app.isJamfSchool) }
@@ -151,6 +160,9 @@ final class JamfWriteModel {
     /// prepares; Create Blueprint writes at once, with no review, so Return in
     /// the Name field must not press it.
     var primaryButtonIsDefault: Bool { mode == .existing }
+
+    /// After Stop during a wait before a retry, when nothing was sent yet.
+    static let stoppedText = "You stopped waiting for Jamf, so nothing was written."
 
     /// JTKit's sentence for a division-assigned Blueprint.
     static let divisionText = "This Blueprint is assigned to a division and can’t be changed through the API."
@@ -283,7 +295,7 @@ final class JamfWriteModel {
             phase = .uncertain(writeError.localizedDescription)
             return
         }
-        if error is CancellationError { phase = .choosing; return }
+        if error is CancellationError { phase = .failed(Self.stoppedText); return }
         phase = .failed(error.localizedDescription)
     }
 }

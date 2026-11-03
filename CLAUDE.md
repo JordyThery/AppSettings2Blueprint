@@ -28,7 +28,7 @@ It is not a policy advisor: it shows what each identifier matches; the admin dec
 - `Connection/`: `ConnectionProfile`, `ProfileStore` (on JTKit's `ConnectionStore`).
 - `Core/TextDiff` (review diff), `Views/` (SwiftUI).
 
-From JTKit: `JamfPlatform` (client, Blueprints list/get/create/PATCH steps/PATCH scope/deploy/report, device groups, deploy watch, error format, `PermissionProblem`, environments), `LosslessJSON`, `JamfRegion`, `RequestRecorder` + `ActivityLog` + `ActivityLogWindow`, `ConnectionStore` + `KeychainSecretStore` + `ConnectionsSettingsTab` + `ConnectionPicker` + `ConnectionCommands`, `AboutWindow` + `Acknowledgement`, `SettingsWindow`, `UpdateChecker` + `AppInfoCommands`. Tests use `JTKitTestSupport`.
+From JTKit: `JamfPlatform` (client, Blueprints list/get/create/PATCH steps/PATCH scope/deploy/report, device groups, deploy watch, error format, `PermissionProblem`, environments), `LosslessJSON`, `JamfRegion`, `RequestRecorder` + `RequestWaits` (retry waits with Stop, `RetryWaitBanner` in the sheets) + `ActivityLog` + `ActivityLogWindow`, `ConnectionStore` + `KeychainSecretStore` + `ConnectionsSettingsTab` + `ConnectionPicker` + `ConnectionCommands`, `AboutWindow` + `Acknowledgement`, `SettingsWindow`, `UpdateChecker` + `AppInfoCommands`. Tests use `JTKitTestSupport`.
 
 App-specific (stays here): declaration encoding/decoding, rules and validation, `AppSettingsLocator`, `BlueprintWriter`, `BackupStore`, CSV, App Store and code-signature lookups, the allow-list, Jamf School detection.
 
@@ -70,6 +70,9 @@ Extend JTKit instead of adding another copy. If something here would be useful t
 - Jamf School: no scope editing and no new-Blueprint creation (no device group list). Deploy stays available and shows group IDs instead of names and counts. Scope editing is a Jamf Pro feature.
 - App Store lookups are logged in the activity log as "App Store" and are not retried. Lookups never include Jamf data or credentials.
 - Keep README's Permissions and Network tables complete when adding an endpoint or host.
+- Secrets are read with `readSecret`; a Keychain that refuses or is locked is `APIError.keychainUnreadable`, never "no complete connection".
+- The activity log records no Blueprint request or response bodies (JTKit's default; only error answers): other components can hold Wi-Fi passwords. Don't set `recordsBodies`.
+- Under the live-check switch (`LiveLaunch`) backups go to `LiveLaunch.appFilesFolder("Backups")`, the connection store holds only the release check's connections and the selection isn't saved.
 
 ## Watchlist
 
@@ -92,7 +95,7 @@ What this app waits for from Apple, Jamf or Microsoft, or must recheck: see WATC
 
 ## Releasing
 
-1. Set the version (`MARKETING_VERSION`, now 1.2.0) and build number (`CURRENT_PROJECT_VERSION`) of the app target.
+1. Set the version (`MARKETING_VERSION`, now 1.3.0) and build number (`CURRENT_PROJECT_VERSION`) of the app target.
 2. CHANGELOG.md: move "Unreleased" under the new version; short, user-facing bullets. Update README.md if features, permissions or hosts changed. Release notes (CHANGELOG entries and GitHub release notes) are for the end user: professional and concise, saying what changed for them, and never mentioning the release check, reviews, tests, test targets, AI tools, JTKit step numbers or how a problem was found (decided by Jordy on 2026-11-01).
 3. Build from `AppSettings2Blueprint.xcodeproj` against the published JTKit. Hardened Runtime stays on; the app is not sandboxed.
 4. Jordy does the Developer ID signing and notarization himself. Zip the notarized app he supplies with `ditto -c -k --keepParent` and attach it to `gh release create`, tagged `vX.Y.Z`. The updater reads GitHub's latest release, so the tag must be a version (suffixes like `v1.2.1-hotfix` are understood).

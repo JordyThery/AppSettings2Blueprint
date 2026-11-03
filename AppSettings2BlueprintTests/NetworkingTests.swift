@@ -124,7 +124,7 @@ struct PlatformAPIClientTests {
         #expect(apiRequests().count == 2)
     }
 
-    @Test func honours429RetryAfter() async throws {
+    @Test func honors429RetryAfter() async throws {
         let gets = Counter()
         let sleeps = SleepRecorder()
         MockURLProtocol.install { request in

@@ -62,8 +62,11 @@ nonisolated enum BackupStore {
         return removed
     }
 
+    /// The usual folder; under the live-check switch (JTKit's `LiveLaunch`)
+    /// the run's own folder, so a release check never writes to `Backups/`.
     static var rootURL: URL {
-        URL.applicationSupportDirectory
+        if let folder = LiveLaunch.appFilesFolder("Backups") { return folder }
+        return URL.applicationSupportDirectory
             .appending(path: "AppSettings2Blueprint", directoryHint: .isDirectory)
             .appending(path: "Backups", directoryHint: .isDirectory)
     }

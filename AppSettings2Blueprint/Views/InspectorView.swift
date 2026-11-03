@@ -56,7 +56,7 @@ private struct InspectionDetail: View {
 
                 HStack {
                     Text("Signing")
-                        .font(.headline)
+                        .font(.headline).accessibilityAddTraits(.isHeader)
                     Spacer()
                     Toggle("Show all architectures", isOn: $model.showsAllArchitectures)
                         .toggleStyle(.checkbox)
@@ -209,18 +209,14 @@ struct ValueRow: View {
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 if copyable {
-                    Button {
+                    IconButton(title: "Copy \(label)", systemImage: "doc.on.doc") {
                         NSPasteboard.general.clearContents()
                         NSPasteboard.general.setString(value, forType: .string)
-                    } label: {
-                        Image(systemName: "doc.on.doc")
                     }
-                    .buttonStyle(.borderless)
-                    .help("Copy \(label)")
                 }
             } else {
                 Text("Unavailable")
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }

@@ -15,6 +15,7 @@ struct TargetPickerView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            RetryWaitBanner(waits: model.app.waits)
             if let deployModel {
                 DeployFlowView(model: deployModel, close: {
                     deployModel.stopWatching()
@@ -54,7 +55,11 @@ struct TargetPickerView: View {
         .task(id: model.app.overviews.map(\.id)) {
             await model.app.loadMissingDetails()
         }
-        .onChange(of: model.app.listState) { model.listDidChange() }
+        .onChange(of: model.app.listState) {
+            model.listDidChange()
+            model.loadSelectedDetailIfNeeded()
+        }
+        .task(id: model.selectedBlueprintID) { model.loadSelectedDetailIfNeeded() }
     }
 }
 
@@ -69,7 +74,7 @@ private struct ChooseTargetView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Write to Jamf").font(.title3.weight(.semibold))
+                    Text("Write to Jamf").font(.title3.weight(.semibold)).accessibilityAddTraits(.isHeader)
                     Text("“\(app.ruleSet.ruleSet.name)” · \(app.ruleSet.ruleSet.platform.displayName) · \(DeclarationEncoder.channels(for: app.ruleSet.ruleSet).joined(separator: " + ")) declaration\(model.declarations.count == 1 ? "" : "s")")
                         .foregroundStyle(.secondary)
                 }
@@ -147,7 +152,7 @@ private struct ExistingTargetView: View {
                             Button("Try Again") { app.loadDetail(id: overview.id) }
                                 .buttonStyle(.link)
                         } else {
-                            Text("Loading…").foregroundStyle(.tertiary)
+                            Text("Loading…").foregroundStyle(.secondary)
                         }
                     }
                     .font(.caption)
@@ -164,6 +169,18 @@ private struct ExistingTargetView: View {
 
             if let detail = model.selectedDetail {
                 PlacementView(model: model, detail: detail)
+            } else if let id = model.selectedBlueprintID, let error = app.detailErrors[id] {
+                ContentUnavailableView {
+                    Label("Couldn’t Load the Blueprint", systemImage: "exclamationmark.triangle")
+                } description: {
+                    Text(error)
+                } actions: {
+                    Button("Try Again") { app.loadDetail(id: id) }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if model.selectedBlueprintID != nil {
+                ProgressView("Loading the Blueprint…")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ContentUnavailableView("Choose a Blueprint", systemImage: "square.stack.3d.up")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -182,7 +199,7 @@ private struct PlacementView: View {
         let others = detail.appSettingsLocations.filter { !$0.isStrictComponent }
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
-                Text(detail.overview.name).font(.headline)
+                Text(detail.overview.name).font(.headline).accessibilityAddTraits(.isHeader)
                 Text(scopeText).font(.caption).foregroundStyle(.secondary)
                 if model.app.isReadOnly(detail) {
                     Banner(style: .error, text: JamfWriteModel.divisionText)
@@ -318,6 +335,7 @@ private struct ProgressPane: View {
             Text(text).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .announcesOnAppear(text)
     }
 }
 
@@ -331,17 +349,21 @@ private struct WriteResultView: View {
             if result.isVerified {
                 Label(result.created ? "Blueprint Created and Verified" : "Written and Verified", systemImage: "checkmark.seal.fill")
                     .font(.title3.weight(.semibold))
+                    .accessibilityAddTraits(.isHeader)
+                    .announcesOnAppear(result.created ? "Blueprint Created and Verified" : "Written and Verified")
                     .labelStyle(.tintedIcon(.green))
                 Text("Jamf returned exactly the component that was sent, and every other component is unchanged.")
                     .foregroundStyle(.secondary)
             } else {
                 Label("Written, but the Read-Back Differs", systemImage: "exclamationmark.triangle.fill")
                     .font(.title3.weight(.semibold))
+                    .accessibilityAddTraits(.isHeader)
+                    .announcesOnAppear("Written, but the Read-Back Differs")
                     .labelStyle(.tintedIcon(.orange))
                 ForEach(result.problems, id: \.self) { Text($0) }
             }
             HStack(spacing: 8) {
-                Text("“\(result.detail.overview.name)”").font(.headline)
+                Text("“\(result.detail.overview.name)”").font(.headline).accessibilityAddTraits(.isHeader)
                 if let state = result.detail.overview.deploymentState?.state { DeploymentStateBadge(state: state) }
             }
             Text("Nothing reaches devices until the Blueprint is deployed. Deploying is a separate, confirmed step.")
@@ -351,7 +373,7 @@ private struct WriteResultView: View {
             MonospacedTextView(text: result.readBackComponent?.serializedString(pretty: true) ?? "Not found")
                 .frame(maxHeight: .infinity)
             HStack {
-                Text(result.detail.id).font(.caption.monospaced()).foregroundStyle(.tertiary).textSelection(.enabled)
+                Text(result.detail.id).font(.caption.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
                 Spacer()
                 Button("Deploy…", action: deploy)
                     .disabled(result.detail.scopeDeviceGroups.isEmpty)
@@ -373,6 +395,8 @@ private struct FailureView: View {
         VStack(alignment: .leading, spacing: 12) {
             Label("Nothing Was Written", systemImage: "xmark.octagon.fill")
                 .font(.title3.weight(.semibold))
+                .accessibilityAddTraits(.isHeader)
+                .announcesOnAppear("Nothing Was Written")
                 .labelStyle(.tintedIcon(.red))
             Text(message)
                 .textSelection(.enabled)
@@ -381,6 +405,7 @@ private struct FailureView: View {
             HStack {
                 Spacer()
                 Button("Close", role: .cancel, action: cancel)
+                    .keyboardShortcut(.cancelAction)
                 Button("Back", action: back).keyboardShortcut(.defaultAction)
             }
         }
@@ -398,13 +423,12 @@ private struct UncertainWriteView: View {
         VStack(alignment: .leading, spacing: 12) {
             Label("Written, Not Verified", systemImage: "exclamationmark.triangle.fill")
                 .font(.title3.weight(.semibold))
+                .accessibilityAddTraits(.isHeader)
+                .announcesOnAppear("Written, Not Verified")
                 .labelStyle(.tintedIcon(.orange))
             Text(message)
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
-            Text("The requests and Jamf’s answers are in the activity log (Window › Activity Log).")
-                .font(.callout)
-                .foregroundStyle(.secondary)
             Spacer()
             HStack {
                 Spacer()

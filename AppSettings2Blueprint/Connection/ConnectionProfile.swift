@@ -14,6 +14,21 @@ nonisolated struct ConnectionProfile: Codable, Identifiable, Hashable, Sendable 
     var environmentID: String
     var clientID: String
 
+    /// One of the release check's connections under the live-check switch
+    /// (JTKit's `LiveLaunch`), kept in memory with its own ID.
+    init(live connection: Connection) {
+        self.init(id: connection.id, name: connection.name, region: connection.region,
+                  environmentID: connection.environmentID, clientID: connection.clientID)
+    }
+
+    init(id: UUID = UUID(), name: String, region: JamfRegion, environmentID: String, clientID: String) {
+        self.id = id
+        self.name = name
+        self.region = region
+        self.environmentID = environmentID
+        self.clientID = clientID
+    }
+
     static func newProfile() -> ConnectionProfile {
         ConnectionProfile(name: "New Connection", region: .us, environmentID: "", clientID: "")
     }

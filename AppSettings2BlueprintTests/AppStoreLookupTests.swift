@@ -43,7 +43,7 @@ struct AppStoreParsingTests {
         #expect(merged[0].platforms == ["iPhone / iOS"])
     }
 
-    @Test func normalisesSearchResultAndLeavesMissingValuesNil() throws {
+    @Test func normalizesSearchResultAndLeavesMissingValuesNil() throws {
         let json = try LosslessJSON(string: searchResponse([(10, "Ten", "com.example.ten"), (11, "Eleven", nil)]))
         let apps = try #require(json["results"]?.arrayValue).compactMap { AppStoreApp(searchResult: $0, platformLabel: "iPad") }
         #expect(apps.count == 2)
@@ -87,7 +87,7 @@ struct AppStoreParsingTests {
     }
 
     @Test(arguments: [("GB", "gb"), (" us ", "us"), ("usa", nil), ("1a", nil), ("", nil), ("é1", nil)] as [(String, String?)])
-    func normalisesStorefrontCodes(input: String, expected: String?) {
+    func normalizesStorefrontCodes(input: String, expected: String?) {
         #expect(AppStoreClient.normalizedCountry(input) == expected)
     }
 }

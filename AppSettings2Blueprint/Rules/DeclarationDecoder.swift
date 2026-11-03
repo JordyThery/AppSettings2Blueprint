@@ -64,7 +64,7 @@ nonisolated enum DeclarationDecoder {
             ruleSet.platform = hasMacKeys ? .macOS : .iOS
         } else {
             // Neither app lists nor binaries: a USER declaration is most likely
-            // macOS privacy defaults.
+            // macOS permission defaults.
             ruleSet.platform = seenChannels.contains(userChannel) ? .macOS : .iOS
         }
 

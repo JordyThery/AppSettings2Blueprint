@@ -117,6 +117,8 @@ final class EditScopeModel {
         } catch let error as BlueprintWriter.WriteError where error.mayHaveWritten {
             app.reloadAfterUncertainWrite(id: detail.id)
             phase = .uncertain(error.localizedDescription)
+        } catch is CancellationError {
+            phase = .failed("You stopped waiting for Jamf, so the scope wasn’t changed.")
         } catch {
             if case BlueprintWriter.WriteError.readOnly = error { app.readOnlyBlueprintIDs.insert(detail.id) }
             phase = .failed(error.localizedDescription)

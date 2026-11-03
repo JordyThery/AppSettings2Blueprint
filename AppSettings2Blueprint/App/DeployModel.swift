@@ -127,6 +127,9 @@ final class DeployModel {
                 return
             }
         } catch is CancellationError {
+            // Stop during a wait before a retry: the deploy is retried only
+            // after a 429, which started nothing.
+            if !Task.isCancelled { phase = .failed("You stopped waiting for Jamf, so the deployment wasn’t started.") }
             return
         } catch let error as JamfPlatform.APIError where error.status == 409 {
             phase = .failed("Jamf didn’t start the deployment: the Blueprint isn’t valid for deployment.\n\n\(error.localizedDescription)")
@@ -148,6 +151,8 @@ final class DeployModel {
             }
             phase = .finished(final)
         } catch is CancellationError {
+            // Stop during a wait while checking; closing the sheet cancels the task.
+            if !Task.isCancelled { phase = .watchFailed("You stopped waiting for Jamf.") }
             return
         } catch {
             phase = .watchFailed(error.localizedDescription)

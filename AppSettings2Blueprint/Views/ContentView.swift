@@ -124,6 +124,7 @@ private struct RuleSetStatusToast: View {
         if let message = model.ruleSet.statusMessage {
             HStack(spacing: 10) {
                 Image(systemName: "checklist")
+                    .accessibilityHidden(true)
                 Text(message)
                     .lineLimit(2)
                 if selection != .ruleSet {
@@ -132,14 +133,9 @@ private struct RuleSetStatusToast: View {
                         model.ruleSet.statusMessage = nil
                     }
                 }
-                Button {
+                IconButton(title: "Dismiss", systemImage: "xmark") {
                     model.ruleSet.statusMessage = nil
-                } label: {
-                    Image(systemName: "xmark")
                 }
-                .buttonStyle(.borderless)
-                .accessibilityLabel("Dismiss")
-                .help("Dismiss")
             }
             .font(.callout)
             .padding(.horizontal, 14)
@@ -150,6 +146,12 @@ private struct RuleSetStatusToast: View {
             .accessibilityIdentifier("ruleSetStatus")
             .padding(.bottom, 16)
             .task(id: message) {
+                AccessibilityNotification.Announcement(message).post()
+                // Stays until dismissed for VoiceOver, Switch Control and
+                // keyboard users, who need time to reach Show Rule Set.
+                let workspace = NSWorkspace.shared
+                guard !workspace.isVoiceOverEnabled, !workspace.isSwitchControlEnabled,
+                      !NSApplication.shared.isFullKeyboardAccessEnabled else { return }
                 try? await Task.sleep(for: .seconds(6))
                 if model.ruleSet.statusMessage == message { model.ruleSet.statusMessage = nil }
             }
@@ -198,7 +200,7 @@ private struct FetchByIDSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Fetch Blueprint by ID")
-                .font(.headline)
+                .font(.headline).accessibilityAddTraits(.isHeader)
             Text("Loads GET /blueprints/v1/blueprints/{id}.")
                 .font(.callout)
                 .foregroundStyle(.secondary)

@@ -25,7 +25,7 @@ struct APIErrorTests {
     }
 
     /// The Device Groups API's answer for a Jamf School environment (verified live).
-    @Test func recognisesJamfSchoolTenantNotFound() {
+    @Test func recognizesJamfSchoolTenantNotFound() {
         let error = failure(404, #"{"httpStatus":404,"traceId":"t","errors":[{"code":"TENANT_NOT_FOUND","description":"No tenant found for environment 'e'."}]}"#)
         #expect(error.hasCode(.tenantNotFound))
     }

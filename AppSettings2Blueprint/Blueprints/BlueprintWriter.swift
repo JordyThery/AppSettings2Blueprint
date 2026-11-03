@@ -262,9 +262,16 @@ nonisolated struct BlueprintWriter: Sendable {
         }
     }
 
-    /// JTKit's `updated` comparison plus the steps themselves.
+    /// The same `updated` time and the same steps. When either copy has no
+    /// `updated` time (Blueprints made in the Jamf UI can have none), the steps
+    /// and the scope decide: other fields, such as the deployment state, may
+    /// change between two reads without anyone editing the Blueprint.
     static func isUnchanged(loaded: JamfPlatform.BlueprintDetail, latest: JamfPlatform.BlueprintDetail) -> Bool {
-        loaded.isUnchanged(in: latest) && (loaded.steps ?? .null) == (latest.steps ?? .null)
+        guard loaded.id == latest.id, (loaded.steps ?? .null) == (latest.steps ?? .null) else { return false }
+        guard let updated = loaded.overview.updated, let latestUpdated = latest.overview.updated else {
+            return (loaded.json["scope"] ?? .null) == (latest.json["scope"] ?? .null)
+        }
+        return updated == latestUpdated
     }
 
     /// Compares the read-back with what was sent: the written component must match,

@@ -86,17 +86,34 @@ private struct AppRuleRow: View {
                 if let name = app.displayName {
                     Text(name).foregroundStyle(.secondary)
                 }
-                Button {
+                IconButton(title: "Remove \(app.bundleID.isEmpty ? "App" : app.bundleID)", systemImage: "minus.circle", help: "Remove") {
                     document.remove(listKeyPath, id: app.id, "Remove App")
-                } label: {
-                    Image(systemName: "minus.circle")
                 }
-                .buttonStyle(.borderless)
-                .help("Remove")
             }
             ForEach(document.issues(for: app.id)) { IssueLabel(issue: $0) }
         }
         .padding(.vertical, 2)
+        // Reordering without dragging, for the keyboard and VoiceOver.
+        .contextMenu {
+            Button("Move Up") { move(by: -1) }.disabled(!canMove(by: -1))
+            Button("Move Down") { move(by: 1) }.disabled(!canMove(by: 1))
+        }
+        .accessibilityAction(named: "Move Up") { move(by: -1) }
+        .accessibilityAction(named: "Move Down") { move(by: 1) }
+    }
+
+    private var index: Int? {
+        document.ruleSet[keyPath: listKeyPath].firstIndex { $0.id == app.id }
+    }
+
+    private func canMove(by offset: Int) -> Bool {
+        guard let index else { return false }
+        return document.ruleSet[keyPath: listKeyPath].indices.contains(index + offset)
+    }
+
+    private func move(by offset: Int) {
+        guard canMove(by: offset), let index else { return }
+        document.update("Reorder Apps") { $0[keyPath: listKeyPath].swapAt(index, index + offset) }
     }
 }
 
@@ -129,6 +146,7 @@ struct Banner<Actions: View>: View {
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: icon).foregroundStyle(color)
+                .accessibilityLabel(style == .error ? "Error" : style == .warning ? "Warning" : "Note")
             // The text takes the row's width and wraps; no Spacer competes with it,
             // so the banner never reports a word-per-line height.
             Text(text)
