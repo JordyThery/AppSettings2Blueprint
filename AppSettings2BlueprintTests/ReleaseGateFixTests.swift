@@ -50,7 +50,7 @@ struct BackupRetentionTests {
         let app = TestApp.model()
         #expect(app.backupRetention == .forever)
         app.backupRetention = .thirtyDays
-        #expect(app.defaults.integer(forKey: BackupStore.Retention.key) == 30)
+        #expect(app.defaults.integer(forKey: BackupStore.retentionKey) == 30)
         #expect(app.backupRetention == .thirtyDays)
     }
 }

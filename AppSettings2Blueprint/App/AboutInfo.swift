@@ -10,7 +10,7 @@ extension AboutConfiguration {
         summary: "Finds app identifiers, builds com.apple.configuration.app.settings rules and writes them to a Jamf Blueprint.",
         links: [
             AboutLink("github.com/JordyThery/AppSettings2Blueprint", address: "https://github.com/JordyThery/AppSettings2Blueprint"),
-        ].compactMap { $0 },
+        ].compactMap { $0 }, // AboutLink(_:address:) is nil for an address that isn't a URL
         acknowledgements: [.appSettingsUtility]
     )
 }

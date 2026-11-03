@@ -13,7 +13,7 @@ struct EditScopeSheet: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            RetryWaitBanner(waits: model.app.waits)
+            RetryWaitBanner(waits: model.waits)
             switch model.phase {
             case .editing:
                 EditScopeForm(model: model, cancel: { dismiss() })

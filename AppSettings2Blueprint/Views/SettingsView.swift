@@ -61,12 +61,12 @@ extension AppModel {
     func testConnection(_ profile: ConnectionProfile, typedSecret: String?) async throws -> String {
         let secret = try typedSecret ?? storedSecret(for: profile)
         let client = try makeClient(credentials: PlatformCredentials(profile: profile, secret: secret))
-        try await client.signIn()
-        let results = await client.checkPermissions(Self.readChecks)
-        if let problem = JamfPlatform.PermissionProblem(results) { throw problem }
-        let page = try await JamfPlatform.Blueprints(client: client).listPage(page: 0, pageSize: 1)
-        let count = page.totalCount.map { "\($0) Blueprint\($0 == 1 ? "" : "s")" } ?? "Blueprint list OK"
-        return "Connected · \(count) · device groups OK"
+        // JTKit's Test Connection: sign-in and the read checks, then the count.
+        return try await client.testConnection(checks: Self.readChecks) {
+            let page = try await JamfPlatform.Blueprints(client: client).listPage(page: 0, pageSize: 1)
+            let count = page.totalCount.map { "\($0) Blueprint\($0 == 1 ? "" : "s")" } ?? "Blueprint list OK"
+            return "\(count) · device groups OK"
+        }
     }
 
     /// The saved secret for Test Connection and Load Environments; empty when

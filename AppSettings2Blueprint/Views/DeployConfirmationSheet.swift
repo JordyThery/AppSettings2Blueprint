@@ -13,7 +13,7 @@ struct DeployConfirmationSheet: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            RetryWaitBanner(waits: model.app.waits)
+            RetryWaitBanner(waits: model.waits)
             DeployFlowView(model: model, close: {
                 model.stopWatching()
                 dismiss()
@@ -73,7 +73,7 @@ private struct DeployErrorView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Label(title, systemImage: icon)
-                .font(.title3.weight(.semibold)).accessibilityAddTraits(.isHeader)
+                .font(.title3.weight(.semibold))
                 .labelStyle(.tintedIcon(color))
                 .accessibilityAddTraits(.isHeader)
                 .announcesOnAppear(title)

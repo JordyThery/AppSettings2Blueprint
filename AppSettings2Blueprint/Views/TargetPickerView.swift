@@ -15,7 +15,7 @@ struct TargetPickerView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            RetryWaitBanner(waits: model.app.waits)
+            RetryWaitBanner(waits: deployModel?.waits ?? model.waits)
             if let deployModel {
                 DeployFlowView(model: deployModel, close: {
                     deployModel.stopWatching()
@@ -35,7 +35,7 @@ struct TargetPickerView: View {
                 ProgressPane(text: "Writing to Jamf and reading the Blueprint back…")
             case .done(let result):
                 WriteResultView(result: result, done: { dismiss() }, deploy: {
-                    deployModel = DeployModel(app: model.app, detail: result.detail)
+                    deployModel = DeployModel(app: model.app, detail: result.detail, generation: model.generation)
                 })
             case .failed(let message):
                 FailureView(message: message, back: { model.backToChoosing() }, cancel: { dismiss() })

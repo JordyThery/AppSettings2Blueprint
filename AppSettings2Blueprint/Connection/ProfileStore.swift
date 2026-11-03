@@ -61,11 +61,10 @@ final class ProfileStore {
         selectedProfileID.flatMap(connections.record(id:))
     }
 
-    /// A new profile for + in Settings › Connections. The first one becomes active.
+    /// A new profile for + in Settings › Connections. JTKit makes it the one
+    /// in use once it's saved, when none is.
     func newProfile() -> ConnectionProfile {
-        let profile = ConnectionProfile.newProfile()
-        if selectedProfile == nil { selectedProfileID = profile.id }
-        return profile
+        ConnectionProfile.newProfile()
     }
 
     /// After a profile was deleted in Settings: when it was the active one, the

@@ -66,14 +66,13 @@ struct ContentView: View {
         .sheet(isPresented: $updates.isPresented) {
             UpdateView()
         }
-        .onChange(of: model.profileStore.selectedProfile) {
-            model.connectionDidChange()
+        // The model clears the old tenant's data on a switch; the list is
+        // loaded again here while it's shown (BlueprintsView lists it when it
+        // opens later).
+        .onChange(of: model.connectionGeneration) {
             if selection == .blueprints && model.hasActiveConnection { model.refresh() }
         }
-        .onChange(of: model.demo.isOn) {
-            model.connectionDidChange()
-            if selection == .blueprints && model.hasActiveConnection { model.refresh() }
-        }
+        .onAppear { model.applyConnectionChange() }
         // Rule set edits from any view share the window's undo history.
         .onAppear { model.ruleSet.undoManager = undoManager }
         .onChange(of: undoManager) { model.ruleSet.undoManager = undoManager }

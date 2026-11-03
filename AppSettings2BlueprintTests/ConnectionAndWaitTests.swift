@@ -34,7 +34,8 @@ struct KeychainReadTests {
         try store.connections.save(profile, secrets: [.main: "secret"])
         store.selectedProfileID = profile.id
         secrets.refusesReads = refusing
-        return (AppModel(profileStore: store, session: MockURLProtocol.makeSession(), defaults: defaults), profile)
+        return (AppModel(profileStore: store, session: MockURLProtocol.makeSession(), defaults: defaults,
+                         backupRoot: TestApp.temporaryFolder()), profile)
     }
 
     @Test("A Keychain that refuses or is locked isn't “No complete connection is configured”")
@@ -145,9 +146,10 @@ extension MockNetworkTests {
             app.ruleSet.update("Add") { $0.deniedApps.append(AppRule(bundleID: "com.apple.tips")) }
             let write = JamfWriteModel(app: app)
             let prepare = Task { await write.performPrepare() }
-            await waitUntil { app.waits.statusText != nil }
-            #expect(app.waits.statusText?.contains("Jamf asked to wait 30 s") == true)
-            app.waits.cancelAll()
+            await waitUntil { write.waits.statusText != nil }
+            #expect(write.waits.statusText?.contains("Jamf asked to wait 30 s") == true)
+            #expect(app.waits.statusText == nil, "other waits aren't this sheet's")
+            write.waits.cancelAll()
             await prepare.value
             guard case .failed(let message) = write.phase else {
                 Issue.record("Expected the stopped message, got \(write.phase)")

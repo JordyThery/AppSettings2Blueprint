@@ -51,7 +51,8 @@ nonisolated struct BlueprintWriter: Sendable {
     }
 
     enum WriteError: Error, LocalizedError {
-        case changedOnServer(name: String, loaded: String?, now: String?)
+        /// `latest` is the Blueprint as it is now, so the next try starts from it.
+        case changedOnServer(name: String, loaded: String?, now: String?, latest: JamfPlatform.BlueprintDetail)
         case readOnly(name: String)
         case noScope(name: String)
         case emptyScope
@@ -61,19 +62,22 @@ nonisolated struct BlueprintWriter: Sendable {
         /// The write request was sent but got no clear answer: Jamf may or may
         /// not have applied it.
         case outcomeUnknown(name: String, action: Action, reason: String)
+        /// Stop was clicked while the app waited to send the write request
+        /// again: an earlier attempt may have reached Jamf.
+        case stopped(name: String, action: Action)
 
         /// True when the write may have reached Jamf: the sheet must never offer
         /// to send it again as if nothing happened.
         var mayHaveWritten: Bool {
             switch self {
-            case .notVerified, .outcomeUnknown: true
+            case .notVerified, .outcomeUnknown, .stopped: true
             default: false
             }
         }
 
         var errorDescription: String? {
             switch self {
-            case let .changedOnServer(name, loaded, now):
+            case let .changedOnServer(name, loaded, now, _):
                 "“\(name)” was changed in Jamf after it was loaded (loaded: \(loaded ?? "unknown"), now: \(now ?? "unknown")). Reload the Blueprint and try again."
             case let .noScope(name):
                 "“\(name)” has no device groups in scope. The Platform API rejects changes until it has one; set the scope with Edit Scope… first (for Jamf School, in Jamf School)."
@@ -91,6 +95,15 @@ nonisolated struct BlueprintWriter: Sendable {
                     "The scope of “\(name)” was changed, but reading it back failed: \(reason)\n\nReload the Blueprint to check what Jamf holds."
                 case .steps, .restore:
                     "“\(name)” was written, but reading it back failed: \(reason)\n\nReload the Blueprint to check what Jamf holds before writing again."
+                }
+            case let .stopped(name, action):
+                switch action {
+                case .create:
+                    "You stopped waiting for Jamf while “\(name)” was being created. An earlier attempt may have reached Jamf.\n\nReload the Blueprints and look for it before creating it again."
+                case .scope:
+                    "You stopped waiting for Jamf while the scope of “\(name)” was being changed. An earlier attempt may have reached Jamf.\n\nReload the Blueprint to check what Jamf holds."
+                case .steps, .restore:
+                    "You stopped waiting for Jamf while “\(name)” was being written. An earlier attempt may have reached Jamf.\n\nReload the Blueprint to check what Jamf holds before writing again."
                 }
             case let .outcomeUnknown(name, action, reason):
                 switch action {
@@ -174,6 +187,12 @@ nonisolated struct BlueprintWriter: Sendable {
         guard !deviceGroups.isEmpty else { throw WriteError.emptyScope }
         let latest = try await service.detail(id: loaded.id)
         try checkUnchanged(loaded: loaded, latest: latest)
+        // As before a deploy: the scope itself must be as loaded, whether or
+        // not Jamf changed "updated" for another admin's scope change.
+        guard loaded.scopeDeviceGroups == latest.scopeDeviceGroups else {
+            throw WriteError.changedOnServer(name: latest.overview.name, loaded: loaded.overview.updated,
+                                             now: latest.overview.updated, latest: latest)
+        }
         if latest.isDivisionLocked { throw WriteError.readOnly(name: latest.overview.name) }
         let backupURL = try backup(latest)
         try await send(name: latest.overview.name, action: .scope) {
@@ -229,6 +248,8 @@ nonisolated struct BlueprintWriter: Sendable {
             throw WriteError.readOnly(name: name)
         } catch let error as JamfPlatform.APIError where Self.wasNotWritten(error) {
             throw error
+        } catch is CancellationError {
+            throw WriteError.stopped(name: name, action: action)
         } catch {
             throw WriteError.outcomeUnknown(name: name, action: action, reason: error.localizedDescription)
         }
@@ -258,7 +279,8 @@ nonisolated struct BlueprintWriter: Sendable {
     /// The `updated` timestamp and the steps must both be as loaded.
     func checkUnchanged(loaded: JamfPlatform.BlueprintDetail, latest: JamfPlatform.BlueprintDetail) throws {
         guard Self.isUnchanged(loaded: loaded, latest: latest) else {
-            throw WriteError.changedOnServer(name: latest.overview.name, loaded: loaded.overview.updated, now: latest.overview.updated)
+            throw WriteError.changedOnServer(name: latest.overview.name, loaded: loaded.overview.updated,
+                                             now: latest.overview.updated, latest: latest)
         }
     }
 
