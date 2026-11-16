@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (1.3.1)
+## 1.3.1 (2026-11-16)
 
 - **Apple Built-in Apps** no longer pushes the window’s content out of view. The sidebar and the list’s top bar stay visible, also when the app opens in that section.
 - The **View** menu switches sections: App Store (⌘1), Apple Built-in Apps (⌘2), Local Mac Apps (⌘3), Editor (⌘4) and Blueprints (⌘5).
