@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 import JTKitUITestSupport
 
@@ -10,8 +11,19 @@ final class DemoSmokeUITests: JTKitUITestCase {
 
     override var appName: String { "AppSettings2Blueprint" }
 
+    /// The small-window test starts in Apple Built-in Apps, in the main
+    /// window's smallest frame (its saved frame, read from the argument domain).
+    private var opensSmallWindow: Bool { name.contains("SmallWindow") }
+
     override var demoLaunchArguments: [String] {
-        ["-sidebarSelection", "ruleSet", "-checksForUpdates", "NO", "-includeUserApplicationsFolder", "NO"]
+        var arguments = ["-sidebarSelection", opensSmallWindow ? "builtInApps" : "ruleSet",
+                         "-checksForUpdates", "NO", "-includeUserApplicationsFolder", "NO"]
+        if opensSmallWindow, let screen = NSScreen.main?.visibleFrame {
+            let top = Int(screen.maxY) - 612
+            arguments += ["-NSWindow Frame main",
+                          "0 \(top) 900 612 \(Int(screen.minX)) \(Int(screen.minY)) \(Int(screen.width)) \(Int(screen.height))"]
+        }
+        return arguments
     }
 
     override func launchApp() {
@@ -26,7 +38,7 @@ final class DemoSmokeUITests: JTKitUITestCase {
         // CoreGraphics (CGS_REQUIRE_INIT). The release check runs each test
         // in its own runner.
         main.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0)).withOffset(CGVector(dx: 0, dy: 8)).click()
-        if main.frame.width < 1200 {
+        if main.frame.width < 1200 && !opensSmallWindow {
             let zoom = app.menuBars.menuItems["Zoom"].firstMatch
             if zoom.exists { zoom.click() }
         }
@@ -165,6 +177,41 @@ final class DemoSmokeUITests: JTKitUITestCase {
         let sheet = app.sheets.firstMatch
         XCTAssertTrue(sheet.waitForExistence(timeout: 10), "⇧⌘J didn't open Write to Jamf")
         tap(sheet.buttons["Cancel"])
+    }
+
+    /// Apple Built-in Apps saved as the section, in the smallest window: each
+    /// section's content fits the window, so the sidebar stays in reach (issue
+    /// #1), and the View menu switches sections. (Chosen from the menu, not
+    /// typed: macOS moves ⌘1 to ⌘5 to the number keys' own characters on
+    /// layouts such as AZERTY, where typing "1" needs Shift.)
+    func test10SectionsFitSmallWindow() {
+        let main = app.windows["main"]
+        XCTAssertTrue(main.waitForExistence(timeout: 20), "The main window did not open")
+        XCTAssertLessThan(main.frame.width, 1000, "The window didn't open at its smallest size: \(main.frame)")
+        XCTAssertTrue(main.title.hasPrefix("Apple Built-in Apps"), "The window title is “\(main.title)”")
+        checkFits(main, section: "Apple Built-in Apps")
+        XCTAssertTrue(main.radioGroups["List"].isHittable, "Apple Built-in Apps' top bar is out of reach")
+
+        for section in ["App Store", "Apple Built-in Apps", "Local Mac Apps", "Editor", "Blueprints"] {
+            let view = app.menuBars.menuBarItems["View"]
+            tap(view)
+            tap(view.menuItems[section], timeout: 5)
+            let shown = XCTNSPredicateExpectation(predicate: NSPredicate(format: "title BEGINSWITH %@", section), object: main)
+            XCTAssertEqual(XCTWaiter.wait(for: [shown], timeout: 10), .completed,
+                           "View › \(section) didn't show it; the window title is “\(main.title)”")
+            checkFits(main, section: section)
+        }
+        XCTAssertTrue(text(ipadBlueprint, in: main).waitForExistence(timeout: 20), "Contoso's Blueprints aren't listed")
+    }
+
+    /// The window's content lies within the window and the sidebar can be clicked.
+    private func checkFits(_ main: XCUIElement, section: String, file: StaticString = #filePath, line: UInt = #line) {
+        let window = main.frame
+        let content = main.splitGroups.firstMatch.frame
+        XCTAssertTrue(content.minY >= window.minY - 1 && content.maxY <= window.maxY + 1,
+                      "\(section): the content (\(content)) is larger than the window (\(window))", file: file, line: line)
+        XCTAssertTrue(app.outlines.staticTexts["Blueprints"].firstMatch.isHittable,
+                      "\(section): the sidebar is out of reach", file: file, line: line)
     }
 
     /// Adds a connection with made-up values and saves it; its editor stays open.

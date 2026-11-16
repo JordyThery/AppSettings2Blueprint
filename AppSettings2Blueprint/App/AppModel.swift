@@ -66,6 +66,10 @@ final class AppModel {
     }
     var editorCommand: EditorCommand?
 
+    /// A section chosen in the View menu (⌘1 to ⌘5); the window shows it and
+    /// clears it. Works even when the sidebar can't be reached.
+    var sectionRequest: SidebarItem?
+
     /// A menu-bar command for the selected Blueprint (Blueprint menu); the
     /// window shows Blueprints, whose detail pane carries it out.
     enum BlueprintCommand: Equatable {

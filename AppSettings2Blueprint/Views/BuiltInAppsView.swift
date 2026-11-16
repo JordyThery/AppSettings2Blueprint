@@ -128,8 +128,10 @@ private struct SourceFooter: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             // One text with the link inside, so it wraps instead of being cut off.
+            // No fixedSize: measured at zero width for the window's minimum, a
+            // fixed-height text asks for its height letter by letter, and the
+            // window's content outgrows the screen (issue #1).
             Text(sourceLine)
-                .fixedSize(horizontal: false, vertical: true)
             if let appleURL = URL(string: list.appleSource) {
                 Link(list.appleSource, destination: appleURL)
             }
