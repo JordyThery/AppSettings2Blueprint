@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased (1.3.1)
+
+- **Apple Built-in Apps** no longer pushes the window’s content out of view. The sidebar and the list’s top bar stay visible, also when the app opens in that section.
+- The **View** menu switches sections: App Store (⌘1), Apple Built-in Apps (⌘2), Local Mac Apps (⌘3), Editor (⌘4) and Blueprints (⌘5).
+
 ## 1.3.0 (2026-11-03)
 
 - **Waiting for Jamf is shown**: when Jamf asks the app to wait before trying again, the write, scope, restore and deploy sheets say how long, with **Stop**. A wait lasts at most 60 seconds.

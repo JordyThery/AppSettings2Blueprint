@@ -178,6 +178,18 @@ private struct AppCommands: Commands {
                 .keyboardShortcut("d", modifiers: [.command, .shift])
                 .disabled(detail?.scopeDeviceGroups.isEmpty ?? true)
         }
+        // The sidebar's sections, also in the menu bar: a way to switch even
+        // when the window's sidebar can't be reached.
+        CommandGroup(before: .toolbar) {
+            ForEach(Array(SidebarItem.allCases.enumerated()), id: \.element) { index, section in
+                Button(section.title) {
+                    openWindow(id: WindowID.main)
+                    model.sectionRequest = section
+                }
+                .keyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: .command)
+            }
+            Divider()
+        }
         CommandGroup(after: .toolbar) {
             Button("Refresh Blueprints") { model.refresh() }
                 .keyboardShortcut("r", modifiers: .command)

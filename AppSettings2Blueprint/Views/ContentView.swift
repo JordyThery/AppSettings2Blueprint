@@ -80,6 +80,7 @@ struct ContentView: View {
         // A menu command shows its section, which then carries it out.
         .onChange(of: model.editorCommand) { showSectionForCommand() }
         .onChange(of: model.blueprintCommand) { showSectionForCommand() }
+        .onChange(of: model.sectionRequest) { showSectionForCommand() }
         // Rule set edits from any view share the window's undo history.
         .onAppear { model.ruleSet.undoManager = undoManager }
         .onChange(of: undoManager) { model.ruleSet.undoManager = undoManager }
@@ -88,6 +89,10 @@ struct ContentView: View {
     }
 
     private func showSectionForCommand() {
+        if let section = model.sectionRequest {
+            selection = section
+            model.sectionRequest = nil
+        }
         if model.editorCommand != nil { selection = .ruleSet }
         if model.blueprintCommand != nil { selection = .blueprints }
     }

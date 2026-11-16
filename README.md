@@ -52,7 +52,7 @@ The Lookup section needs no Jamf permissions and no macOS privacy permission: th
 4. Click **Write to Jamf…**, choose a new or an existing Blueprint, review the diff and write.
 5. Deploy from the write sheet or from **Jamf › Blueprints › Deploy…**. **Edit Scope…** in the same place changes a Blueprint’s device groups. **Fetch by ID** in the toolbar loads one Blueprint by its ID.
 
-The editor’s buttons are also in the **File** menu: New macOS Rule Set (⌘N), New iOS / iPadOS Rule Set (⌥⌘N), Open Rule Set… (⌘O), Save Rule Set… (⌘S) and Import CSV… (⇧⌘I). The **Blueprint** menu has Write to Jamf… (⇧⌘J) and, for the selected Blueprint, Reload Blueprint (⌥⌘R), Edit Scope…, Backups… and Deploy… (⇧⌘D). Refresh Blueprints is ⌘R. The Write to Jamf, Edit Scope and Restore from Backup sheets can be resized.
+The editor’s buttons are also in the **File** menu: New macOS Rule Set (⌘N), New iOS / iPadOS Rule Set (⌥⌘N), Open Rule Set… (⌘O), Save Rule Set… (⌘S) and Import CSV… (⇧⌘I). The **Blueprint** menu has Write to Jamf… (⇧⌘J) and, for the selected Blueprint, Reload Blueprint (⌥⌘R), Edit Scope…, Backups… and Deploy… (⇧⌘D). Refresh Blueprints is ⌘R. The **View** menu switches sections: App Store (⌘1), Apple Built-in Apps (⌘2), Local Mac Apps (⌘3), Editor (⌘4) and Blueprints (⌘5). The Write to Jamf, Edit Scope and Restore from Backup sheets can be resized.
 
 On macOS, Apple accepts binary rules only in the system channel and Privacy only in the user channel, so a macOS rule set is written as up to two declarations in the same component. For Shared iPad, check **Shared iPad** in the editor: the iOS declaration is then written to the user channel, as Apple requires.
 

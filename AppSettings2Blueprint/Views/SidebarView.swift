@@ -1,8 +1,9 @@
 import JTKit
 import SwiftUI
 
-/// Top-level destinations: Lookup | Rule Set | Jamf.
-enum SidebarItem: String, Hashable {
+/// Top-level destinations: Lookup | Rule Set | Jamf, in sidebar order (the
+/// View menu's ⌘1 to ⌘5 follow it).
+enum SidebarItem: String, Hashable, CaseIterable {
     case appStore
     case builtInApps
     case localApps
