@@ -341,7 +341,7 @@ final class AppModel {
         let root = backupRoot
         let retention = backupRetention
         writer.backup = { detail in
-            let url = try BackupStore.write(detail, root: root)
+            let url = try BackupStore.backUp(detail, root: root)
             BackupStore.prune(retention, root: root)
             return url
         }
