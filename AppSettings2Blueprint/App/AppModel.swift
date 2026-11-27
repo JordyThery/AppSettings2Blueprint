@@ -120,7 +120,9 @@ final class AppModel {
     private var client: (credentials: PlatformCredentials, client: JamfPlatform.Client)?
     /// JTKit's client for demo mode, the same for the whole launch.
     @ObservationIgnored private var demoClient: JamfPlatform.Client?
-    /// The network for real connections; demo mode has its own.
+    /// The network for real connections; demo mode has its own. Under tests
+    /// it refuses every request when the connections are the saved ones
+    /// (`UnderTest`).
     @ObservationIgnored let session: URLSession
     private var listTask: Task<Void, Never>?
     /// Incremented on every connection or demo switch. Async work compares it
@@ -154,29 +156,35 @@ final class AppModel {
     ///   - profileStore: the saved connections; in-memory ones for a sandbox run.
     ///   - demo: the app passes its saved demo mode (`forLaunch()`). Previews
     ///     and tests start with it off, and save nothing.
-    ///   - session: the network for real connections.
+    ///   - session: the network for real connections. Under tests, with the
+    ///     saved connections, a refusing one is used instead (`UnderTest`).
     ///   - defaults: where the app's own settings are saved.
     ///   - backupRoot: where backups go outside demo mode; tests pass a
     ///     temporary folder.
+    ///   - underTestLog: where refused requests to the saved connections are
+    ///     written; tests pass one of their own.
     init(
         profileStore: ProfileStore = ProfileStore(),
         demo: DemoMode? = nil,
         session: URLSession = .shared,
         defaults: UserDefaults = .standard,
-        backupRoot: URL = BackupStore.rootURL
+        backupRoot: URL = BackupStore.rootURL,
+        underTestLog: TestRun.AttemptLog = .savedConnections
     ) {
         self.profileStore = profileStore
         self.demo = demo ?? DemoMode(key: Self.demoModeKey, arguments: [DemoMode.launchArgument, "NO"])
         demoChoice = DemoConnectionChoice(mode: self.demo, connections: [.demoJamfPlatform])
-        self.session = session
+        self.session = UnderTest.isActive && profileStore.holdsSavedConnections ? UnderTest.refusingSession(log: underTestLog) : session
         self.defaults = defaults
         realBackupRoot = backupRoot
         let log = ActivityLog()
         activityLog = log
         localApps = LocalAppsModel(defaults: defaults)
-        // A sandbox run (UI tests) makes no public lookups: its App Store client
-        // reaches nothing but demo mode's empty network.
-        let lookups = self.demo.isSandbox ? DemoNetwork(servers: [:]).session : URLSession(configuration: .ephemeral)
+        // Under tests (the unit-test host, a sandbox run for the UI tests) the
+        // app makes no public lookups: its App Store client reaches nothing
+        // but demo mode's empty network.
+        let lookups = self.demo.isSandbox || UnderTest.isActive
+            ? DemoNetwork(servers: [:]).session : URLSession(configuration: .ephemeral)
         appStore = AppStoreModel(client: AppStoreClient(session: lookups, log: log), defaults: defaults)
         let logger = Logger(subsystem: "be.jordythery.appsettings2blueprint", category: "updates")
         defer {
@@ -189,16 +197,41 @@ final class AppModel {
         )
     }
 
-    /// The model for this launch: the saved connections and demo mode, or, for
-    /// a sandbox run (`-JTKitSandbox YES`), connections and secrets in memory
-    /// and settings in the run's own suite.
+    /// The model for this launch: the saved connections and demo mode, or,
+    /// under tests, settings and secrets of the run's own, so no saved
+    /// connection, Keychain item or real setting is read or written:
+    /// - the host of the unit tests: a throwaway settings domain in the
+    ///   temporary folder, secrets in memory, Demo Mode off;
+    /// - a sandbox run (`-JTKitSandbox YES`, the UI tests): connections and
+    ///   secrets in memory and settings in the run's own suite.
     static func forLaunch() -> AppModel {
+        if TestRun.isUnitTestHost {
+            let defaults = UnderTest.throwawayDefaults(named: "unit-test-host")
+            return AppModel(profileStore: ProfileStore(defaults: defaults, secrets: SandboxSecretStore()),
+                            demo: DemoMode(key: demoModeKey, defaults: defaults, arguments: [DemoMode.launchArgument, "NO"]),
+                            defaults: defaults, backupRoot: FileManager.default.temporaryDirectory
+                                .appending(path: "AppSettings2Blueprint-unit-test-host-backups", directoryHint: .isDirectory))
+        }
         let demo = DemoMode(key: demoModeKey)
         guard demo.isSandbox else { return AppModel(demo: demo) }
         let defaults = DemoMode.sandboxDefaults()
         return AppModel(profileStore: ProfileStore(defaults: defaults, secrets: SandboxSecretStore()),
                         demo: demo, defaults: defaults)
     }
+
+    /// For Xcode previews: no saved connection, Keychain item or real
+    /// setting, and a network that reaches nothing.
+    static func preview() -> AppModel {
+        let defaults = UnderTest.throwawayDefaults(named: "preview")
+        return AppModel(profileStore: ProfileStore(defaults: defaults, secrets: SandboxSecretStore()),
+                        demo: DemoMode(key: demoModeKey, defaults: defaults, arguments: [DemoMode.launchArgument, "NO"]),
+                        session: DemoNetwork(servers: [:]).session, defaults: defaults,
+                        backupRoot: FileManager.default.temporaryDirectory
+                            .appending(path: "AppSettings2Blueprint-preview-backups", directoryHint: .isDirectory))
+    }
+
+    /// Under tests (the unit-test host, a sandbox run): no update check.
+    var checksForUpdates: Bool { !demo.isSandbox && !UnderTest.isActive }
 
     // MARK: Settings
 
@@ -334,8 +367,7 @@ final class AppModel {
         connectionDidChange()
     }
 
-    /// Clears everything
-    /// loaded from the old tenant, including the rule set's link to one of
+    /// Clears everything loaded from the old tenant, including the rule set's link to one of
     /// its Blueprints (that ID means nothing on the new one).
     func connectionDidChange() {
         connectionGeneration += 1

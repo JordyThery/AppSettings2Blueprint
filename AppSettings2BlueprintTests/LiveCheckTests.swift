@@ -9,7 +9,10 @@ import Testing
 // from the login Keychain. ⌘U skips them. The tenant is named by role only:
 // jamf-test-a over the Jamf Platform API. Every request goes through
 // JTKitLiveCheck's guarded network: creates only with the run's JTKTEST
-// prefix, changes and deletes only of objects this run created.
+// prefix, changes and deletes only of objects this run created. Before the
+// live steps and at the end, the checks also prove that nothing under tests
+// (the unit-test host, the UI tests) made a request to a saved connection
+// (`UnderTest`); any attempt fails the run.
 
 private let live = LiveCheckRun.isEnabled
 
@@ -129,6 +132,15 @@ private extension JamfPlatform.APIError {
     }
 }
 
+/// The "under tests" check, recorded as a step; any attempt fails the run.
+@MainActor
+func checkUnderTest(_ run: LiveCheckRun, when: String) {
+    let attempts = TestRun.AttemptLog.savedConnections.attempts()
+    run.record(step: "no request to a saved connection under tests (\(when))", passed: attempts.isEmpty,
+               note: attempts.isEmpty ? nil : "\(attempts.count) refused: " + attempts.map { "\($0.what) (\($0.process))" }.joined(separator: "; "))
+    #expect(attempts.isEmpty, "Requests to saved connections under tests: \(attempts.map(\.what))")
+}
+
 // MARK: Stage 1: sign in
 
 @MainActor
@@ -157,6 +169,28 @@ struct LiveSignInTests {
 struct LiveBlueprintTests {
     @Test func tenantA() async throws {
         let run = try LiveCheckRun.current()
+        checkUnderTest(run, when: "before the live checks")
+
+        // --fault saved-connection-attempt: one Blueprint list for a saved
+        // connection through the app's real doorway, to show it is refused
+        // before anything is sent and fails the run. Only under tests (the
+        // guard is on); the connection is made up and in memory.
+        if run.fault == "saved-connection-attempt" {
+            try #require(UnderTest.isActive, "Not under tests: the fault isn't injected")
+            let defaults = UserDefaults(suiteName: FileManager.default.temporaryDirectory
+                .appending(path: "as-live-fault-\(UUID().uuidString)").path)!
+            let store = ProfileStore(defaults: defaults, secrets: SandboxSecretStore(), countsAsSaved: true)
+            let profile = ConnectionProfile(name: "Fault", region: .eu,
+                                            environmentID: "00000000-0000-4000-8000-000000000000", clientID: "fault")
+            try store.connections.save(profile, secrets: [.main: "fault"])
+            store.selectedProfileID = profile.id
+            let model = AppModel(profileStore: store, defaults: defaults, backupRoot: FileManager.default.temporaryDirectory
+                .appending(path: "as-live-fault-backups", directoryHint: .isDirectory))
+            _ = try? await model.service(waits: RequestWaits()).list()
+            run.record(step: "saved-connection-attempt", passed: false,
+                       note: "a Blueprint list for a saved connection through the real doorway, injected on purpose (--fault saved-connection-attempt)")
+        }
+
         guard run.roles.contains(LiveTenant.role) else { return }
         let target = try LiveTenant(run: run)
         let ledgerTarget = try run.target(role: LiveTenant.role, service: LiveTenant.service)
@@ -277,5 +311,7 @@ struct LiveCleanupTests {
         let left = run.ledger.outstanding
         run.record(step: "cleanup", passed: left.isEmpty, note: left.isEmpty ? nil : "\(left.count) not removed")
         #expect(left.isEmpty, "\(left.map { "\($0.resource) \($0.id) \($0.name)" })")
+        // The last step: nothing under tests reached a saved connection.
+        checkUnderTest(run, when: "at the end")
     }
 }

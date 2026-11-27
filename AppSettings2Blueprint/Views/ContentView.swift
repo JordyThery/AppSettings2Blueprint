@@ -263,7 +263,8 @@ private struct FetchByIDSheet: View {
 }
 
 #Preview {
-    let model = AppModel()
+    // Never the saved connections or the Keychain.
+    let model = AppModel.preview()
     ContentView()
         .environment(model)
         .environment(model.updates)

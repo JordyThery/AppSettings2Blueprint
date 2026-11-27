@@ -12,8 +12,8 @@ import SwiftUI
                 .environment(model.updates)
                 .frame(minWidth: 900, minHeight: 560)
                 .onAppear { appDelegate.model = model }
-                // A sandbox run (UI tests) makes no public lookups.
-                .task { if !model.demo.isSandbox { await model.updates.checkAutomatically() } }
+                // Under tests (unit-test host, UI tests) no public lookups.
+                .task { if model.checksForUpdates { await model.updates.checkAutomatically() } }
         }
         .environment(model.demo)
         .defaultSize(width: 1280, height: 800)
