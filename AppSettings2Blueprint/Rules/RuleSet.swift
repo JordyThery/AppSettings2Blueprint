@@ -175,6 +175,16 @@ nonisolated struct PreservedJSON: Codable, Hashable, Sendable {
 
     var isEmpty: Bool { object.isEmpty }
 
+    /// Adds a member, unless one with its key is already kept: then the first
+    /// value stays and this returns false. Two declarations combined into one
+    /// never give an object with the same key twice.
+    @discardableResult
+    mutating func append(_ member: LosslessJSON.Object.Member) -> Bool {
+        guard !object.members.contains(where: { $0.key == member.key }) else { return false }
+        object.members.append(member)
+        return true
+    }
+
     init(from decoder: any Decoder) throws {
         let text = try decoder.singleValueContainer().decode(String.self)
         guard let object = try LosslessJSON(string: text).objectValue else {

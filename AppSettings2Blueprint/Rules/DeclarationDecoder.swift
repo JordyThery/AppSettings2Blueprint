@@ -33,6 +33,8 @@ nonisolated enum DeclarationDecoder {
         var privacyChannels = Set<String>()
         var binaryChannels = Set<String>()
         var appListChannels = Set<String>()
+        /// Keys a combined declaration already held: the first value is kept.
+        var dropped: [String] = []
 
         for declaration in declarations where declaration["type"]?.stringValue == DeclarationEncoder.declarationType {
             let channel = declaration["channelType"]?.stringValue ?? DeclarationEncoder.systemChannel
@@ -41,7 +43,9 @@ nonisolated enum DeclarationDecoder {
             }
             var parts = ruleSet.preserved[channel] ?? PreservedDeclarationParts()
             if let object = declaration.objectValue {
-                parts.declaration.object.members += object.members.filter { !declarationKeys.contains($0.key) }
+                for member in object.members where !declarationKeys.contains(member.key) {
+                    keep(member, in: &parts.declaration, dropped: &dropped)
+                }
             }
             let payload = declaration["payload"]?.objectValue ?? LosslessJSON.Object()
             for member in payload.members {
@@ -49,15 +53,15 @@ nonisolated enum DeclarationDecoder {
                 case ("Allowed", .object(let allowed)):
                     let before = ruleSet.allowedBinaries.count + ruleSet.deniedBinaries.count
                     let appsBefore = ruleSet.allowedApps.count + ruleSet.deniedApps.count
-                    decodeAllowed(allowed, into: &ruleSet, parts: &parts, hasIOSKeys: &hasIOSKeys, hasMacKeys: &hasMacKeys)
+                    decodeAllowed(allowed, into: &ruleSet, parts: &parts, dropped: &dropped, hasIOSKeys: &hasIOSKeys, hasMacKeys: &hasMacKeys)
                     if ruleSet.allowedBinaries.count + ruleSet.deniedBinaries.count > before { binaryChannels.insert(channel) }
                     if ruleSet.allowedApps.count + ruleSet.deniedApps.count > appsBefore { appListChannels.insert(channel) }
                 case ("Privacy", .object(let privacy)):
                     let before = ruleSet.permissionDefaults.count
-                    decodePrivacy(privacy, into: &ruleSet, parts: &parts, hasMacKeys: &hasMacKeys)
+                    decodePrivacy(privacy, into: &ruleSet, parts: &parts, dropped: &dropped, hasMacKeys: &hasMacKeys)
                     if ruleSet.permissionDefaults.count > before { privacyChannels.insert(channel) }
                 default:
-                    parts.payload.object.members.append(member)
+                    keep(member, in: &parts.payload, dropped: &dropped)
                 }
             }
             ruleSet.preserved[channel] = parts.isEmpty ? nil : parts
@@ -98,11 +102,21 @@ nonisolated enum DeclarationDecoder {
         if !ruleSet.allowedApps.isEmpty && !ruleSet.deniedApps.isEmpty {
             notes.append("Both AllowedApps and DeniedApps are set. Both are kept.")
         }
+        if !dropped.isEmpty {
+            let keys = Array(Set(dropped)).sorted().map { "“\($0)”" }.joined(separator: ", ")
+            notes.append("More than one of the combined declarations had \(keys). The first value is kept; the others are dropped.")
+        }
         for key in RuleSet.listKeys where ruleSet.hasEmptyList(key) {
             notes.append(emptyListNote(key))
         }
         ruleSet.appListMode = ruleSet.deniedApps.isEmpty && (!ruleSet.allowedApps.isEmpty || ruleSet.hasEmptyList("AllowedApps")) ? .allow : .deny
         return Result(ruleSet: ruleSet, notes: notes)
+    }
+
+    /// Keeps a member the editor doesn't interpret; one whose key is already
+    /// kept (a second declaration on the same channel) is dropped and named.
+    private static func keep(_ member: LosslessJSON.Object.Member, in json: inout PreservedJSON, dropped: inout [String]) {
+        if !json.append(member) { dropped.append(member.key) }
     }
 
     // MARK: Allowed
@@ -111,6 +125,7 @@ nonisolated enum DeclarationDecoder {
         _ allowed: LosslessJSON.Object,
         into ruleSet: inout RuleSet,
         parts: inout PreservedDeclarationParts,
+        dropped: inout [String],
         hasIOSKeys: inout Bool,
         hasMacKeys: inout Bool
     ) {
@@ -124,7 +139,7 @@ nonisolated enum DeclarationDecoder {
                       items.allSatisfy({ $0.stringValue != nil }) else {
                     // An empty list is still an iOS key (for the platform guess).
                     if member.value.arrayValue?.isEmpty == true { hasIOSKeys = true }
-                    parts.allowed.object.members.append(member)
+                    keep(member, in: &parts.allowed, dropped: &dropped)
                     continue
                 }
                 hasIOSKeys = true
@@ -135,7 +150,7 @@ nonisolated enum DeclarationDecoder {
                       items.allSatisfy({ $0.objectValue != nil }) else {
                     // An empty list is still a macOS key (for the platform guess).
                     if member.value.arrayValue?.isEmpty == true { hasMacKeys = true }
-                    parts.allowed.object.members.append(member)
+                    keep(member, in: &parts.allowed, dropped: &dropped)
                     continue
                 }
                 hasMacKeys = true
@@ -143,13 +158,13 @@ nonisolated enum DeclarationDecoder {
                 if member.key == "AllowedBinaries" { ruleSet.allowedBinaries += rules } else { ruleSet.deniedBinaries += rules }
             case "AlwaysAllowManagedApps":
                 guard let value = member.value.boolValue else {
-                    parts.allowed.object.members.append(member)
+                    keep(member, in: &parts.allowed, dropped: &dropped)
                     continue
                 }
                 hasMacKeys = true
                 ruleSet.alwaysAllowManagedApps = value
             default:
-                parts.allowed.object.members.append(member)
+                keep(member, in: &parts.allowed, dropped: &dropped)
             }
         }
     }
@@ -179,12 +194,13 @@ nonisolated enum DeclarationDecoder {
         _ privacy: LosslessJSON.Object,
         into ruleSet: inout RuleSet,
         parts: inout PreservedDeclarationParts,
+        dropped: inout [String],
         hasMacKeys: inout Bool
     ) {
         for member in privacy.members {
             guard member.key == "PermissionDefaults", case .object(let defaults) = member.value,
                   defaults.members.allSatisfy({ $0.value.objectValue != nil }) else {
-                parts.privacy.object.members.append(member)
+                keep(member, in: &parts.privacy, dropped: &dropped)
                 continue
             }
             for entry in defaults.members {

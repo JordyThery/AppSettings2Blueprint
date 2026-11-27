@@ -57,3 +57,24 @@ struct EmptyListTests {
         #expect(RuleSet.listKeys.allSatisfy { !ruleSet.hasEmptyList($0) })
     }
 }
+
+@Suite("Combined declarations")
+struct CombinedDeclarationTests {
+    @Test("Two SYSTEM declarations with the same unknown key keep the first value, once, and say so")
+    func duplicateUnknownKey() throws {
+        let first = try LosslessJSON(string: #"{"kind":"CONFIGURATION","type":"com.apple.configuration.app.settings","payload":{"Foo":1,"Allowed":{"DeniedApps":["com.example.a"],"Bar":true}},"channelType":"SYSTEM"}"#)
+        let second = try LosslessJSON(string: #"{"kind":"CONFIGURATION","type":"com.apple.configuration.app.settings","payload":{"Foo":2,"Allowed":{"DeniedApps":["com.example.b"],"Bar":false}},"channelType":"SYSTEM"}"#)
+        let decoded = DeclarationDecoder.decode(declarations: [first, second])
+        #expect(decoded.ruleSet.deniedApps.map(\.bundleID) == ["com.example.a", "com.example.b"])
+        #expect(decoded.notes.contains { $0.contains("“Bar”, “Foo”") && $0.contains("first value is kept") })
+
+        let written = DeclarationEncoder.declarations(for: decoded.ruleSet)
+        #expect(written.count == 1)
+        let payload = try #require(written[0]["payload"]?.objectValue)
+        #expect(payload.keys.filter { $0 == "Foo" }.count == 1)
+        #expect(payload["Foo"]?.serializedString() == "1")
+        let allowed = try #require(payload["Allowed"]?.objectValue)
+        #expect(allowed.keys.filter { $0 == "Bar" }.count == 1)
+        #expect(allowed["Bar"]?.boolValue == true)
+    }
+}
