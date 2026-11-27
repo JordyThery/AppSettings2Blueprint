@@ -525,6 +525,21 @@ struct DeployModelTests {
         #expect(model.blockingReason != nil)
     }
 
+    @Test("Two declarations, AllowedBinaries with the baseline and an empty one: together they allow nothing, so deploying warns")
+    func entriesAndEmptyAllowListWarns() throws {
+        let entries = #"{"kind":"CONFIGURATION","type":"com.apple.configuration.app.settings","payload":{"Allowed":{"AllowedBinaries":[{"TeamID":"*APPLE*","SigningState":"Apple"}],"AlwaysAllowManagedApps":true}},"channelType":"SYSTEM"}"#
+        let empty = #"{"kind":"CONFIGURATION","type":"com.apple.configuration.app.settings","payload":{"Allowed":{"AllowedBinaries":[]}},"channelType":"SYSTEM"}"#
+        let model = DeployModel(app: TestApp.model(), detail: try detail(declarations: "[\(entries),\(empty)]"))
+        #expect(model.allowListWarnings.count == 1)
+        #expect(model.allowListWarnings.first?.contains("allow no binary") == true)
+    }
+
+    @Test("Mixed iOS and macOS keys with an empty AllowedBinaries: deploying warns")
+    func mixedKeysEmptyAllowListWarns() throws {
+        let model = DeployModel(app: TestApp.model(), detail: try detail(declarations: #"[{"kind":"CONFIGURATION","type":"com.apple.configuration.app.settings","payload":{"Allowed":{"AllowedApps":["com.example.app"],"AllowedBinaries":[]}},"channelType":"SYSTEM"}]"#))
+        #expect(model.allowListWarnings.count == 1)
+    }
+
     @Test func baselinePresentNeedsNoWarning() throws {
         let model = DeployModel(app: TestApp.model(), detail: try detail(declarations: #"[{"kind":"CONFIGURATION","type":"com.apple.configuration.app.settings","payload":{"Allowed":{"AllowedBinaries":[{"TeamID":"*APPLE*","SigningState":"Apple"},{"TeamID":"ABCDE12345"}],"AlwaysAllowManagedApps":true}},"channelType":"SYSTEM"}]"#))
         #expect(model.allowListWarnings.isEmpty)

@@ -9,6 +9,10 @@ nonisolated enum DeclarationDecoder {
         var ruleSet: RuleSet
         /// Things the editor should point out, e.g. both app lists set.
         var notes: [String]
+        /// Lists that combined declarations held both with entries and as an
+        /// empty array: on a device the allow lists intersect, so together they
+        /// allowed nothing. The entries are kept and the empty array dropped.
+        var droppedEmptyLists: [String] = []
     }
 
     private static let declarationKeys: Set<String> = ["type", "kind", "channelType", "payload"]
@@ -67,11 +71,26 @@ nonisolated enum DeclarationDecoder {
             ruleSet.preserved[channel] = parts.isEmpty ? nil : parts
         }
 
+        // A list given both with entries and as [] by combined declarations:
+        // the entries are kept, the empty array would be dropped on writing.
+        var droppedEmptyLists: [String] = []
+        for key in RuleSet.listKeys where ruleSet.editorCount(key) > 0 && ruleSet.keepsEmptyArray(key) {
+            ruleSet.removeEmptyList(key)
+            droppedEmptyLists.append(key)
+            // Denied lists combine, so an empty one changes nothing.
+            if key.hasPrefix("Allowed") {
+                notes.append("One of the combined declarations has \(key) with entries and another an empty \(key). Devices intersect allow lists, so together they allowed nothing; here the entries are kept and the empty list is dropped.")
+            }
+        }
+
         let userChannel = DeclarationEncoder.userChannel
         if let platform {
             ruleSet.platform = platform
         } else if hasIOSKeys && hasMacKeys {
-            ruleSet.platform = (ruleSet.allowedBinaries.isEmpty && ruleSet.deniedBinaries.isEmpty) ? .iOS : .macOS
+            // An empty binary list is still a binary key.
+            let hasBinaries = !ruleSet.allowedBinaries.isEmpty || !ruleSet.deniedBinaries.isEmpty
+                || ruleSet.hasEmptyList("AllowedBinaries") || ruleSet.hasEmptyList("DeniedBinaries")
+            ruleSet.platform = hasBinaries ? .macOS : .iOS
             notes.append("The declaration mixes iOS-only and macOS-only keys. It is opened as \(ruleSet.platform.displayName); fix the keys the editor marks before saving.")
         } else if hasMacKeys || hasIOSKeys {
             ruleSet.platform = hasMacKeys ? .macOS : .iOS
@@ -110,7 +129,7 @@ nonisolated enum DeclarationDecoder {
             notes.append(emptyListNote(key))
         }
         ruleSet.appListMode = ruleSet.deniedApps.isEmpty && (!ruleSet.allowedApps.isEmpty || ruleSet.hasEmptyList("AllowedApps")) ? .allow : .deny
-        return Result(ruleSet: ruleSet, notes: notes)
+        return Result(ruleSet: ruleSet, notes: notes, droppedEmptyLists: droppedEmptyLists)
     }
 
     /// Keeps a member the editor doesn't interpret; one whose key is already

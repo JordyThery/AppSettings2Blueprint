@@ -77,7 +77,14 @@ final class DeployModel {
             // one warning per component, however many declarations it holds
             guard seen.insert(location.componentPath).inserted else { return nil }
             let declarations = detail.json.value(at: location.componentPath + [.key("configuration"), .key("declarations")])?.arrayValue ?? []
-            let ruleSet = DeclarationDecoder.decode(declarations: declarations).ruleSet
+            let decoded = DeclarationDecoder.decode(declarations: declarations)
+            var ruleSet = decoded.ruleSet
+            // Any binary allow list is judged as macOS, whatever else the
+            // component holds (devices apply it either way).
+            if !ruleSet.allowedBinaries.isEmpty || ruleSet.hasEmptyList("AllowedBinaries") { ruleSet.platform = .macOS }
+            if decoded.droppedEmptyLists.contains("AllowedBinaries") {
+                return "Step \(location.stepIndex + 1), component \(location.componentIndex + 1): one App Settings declaration has AllowedBinaries with entries and another an empty AllowedBinaries. Devices intersect allow lists, so together they allow no binary."
+            }
             guard ruleSet.isMissingAllowListBaseline else { return nil }
             let missing = [
                 ruleSet.alwaysAllowManagedApps == true ? nil : "AlwaysAllowManagedApps isn’t true",

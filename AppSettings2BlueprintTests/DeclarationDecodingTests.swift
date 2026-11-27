@@ -41,6 +41,24 @@ struct EmptyListTests {
         #expect(allowed["AllowedBinaries"]?.arrayValue?.count == 1)
     }
 
+    @Test("Mixed keys: an empty AllowedBinaries still makes it macOS, and deploying asks the extra confirmation")
+    func mixedKeysWithEmptyBinaries() throws {
+        let decoded = DeclarationDecoder.decode(declarations: [try declaration(#"{"AllowedApps":["com.example.app"],"AllowedBinaries":[]}"#)])
+        #expect(decoded.ruleSet.platform == .macOS)
+        #expect(decoded.ruleSet.isMissingAllowListBaseline)
+    }
+
+    @Test("Combined declarations with AllowedBinaries entries and an empty AllowedBinaries: pointed out, and deploying warns")
+    func entriesAndEmptyAllowList() throws {
+        let declarations = [try declaration(#"{"AllowedBinaries":[{"TeamID":"*APPLE*","SigningState":"Apple"}],"AlwaysAllowManagedApps":true}"#),
+                            try declaration(#"{"AllowedBinaries":[]}"#)]
+        let decoded = DeclarationDecoder.decode(declarations: declarations)
+        #expect(decoded.droppedEmptyLists == ["AllowedBinaries"])
+        #expect(decoded.notes.contains { $0.contains("together they allowed nothing") })
+        #expect(!decoded.ruleSet.keepsEmptyArray("AllowedBinaries"))
+        #expect(!decoded.ruleSet.isMissingAllowListBaseline, "the editor's rule set has the baseline")
+    }
+
     @Test("An empty AllowedApps opens as iOS in allow mode and is pointed out")
     func emptyAllowedApps() throws {
         let decoded = DeclarationDecoder.decode(declarations: [try declaration(#"{"AllowedApps":[]}"#)])

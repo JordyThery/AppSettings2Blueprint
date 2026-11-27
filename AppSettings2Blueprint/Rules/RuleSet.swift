@@ -126,15 +126,23 @@ nonisolated struct RuleSet: Codable, Hashable, Sendable {
     /// as `[]`. An empty AllowedBinaries or AllowedApps allows nothing. An
     /// entry added in the editor replaces it.
     func hasEmptyList(_ key: String) -> Bool {
-        let editorList: Int = switch key {
+        editorCount(key) == 0 && keepsEmptyArray(key)
+    }
+
+    /// How many entries the editor's own list for `key` holds.
+    func editorCount(_ key: String) -> Int {
+        switch key {
         case "AllowedApps": allowedApps.count
         case "DeniedApps": deniedApps.count
         case "AllowedBinaries": allowedBinaries.count
         case "DeniedBinaries": deniedBinaries.count
-        default: 1
+        default: 0
         }
-        guard editorList == 0 else { return false }
-        return preserved.values.contains { parts in
+    }
+
+    /// Whether `[]` is kept for `key` on any channel.
+    func keepsEmptyArray(_ key: String) -> Bool {
+        preserved.values.contains { parts in
             parts.allowed.object.members.contains { $0.key == key && $0.value.arrayValue?.isEmpty == true }
         }
     }
