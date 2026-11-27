@@ -65,7 +65,7 @@ private struct RuleList: View {
                        text: isAllowList
                            ? "Set to an empty list: no binary is allowed."
                            : "Set to an empty list: nothing is denied.") {
-                    Button("Remove") {
+                    Button("Remove Empty List") {
                         document.update("Remove Empty \(title)") { $0.removeEmptyList(title) }
                     }
                 }
