@@ -34,7 +34,8 @@ final class ProfileStore {
         connections = ConnectionStore(
             storage: UserDefaultsConnectionStorage(key: Self.profilesKey, defaults: defaults),
             secrets: [.main: SecretLocation(store: secrets)],
-            log: { logger.error("\($0, privacy: .public)") },
+            // Can name connections and Keychain accounts: private in the system log.
+            log: { logger.error("\($0, privacy: .private)") },
             liveRecord: ConnectionProfile.init(live:)
         )
         let storedSelection = LiveLaunch.isSwitched ? nil : defaults.string(forKey: Self.selectedKey).flatMap(UUID.init)
@@ -50,7 +51,7 @@ final class ProfileStore {
     nonisolated static let keychain = KeychainSecretStore(
         service: "AppSettings2Blueprint.client-secret",
         label: "AppSettings2Blueprint client secret",
-        log: { logger.error("\($0, privacy: .public)") }
+        log: { logger.error("\($0, privacy: .private)") }
     )
 
     private nonisolated static let logger = Logger(subsystem: "be.jordythery.appsettings2blueprint", category: "connections")
