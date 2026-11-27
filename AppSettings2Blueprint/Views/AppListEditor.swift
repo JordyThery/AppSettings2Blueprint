@@ -48,7 +48,21 @@ struct AppListEditor: View {
                 }
             }
             .overlay {
-                if ruleSet.currentAppList.isEmpty {
+                if ruleSet.currentAppList.isEmpty, ruleSet.hasEmptyList(ruleSet.appListMode.key) {
+                    // Kept from the Blueprint or file as `[]`, and written back so.
+                    let key = ruleSet.appListMode.key
+                    ContentUnavailableView {
+                        Label("Empty \(key)", systemImage: ruleSet.appListMode == .allow ? "exclamationmark.triangle" : "app.dashed")
+                    } description: {
+                        Text(ruleSet.appListMode == .allow
+                             ? "\(key) is set to an empty list, so no app can be shown or launched. Add apps, or remove the empty list."
+                             : "\(key) is set to an empty list, so nothing is denied. Add apps, or remove the empty list.")
+                    } actions: {
+                        Button("Remove Empty List") {
+                            document.update("Remove Empty \(key)") { $0.removeEmptyList(key) }
+                        }
+                    }
+                } else if ruleSet.currentAppList.isEmpty {
                     ContentUnavailableView(
                         "No Apps",
                         systemImage: "app.dashed",

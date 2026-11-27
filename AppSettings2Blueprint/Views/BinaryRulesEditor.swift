@@ -59,7 +59,18 @@ private struct RuleList: View {
                     document.update("Add Binary Rule") { $0[keyPath: keyPath].append(BinaryRule()) }
                 }
             }
-            if rules.isEmpty {
+            if rules.isEmpty, document.ruleSet.hasEmptyList(title) {
+                // Kept from the Blueprint or file as `[]`, and written back so.
+                Banner(style: isAllowList ? .warning : .info,
+                       text: isAllowList
+                           ? "Set to an empty list: no binary is allowed."
+                           : "Set to an empty list: nothing is denied.") {
+                    Button("Remove") {
+                        document.update("Remove Empty \(title)") { $0.removeEmptyList(title) }
+                    }
+                }
+                .accessibilityElement(children: .contain)
+            } else if rules.isEmpty {
                 Text(isAllowList ? "Not set: no allow list is applied." : "Not set.")
                     .foregroundStyle(.secondary)
                     .font(.callout)

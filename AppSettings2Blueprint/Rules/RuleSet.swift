@@ -118,10 +118,40 @@ nonisolated struct RuleSet: Codable, Hashable, Sendable {
         return added
     }
 
+    /// The app and binary lists of the payload's Allowed object.
+    static let listKeys = ["AllowedApps", "DeniedApps", "AllowedBinaries", "DeniedBinaries"]
+
+    /// A list kept as it was read, an empty array (`"AllowedBinaries": []`),
+    /// while the editor's own list for that key is empty: it's written back
+    /// as `[]`. An empty AllowedBinaries or AllowedApps allows nothing. An
+    /// entry added in the editor replaces it.
+    func hasEmptyList(_ key: String) -> Bool {
+        let editorList: Int = switch key {
+        case "AllowedApps": allowedApps.count
+        case "DeniedApps": deniedApps.count
+        case "AllowedBinaries": allowedBinaries.count
+        case "DeniedBinaries": deniedBinaries.count
+        default: 1
+        }
+        guard editorList == 0 else { return false }
+        return preserved.values.contains { parts in
+            parts.allowed.object.members.contains { $0.key == key && $0.value.arrayValue?.isEmpty == true }
+        }
+    }
+
+    /// Removes a kept empty list (`hasEmptyList`), so the key isn't written.
+    mutating func removeEmptyList(_ key: String) {
+        for channel in preserved.keys {
+            preserved[channel]?.allowed.object.members.removeAll { $0.key == key && $0.value.arrayValue?.isEmpty == true }
+            if preserved[channel]?.isEmpty == true { preserved[channel] = nil }
+        }
+    }
+
     /// Whether AllowedBinaries is set without the recommended baseline:
-    /// AlwaysAllowManagedApps true and an Apple-signed `*APPLE*` entry.
+    /// AlwaysAllowManagedApps true and an Apple-signed `*APPLE*` entry. An
+    /// empty AllowedBinaries counts: it allows nothing.
     var isMissingAllowListBaseline: Bool {
-        guard platform == .macOS, !allowedBinaries.isEmpty else { return false }
+        guard platform == .macOS, !allowedBinaries.isEmpty || hasEmptyList("AllowedBinaries") else { return false }
         return alwaysAllowManagedApps != true || !allowedBinaries.contains(where: \.isAppleBaseline)
     }
 

@@ -13,6 +13,15 @@ nonisolated enum DeclarationDecoder {
 
     private static let declarationKeys: Set<String> = ["type", "kind", "channelType", "payload"]
 
+    /// What an empty list means, for the load note.
+    private static func emptyListNote(_ key: String) -> String {
+        switch key {
+        case "AllowedApps": "AllowedApps is an empty list, so no app is allowed. It’s kept as it is; remove it on the Apps tab if that isn’t intended."
+        case "AllowedBinaries": "AllowedBinaries is an empty list, so no binary is allowed. It’s kept as it is; remove it on the Binaries tab if that isn’t intended."
+        default: "\(key) is an empty list. It’s kept as it is; remove it in the editor if it isn’t needed."
+        }
+    }
+
     /// Decodes every `com.apple.configuration.app.settings` declaration in `declarations`.
     /// The platform is inferred from the keys unless `platform` is given.
     static func decode(declarations: [LosslessJSON], name: String = "Untitled Rule Set", platform: RulePlatform? = nil) -> Result {
@@ -89,7 +98,10 @@ nonisolated enum DeclarationDecoder {
         if !ruleSet.allowedApps.isEmpty && !ruleSet.deniedApps.isEmpty {
             notes.append("Both AllowedApps and DeniedApps are set. Both are kept.")
         }
-        ruleSet.appListMode = ruleSet.deniedApps.isEmpty && !ruleSet.allowedApps.isEmpty ? .allow : .deny
+        for key in RuleSet.listKeys where ruleSet.hasEmptyList(key) {
+            notes.append(emptyListNote(key))
+        }
+        ruleSet.appListMode = ruleSet.deniedApps.isEmpty && (!ruleSet.allowedApps.isEmpty || ruleSet.hasEmptyList("AllowedApps")) ? .allow : .deny
         return Result(ruleSet: ruleSet, notes: notes)
     }
 
@@ -110,6 +122,8 @@ nonisolated enum DeclarationDecoder {
                 // "not set") is kept verbatim.
                 guard let items = member.value.arrayValue, !items.isEmpty,
                       items.allSatisfy({ $0.stringValue != nil }) else {
+                    // An empty list is still an iOS key (for the platform guess).
+                    if member.value.arrayValue?.isEmpty == true { hasIOSKeys = true }
                     parts.allowed.object.members.append(member)
                     continue
                 }
@@ -119,6 +133,8 @@ nonisolated enum DeclarationDecoder {
             case "AllowedBinaries", "DeniedBinaries":
                 guard let items = member.value.arrayValue, !items.isEmpty,
                       items.allSatisfy({ $0.objectValue != nil }) else {
+                    // An empty list is still a macOS key (for the platform guess).
+                    if member.value.arrayValue?.isEmpty == true { hasMacKeys = true }
                     parts.allowed.object.members.append(member)
                     continue
                 }

@@ -499,6 +499,14 @@ struct DeployModelTests {
         #expect(model.blockingReason == nil)
     }
 
+    @Test("An empty AllowedBinaries allows nothing: it needs the second confirmation too")
+    func emptyAllowListNeedsASecondConfirmation() throws {
+        let model = DeployModel(app: TestApp.model(), detail: try detail(declarations: #"[{"kind":"CONFIGURATION","type":"com.apple.configuration.app.settings","payload":{"Allowed":{"AllowedBinaries":[]}},"channelType":"SYSTEM"}]"#))
+        #expect(model.allowListWarnings.count == 1)
+        model.isConfirmed = true
+        #expect(model.blockingReason != nil)
+    }
+
     @Test func baselinePresentNeedsNoWarning() throws {
         let model = DeployModel(app: TestApp.model(), detail: try detail(declarations: #"[{"kind":"CONFIGURATION","type":"com.apple.configuration.app.settings","payload":{"Allowed":{"AllowedBinaries":[{"TeamID":"*APPLE*","SigningState":"Apple"},{"TeamID":"ABCDE12345"}],"AlwaysAllowManagedApps":true}},"channelType":"SYSTEM"}]"#))
         #expect(model.allowListWarnings.isEmpty)
