@@ -186,9 +186,20 @@ struct LiveBlueprintTests {
             store.selectedProfileID = profile.id
             let model = AppModel(profileStore: store, defaults: defaults, backupRoot: FileManager.default.temporaryDirectory
                 .appending(path: "as-live-fault-backups", directoryHint: .isDirectory))
-            _ = try? await model.service(waits: RequestWaits()).list()
-            run.record(step: "saved-connection-attempt", passed: false,
-                       note: "a Blueprint list for a saved connection through the real doorway, injected on purpose (--fault saved-connection-attempt)")
+            let before = TestRun.AttemptLog.savedConnections.attempts().count
+            let outcome: String
+            do {
+                _ = try await model.service(waits: RequestWaits()).list()
+                outcome = "not refused: the list was answered"
+            } catch {
+                outcome = error.localizedDescription
+            }
+            // The fault step passes only when the guard refused and wrote it
+            // down; that attempt then fails the run at "at the end".
+            let refused = TestRun.AttemptLog.savedConnections.attempts().count > before
+            run.record(step: "saved-connection-attempt (injected on purpose)", passed: refused,
+                       note: (refused ? "refused and written down: " : "NOT refused: ") + outcome)
+            #expect(refused, "The saved-connection guard didn't refuse: \(outcome)")
         }
 
         guard run.roles.contains(LiveTenant.role) else { return }
