@@ -66,6 +66,10 @@ final class AppModel {
     }
     var editorCommand: EditorCommand?
 
+    /// The Write to Jamf sheet is open: File › New, Open and Import CSV are
+    /// off, so the rule set it writes can't be replaced under it.
+    var isWritingToJamf = false
+
     /// A section chosen in the View menu (⌘1 to ⌘5); the window shows it and
     /// clears it. Works even when the sidebar can't be reached.
     var sectionRequest: SidebarItem?

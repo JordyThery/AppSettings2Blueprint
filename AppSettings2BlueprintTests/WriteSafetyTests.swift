@@ -71,6 +71,35 @@ extension MockNetworkTests {
             #expect(apiRequests("PATCH").count == 1)
         }
 
+        @Test("A rule set replaced under the open sheet isn't linked to the Blueprint or marked saved")
+        func replacedRuleSetIsNotLinked() async throws {
+            let state = ServerState(appSettingsBlueprintJSON)
+            MockURLProtocol.install { request in
+                if request.path == "/auth/token" { return token }
+                if request.method == "PATCH" {
+                    state.applyPatch(request.body)
+                    return MockResponse(status: 204, body: Data())
+                }
+                return .json(200, state.text)
+            }
+            let app = editedModel()
+            app.ruleSet.linkedBlueprint = nil
+            let model = JamfWriteModel(app: app)
+            model.selectedBlueprintID = blueprintID
+            await model.performPrepare()
+            guard case .review(let prepared) = model.phase else { Issue.record("No review: \(model.phase)"); return }
+            // e.g. File › New before the menu item was off
+            app.ruleSet.newRuleSet(platform: .macOS)
+            app.ruleSet.update("Add") { $0.deniedBinaries.append(BinaryRule(teamID: "ABCDE12345", signingID: "com.example.other")) }
+            await model.performCommit(prepared)
+
+            guard case .done = model.phase else { Issue.record("Expected done, got \(model.phase)"); return }
+            #expect(apiRequests("PATCH").count == 1, "the reviewed content was written")
+            #expect(model.selectedBlueprintID == blueprintID)
+            #expect(app.ruleSet.linkedBlueprint == nil, "the new rule set isn't linked")
+            #expect(app.ruleSet.isDirty, "nor marked saved")
+        }
+
         @Test("A created Blueprint that can't be read back is linked, and the sheet can't create it again")
         func createSucceededReadBackFailed() async throws {
             MockURLProtocol.install { request in

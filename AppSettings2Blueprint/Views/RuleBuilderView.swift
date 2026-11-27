@@ -12,7 +12,6 @@ struct RuleBuilderView: View {
     @State private var pendingAction: PendingAction?
     @State private var csvImport: IdentifiedCSV?
     @State private var errorMessage: String?
-    @State private var isWritingToJamf = false
 
     enum PendingAction: Identifiable {
         case new(RulePlatform)
@@ -28,6 +27,7 @@ struct RuleBuilderView: View {
     }
 
     var body: some View {
+        @Bindable var model = model
         let document = model.ruleSet
         VStack(spacing: 0) {
             header
@@ -55,6 +55,8 @@ struct RuleBuilderView: View {
             }
         }
         .onAppear(perform: selectVisibleTab)
+        // The sheet goes with the editor.
+        .onDisappear { model.isWritingToJamf = false }
         .onChange(of: document.ruleSet.platform) { selectVisibleTab() }
         // File and Blueprint menu commands, also when they opened the editor.
         .onChange(of: model.editorCommand, initial: true) { _, command in
@@ -90,7 +92,7 @@ struct RuleBuilderView: View {
                 Text("The rule set has changes that aren’t saved to a file or written to Jamf.")
             }
         }
-        .sheet(isPresented: $isWritingToJamf) {
+        .sheet(isPresented: $model.isWritingToJamf) {
             TargetPickerView(app: model)
         }
         .sheet(item: $csvImport) { item in
@@ -232,8 +234,10 @@ struct RuleBuilderView: View {
     // MARK: Files
 
     /// A header button or its menu command; the same checks either way.
+    /// While Write to Jamf is open, nothing replaces the rule set it writes.
     private func perform(_ command: AppModel.EditorCommand) {
         let document = model.ruleSet
+        if model.isWritingToJamf, command != .save, command != .writeToJamf { return }
         switch command {
         case .new(let platform):
             if document.isDirty { pendingAction = .new(platform) } else { document.newRuleSet(platform: platform) }
@@ -246,7 +250,7 @@ struct RuleBuilderView: View {
             importCSV()
         case .writeToJamf:
             guard !document.hasErrors, model.hasActiveConnection else { return }
-            isWritingToJamf = true
+            model.isWritingToJamf = true
         }
     }
 

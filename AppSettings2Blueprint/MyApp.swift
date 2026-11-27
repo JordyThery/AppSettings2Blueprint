@@ -141,13 +141,17 @@ private struct AppCommands: Commands {
         }
         // The editor's header buttons, in the File menu.
         CommandGroup(replacing: .newItem) {
+            // Off while Write to Jamf is open: they'd replace the rule set it writes.
             Button("New macOS Rule Set") { editor(.new(.macOS)) }
                 .keyboardShortcut("n", modifiers: .command)
+                .disabled(model.isWritingToJamf)
             Button("New iOS / iPadOS Rule Set") { editor(.new(.iOS)) }
                 .keyboardShortcut("n", modifiers: [.command, .option])
+                .disabled(model.isWritingToJamf)
             Divider()
             Button("Open Rule Set…") { editor(.open) }
                 .keyboardShortcut("o", modifiers: .command)
+                .disabled(model.isWritingToJamf)
         }
         CommandGroup(replacing: .saveItem) {
             Button("Save Rule Set…") {
@@ -159,6 +163,7 @@ private struct AppCommands: Commands {
                 .disabled(model.ruleSet.hasErrors)
             Button("Import CSV…") { editor(.importCSV) }
                 .keyboardShortcut("i", modifiers: [.command, .shift])
+                .disabled(model.isWritingToJamf)
         }
         // Writing and the selected Blueprint's actions.
         CommandMenu("Blueprint") {
