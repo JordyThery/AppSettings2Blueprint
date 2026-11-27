@@ -90,9 +90,10 @@ final class AppModel {
     /// or the connection changes: it never runs for a different Blueprint.
     private(set) var blueprintCommand: BlueprintCommandRequest?
 
-    /// For the selected Blueprint; nothing when none is selected.
+    /// For the selected Blueprint; nothing when none is selected or while
+    /// Write to Jamf is open.
     func requestBlueprintCommand(_ command: BlueprintCommand) {
-        guard let id = selectedBlueprintID else { return }
+        guard let id = selectedBlueprintID, !isWritingToJamf else { return }
         blueprintCommand = BlueprintCommandRequest(command: command, blueprintID: id)
     }
 

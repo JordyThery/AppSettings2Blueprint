@@ -169,9 +169,11 @@ private struct AppCommands: Commands {
         CommandMenu("Blueprint") {
             Button("Write to Jamf…") { editor(.writeToJamf) }
                 .keyboardShortcut("j", modifiers: [.command, .shift])
-                .disabled(model.ruleSet.hasErrors || !model.hasActiveConnection)
+                .disabled(model.ruleSet.hasErrors || !model.hasActiveConnection || model.isWritingToJamf)
             Divider()
-            let detail = model.selectedDetail
+            // Off while Write to Jamf is open: they'd switch to Blueprints and
+            // close the sheet in the middle of a write.
+            let detail = model.isWritingToJamf ? nil : model.selectedDetail
             Button("Reload Blueprint") { blueprint(.reload) }
                 .keyboardShortcut("r", modifiers: [.command, .option])
                 .disabled(detail == nil)
@@ -192,6 +194,8 @@ private struct AppCommands: Commands {
                     model.sectionRequest = section
                 }
                 .keyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: .command)
+                // Switching sections would close Write to Jamf mid-write.
+                .disabled(model.isWritingToJamf)
             }
             Divider()
         }
@@ -204,7 +208,7 @@ private struct AppCommands: Commands {
                 openWindow(id: WindowID.main)
                 model.isShowingFetchByID = true
             }
-            .disabled(!model.hasActiveConnection)
+            .disabled(!model.hasActiveConnection || model.isWritingToJamf)
         }
     }
 }

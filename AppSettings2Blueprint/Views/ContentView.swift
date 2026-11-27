@@ -89,6 +89,11 @@ struct ContentView: View {
     }
 
     private func showSectionForCommand() {
+        // Write to Jamf stays open on the editor until it's closed.
+        if model.isWritingToJamf {
+            model.sectionRequest = nil
+            return
+        }
         if let section = model.sectionRequest {
             selection = section
             model.sectionRequest = nil
