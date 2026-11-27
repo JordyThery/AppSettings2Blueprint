@@ -406,11 +406,15 @@ final class AppModel {
             func enqueue() {
                 guard let id = pending.popFirst() else { return }
                 group.addTask {
+                    // One return, after the do/catch (swiftlang/swift#93208:
+                    // a child returning from both can misbehave in Release).
+                    var answer: (id: String, detail: JamfPlatform.BlueprintDetail?, error: String?) = (id, nil, nil)
                     do {
-                        return (id, try await service.detail(id: id), nil)
+                        answer.detail = try await service.detail(id: id)
                     } catch {
-                        return (id, nil, error.localizedDescription)
+                        answer.error = error.localizedDescription
                     }
+                    return answer
                 }
             }
             for _ in 0..<5 { enqueue() }

@@ -167,7 +167,7 @@ final class JamfWriteModel {
     static let stoppedText = "You stopped waiting for Jamf, so nothing was written."
 
     /// JTKit's sentence for a division-assigned Blueprint.
-    static let divisionText = "This Blueprint is assigned to a division and can’t be changed through the API."
+    static let divisionText = JamfPlatform.APIError.divisionLocked
 
     /// The same sentence wherever a Blueprint without scope is refused.
     static func noScopeText(isJamfSchool: Bool) -> String {
