@@ -466,9 +466,17 @@ final class AppModel {
     /// yet, so App Settings in other Blueprints can be found. A failure is kept
     /// in `detailErrors`; that Blueprint is tried again on the next call.
     func loadMissingDetails() async {
-        guard let service = try? currentService() else { return }
-        let generation = connectionGeneration
         let missing = overviews.map(\.id).filter { details[$0] == nil && !loadingDetailIDs.contains($0) }
+        let service: JamfPlatform.Blueprints
+        do {
+            service = try currentService()
+        } catch {
+            // e.g. a locked Keychain: each one is marked as not loaded, so
+            // nothing waits for it.
+            for id in missing { detailErrors[id] = error.localizedDescription }
+            return
+        }
+        let generation = connectionGeneration
         loadingDetailIDs.formUnion(missing)
         defer { if generation == connectionGeneration { loadingDetailIDs.subtract(missing) } }
         for id in missing { detailErrors[id] = nil }

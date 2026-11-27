@@ -196,8 +196,9 @@ final class JamfWriteModel {
     }
 
     /// The listed Blueprints the overlap check can't see yet: their details
-    /// are still loading, or couldn't be loaded. Zero while the target has no
-    /// device groups (there's nothing to overlap with).
+    /// are being loaded, or aren't (they failed, or nothing is loading them).
+    /// Zero while the target has no device groups (there's nothing to overlap
+    /// with).
     var uncheckedForOverlap: (loading: Int, failed: Int) {
         let hasGroups = switch mode {
         case .existing: !(selectedDetail?.scopeDeviceGroups.isEmpty ?? true)
@@ -205,8 +206,8 @@ final class JamfWriteModel {
         }
         guard hasGroups else { return (0, 0) }
         let missing = app.overviews.map(\.id).filter { $0 != selectedBlueprintID && app.details[$0] == nil }
-        let failed = missing.filter { app.detailErrors[$0] != nil }.count
-        return (missing.count - failed, failed)
+        let loading = missing.filter { app.loadingDetailIDs.contains($0) }.count
+        return (loading, missing.count - loading)
     }
 
     // MARK: Actions
