@@ -6,7 +6,7 @@ import Testing
 @testable import AppSettings2Blueprint
 
 /// A secret store that counts reads and writes: demo mode must do neither.
-private final class CountingSecretStore: SecretStore, @unchecked Sendable {
+final class CountingSecretStore: SecretStore, @unchecked Sendable {
     private let lock = NSLock()
     private var secrets: [String: String] = [:]
     private var reads = 0

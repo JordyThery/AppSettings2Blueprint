@@ -37,6 +37,7 @@ struct UnderTestTests {
         #expect(model.profileStore.profiles.isEmpty)
         #expect(model.defaults !== UserDefaults.standard)
         #expect(!model.demo.isOn)
+        #expect(!model.checksForUpdates)
         #expect(model.backupRoot != BackupStore.rootURL)
     }
 
@@ -49,18 +50,21 @@ struct UnderTestTests {
         #expect(ProfileStore(defaults: settings.defaults, secrets: InMemorySecretStore(), countsAsSaved: true).holdsSavedConnections)
     }
 
-    @Test("Every request of a saved connection, sign-in included, is refused before it's sent and written down")
+    @Test("Every request of a saved connection, sign-in included, is refused before the Keychain is read or anything is sent, and written down")
     func savedConnectionRequestsAreRefused() async throws {
         let log = temporaryLog()
+        let secrets = CountingSecretStore()
         // A fake Jamf that answers everything: nothing may reach it.
         let server = MockServer { _ in .json(200, #"{"access_token": "x", "expires_in": 3600}"#) }
         let defaults = TestApp.defaults()
-        let store = ProfileStore(defaults: defaults, secrets: InMemorySecretStore(), countsAsSaved: true)
+        let store = ProfileStore(defaults: defaults, secrets: secrets, countsAsSaved: true)
         let profile = ConnectionProfile(name: "Saved", region: .eu, environmentID: testEnvironmentID, clientID: "client-1")
         try store.connections.save(profile, secrets: [.main: "secret"])
         store.selectedProfileID = profile.id
         let model = AppModel(profileStore: store, session: server.session, defaults: defaults,
                              backupRoot: TestApp.temporaryFolder(), underTestLog: log)
+        #expect(model.refusesSavedConnections)
+        let readsBefore = secrets.readCount
 
         // The Blueprint list.
         model.refresh()
@@ -72,11 +76,17 @@ struct UnderTestTests {
         await #expect(throws: (any Error).self) { _ = try await model.testConnection(profile, typedSecret: nil) }
         await #expect(throws: (any Error).self) { _ = try await model.environments(for: profile, typedSecret: nil) }
 
+        #expect(secrets.readCount == readsBefore, "the Keychain isn't read")
+        let keychainAttempts = log.attempts().map(\.what)
+        #expect(keychainAttempts.count == 4)
+        #expect(keychainAttempts.allSatisfy { $0 == "Keychain read for a saved connection" })
+
+        // A secret typed in Settings skips the Keychain; the sign-in is refused by the network.
+        await #expect(throws: (any Error).self) { _ = try await model.testConnection(profile, typedSecret: "typed") }
         #expect(server.requests.isEmpty)
-        let attempts = log.attempts().map(\.what)
-        #expect(attempts.count >= 4)
-        // Each was a sign-in: refused before anything else could be asked.
-        #expect(attempts.allSatisfy { $0.hasPrefix("POST ") && $0.contains("api.jamfcloud.com") })
+        let signIn = log.attempts().map(\.what).dropFirst(4)
+        #expect(signIn.count == 1)
+        #expect(signIn.allSatisfy { $0.hasPrefix("POST ") && $0.contains("api.jamfcloud.com") })
     }
 
     @Test("A refused request reads as no answer, never as a cancellation, and is written down without its query")
@@ -106,3 +116,4 @@ struct UnderTestTests {
 private extension AppModel {
     var isFailed: Bool { if case .failed = listState { true } else { false } }
 }
+

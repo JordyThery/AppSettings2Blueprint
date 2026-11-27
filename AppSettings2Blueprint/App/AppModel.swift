@@ -167,28 +167,35 @@ final class AppModel {
     ///     temporary folder.
     ///   - underTestLog: where refused requests to the saved connections are
     ///     written; tests pass one of their own.
+    ///   - blocksPublicLookups: no App Store lookups and no update check
+    ///     (Xcode previews); always so under tests.
     init(
         profileStore: ProfileStore = ProfileStore(),
         demo: DemoMode? = nil,
         session: URLSession = .shared,
         defaults: UserDefaults = .standard,
         backupRoot: URL = BackupStore.rootURL,
-        underTestLog: TestRun.AttemptLog = .savedConnections
+        underTestLog: TestRun.AttemptLog = .savedConnections,
+        blocksPublicLookups: Bool = false
     ) {
         self.profileStore = profileStore
+        refusesSavedConnections = UnderTest.isActive && profileStore.holdsSavedConnections
+        self.underTestLog = underTestLog
         self.demo = demo ?? DemoMode(key: Self.demoModeKey, arguments: [DemoMode.launchArgument, "NO"])
         demoChoice = DemoConnectionChoice(mode: self.demo, connections: [.demoJamfPlatform])
-        self.session = UnderTest.isActive && profileStore.holdsSavedConnections ? UnderTest.refusingSession(log: underTestLog) : session
+        self.session = refusesSavedConnections ? UnderTest.refusingSession(log: underTestLog) : session
         self.defaults = defaults
         realBackupRoot = backupRoot
         let log = ActivityLog()
         activityLog = log
         localApps = LocalAppsModel(defaults: defaults)
-        // Under tests (the unit-test host, a sandbox run for the UI tests) the
-        // app makes no public lookups: its App Store client reaches nothing
-        // but demo mode's empty network.
-        let lookups = self.demo.isSandbox || UnderTest.isActive
-            ? DemoNetwork(servers: [:]).session : URLSession(configuration: .ephemeral)
+        // Under tests (the unit-test host, a sandbox run for the UI tests) and
+        // in previews the app makes no public lookups: its App Store client
+        // reaches nothing but demo mode's empty network, and the update
+        // checker never asks GitHub.
+        let noLookups = self.demo.isSandbox || UnderTest.isActive || blocksPublicLookups
+        checksForUpdates = !noLookups
+        let lookups = noLookups ? DemoNetwork(servers: [:]).session : URLSession(configuration: .ephemeral)
         appStore = AppStoreModel(client: AppStoreClient(session: lookups, log: log), defaults: defaults)
         let logger = Logger(subsystem: "be.jordythery.appsettings2blueprint", category: "updates")
         defer {
@@ -197,7 +204,12 @@ final class AppModel {
         }
         updates = UpdateChecker(
             configuration: UpdateConfiguration(owner: "JordyThery", repository: "AppSettings2Blueprint", appName: "AppSettings2Blueprint"),
-            activity: { logger.info("\($0, privacy: .public)") }
+            activity: { logger.info("\($0, privacy: .public)") },
+            // Its settings live with the app's own (a throwaway domain under tests).
+            defaults: defaults,
+            // A blocked checker counts as a sandbox one: neither the daily nor
+            // the manual check asks GitHub.
+            arguments: noLookups ? [DemoMode.sandboxArgument, "YES"] : ProcessInfo.processInfo.arguments
         )
     }
 
@@ -231,11 +243,33 @@ final class AppModel {
                         demo: DemoMode(key: demoModeKey, defaults: defaults, arguments: [DemoMode.launchArgument, "NO"]),
                         session: DemoNetwork(servers: [:]).session, defaults: defaults,
                         backupRoot: FileManager.default.temporaryDirectory
-                            .appending(path: "AppSettings2Blueprint-preview-backups", directoryHint: .isDirectory))
+                            .appending(path: "AppSettings2Blueprint-preview-backups", directoryHint: .isDirectory),
+                        blocksPublicLookups: true)
     }
 
-    /// Under tests (the unit-test host, a sandbox run): no update check.
-    var checksForUpdates: Bool { !demo.isSandbox && !UnderTest.isActive }
+    /// Under tests (the unit-test host, a sandbox run) and in previews: no
+    /// update check.
+    @ObservationIgnored let checksForUpdates: Bool
+
+    /// Under tests with the saved connections: no Keychain read and no
+    /// request for them (`UnderTest`).
+    @ObservationIgnored let refusesSavedConnections: Bool
+    @ObservationIgnored private let underTestLog: TestRun.AttemptLog
+
+    /// What a sign-in to the saved connection needs. Under tests with the
+    /// saved connections, refused (and written down) before the Keychain is
+    /// read.
+    func savedCredentials(for profile: ConnectionProfile) throws -> PlatformCredentials {
+        try refuseSavedConnectionUnderTests("Keychain read for a saved connection")
+        return try profileStore.credentials(for: profile)
+    }
+
+    /// Throws (and records `what`) under tests with the saved connections.
+    func refuseSavedConnectionUnderTests(_ what: String) throws {
+        guard refusesSavedConnections else { return }
+        underTestLog.record(what)
+        throw TestRun.Refusal(UnderTest.refusal)
+    }
 
     // MARK: Settings
 
@@ -271,7 +305,7 @@ final class AppModel {
             return made
         }
         guard let profile = profileStore.selectedProfile else { throw APIError.missingCredentials }
-        let credentials = try profileStore.credentials(for: profile)
+        let credentials = try savedCredentials(for: profile)
         if let client, client.credentials == credentials {
             return client.client
         }
@@ -294,7 +328,7 @@ final class AppModel {
                 log: activityLog, waits: waits))
         }
         guard let profile = profileStore.selectedProfile else { throw APIError.missingCredentials }
-        let credentials = try profileStore.credentials(for: profile)
+        let credentials = try savedCredentials(for: profile)
         return JamfPlatform.Blueprints(client: try PlatformAPIClient.make(
             credentials: credentials, session: session, log: activityLog, waits: waits))
     }
