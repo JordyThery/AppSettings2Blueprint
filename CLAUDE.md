@@ -2,7 +2,7 @@
 
 At the start of every conversation, run ../JTKit/Scripts/check-versions.sh (or fetch it from GitHub if ../JTKit isn’t there) and mention the result in one line if anything is out of date.
 
-Shared code and the standards for every app: see JTKit's CLAUDE.md and ROADMAP.md (github.com/JordyThery/JTKit, or ../JTKit in the workspace).
+Shared code and the standards for every app: see JTKit's CLAUDE.md and ROADMAP.md (github.com/JordyThery/JTKit, or ../JTKit in the workspace). This app's own unscheduled ideas are in ROADMAP.md (nothing planned).
 
 ## What the app does
 
@@ -19,18 +19,18 @@ It is not a policy advisor: it shows what each identifier matches; the admin dec
 
 ## Architecture
 
-- `App/`: `AppModel` (active connection, Blueprint list, device groups, Jamf School detection), `RuleSetDocument` (the rule set, undo), `JamfWriteModel`, `DeployModel`, `EditScopeModel`, `AppStoreModel`, `LocalAppsModel`, `AboutInfo` (About and the App Settings Utility acknowledgement).
+- `App/`: `AppModel` (active connection, Blueprint list, device groups, Jamf School detection), `RuleSetDocument` (the rule set, undo), `JamfWriteModel`, `DeployModel`, `EditScopeModel`, `AppStoreModel`, `LocalAppsModel`, `AboutInfo` (About and the App Settings Utility acknowledgement), `UnderTest` (the under-tests guard, see Testing).
 - `Rules/`: `RuleSet`, `BinaryRule`, `PermissionDefault`, `RuleValidator`, `DeclarationEncoder` / `DeclarationDecoder` (rule set to and from declarations).
-- `Blueprints/`: `AppSettingsLocator` (finds and replaces the App Settings component), `BlueprintWriter` (prepare, back up, write, verify, restore), `BackupStore`.
+- `Blueprints/`: `AppSettingsLocator` (finds and replaces the App Settings component), `BlueprintWriter` (prepare, back up, write, verify, restore), `BackupStore` (folder, retention key and live-check folder on JTKit's `TimestampedBackupStore`).
 - `Lookup/`: `AppStoreClient`, `CodeSignatureInspector`, `MachOSlices`, `LocalAppScanner`, `AppleBuiltInApps` (with `Resources/AppleBuiltInApps.json`).
 - `Interop/`: App Settings Utility's two CSV formats, import and export.
 - `API/`: `RequestAllowList` and `PlatformAPIClient` (builds JTKit's client with the app's allow-list and hint); `APIError`.
 - `Connection/`: `ConnectionProfile`, `ProfileStore` (on JTKit's `ConnectionStore`).
-- `Core/TextDiff` (review diff), `Views/` (SwiftUI).
+- `Core/TextDiff` (review diff), `Views/` (SwiftUI; `RetryWaitBanner` shows a sheet's `RequestWaits` with Stop).
 
-From JTKit: `JamfPlatform` (client, Blueprints list/get/create/PATCH steps/PATCH scope/deploy/report, device groups, deploy watch, error format, `PermissionProblem`, environments), `LosslessJSON`, `JamfRegion`, `RequestRecorder` + `RequestWaits` (retry waits with Stop, `RetryWaitBanner` in the sheets) + `ActivityLog` + `ActivityLogWindow`, `ConnectionStore` + `KeychainSecretStore` + `ConnectionsSettingsTab` + `ConnectionPicker` + `ConnectionCommands`, `AboutWindow` + `Acknowledgement`, `SettingsWindow`, `UpdateChecker` + `AppInfoCommands`. Tests use `JTKitTestSupport`.
+From JTKit: `JamfPlatform` (client, Blueprints list/get/create/PATCH steps/PATCH scope/deploy/report, device groups, deploy watch, error format, `PermissionProblem`, `PermissionCheck` for Test Connection, environments, the division-lock sentence), `LosslessJSON`, `JamfRegion`, `RequestRecorder` + `RequestWaits` (retry waits with Stop) + `ActivityLog` + `ActivityLogWindow`, `ConnectionStore` + `KeychainSecretStore` + `ConnectionsSettingsTab` + `ConnectionPicker` + `ConnectionCommands`, `TimestampedBackupStore` + `BackupRetention`, `DemoMode` + `DemoModeToggle`, `LiveLaunch` (the release check's live-check switch), `TestRun` (under tests: attempt logs, refusing session), `AboutWindow` + `Acknowledgement`, `SettingsWindow`, `UpdateChecker` + `AppInfoCommands`. Unit tests use `JTKitTestSupport` and, for the live checks, `JTKitLiveCheck`; UI tests use `JTKitUITestSupport`.
 
-App-specific (stays here): declaration encoding/decoding, rules and validation, `AppSettingsLocator`, `BlueprintWriter`, `BackupStore`, CSV, App Store and code-signature lookups, the allow-list, Jamf School detection.
+App-specific (stays here): declaration encoding/decoding, rules and validation, `AppSettingsLocator`, `BlueprintWriter`, CSV, App Store and code-signature lookups, the allow-list, Jamf School detection.
 
 Extend JTKit instead of adding another copy. If something here would be useful to another app, it belongs in JTKit (via the workspace).
 
@@ -41,12 +41,12 @@ Extend JTKit instead of adding another copy. If something here would be useful t
 - The Blueprints API applies PATCH as a JSON merge-patch, which replaces arrays wholesale. Always send the complete `steps` array, with everything outside the App Settings component exactly as received (`LosslessJSON` keeps key order and number text). Never reformat or re-sort JSON.
 - Only the `com.jamf.ddm-strict` component is edited. App Settings in other components are shown, not changed.
 - Order of a write: fetch again, check `updated` and the steps are unchanged, back up, PATCH, verify against a read-back. If the Blueprint changed on the server, write nothing.
-- Backups are never overwritten. Write them with `.withoutOverwriting` only, never combined with `.atomic`. Folders 0700, files 0600 (they hold other components' secrets). Old backups are removed only by the retention the user chooses in Settings › General (default Forever), never the newest one of a Blueprint.
+- Backups are never overwritten: `.withoutOverwriting` only, never combined with `.atomic`; folders 0700, files 0600 (they hold other components' secrets). JTKit's `TimestampedBackupStore` carries this out; don't add an app-side writer. The backup before a change reuses the Blueprint's newest backup when it holds exactly the same bytes (`BackupStore.backUp`), so a repeated review adds no copy. Old backups are removed only by the retention the user chooses in Settings › General (default Forever), never the newest one of a Blueprint.
 - After a write request was sent, a failure (no clear answer, or the read-back failing) is `WriteError.notVerified`/`.outcomeUnknown`: the sheet shows "not verified" with Close only, never Back, so a create can't be repeated.
 - Deploy fetches the Blueprint again just before the POST; if `updated`, steps or scope differ from what was confirmed, it shows the confirmation again, unconfirmed.
 - Never send `divisionId`. Division-assigned Blueprints are read-only (JTKit's `DIVISION_PATCH_NOT_ALLOWED`).
 - The allow-list permits only GET, `POST /auth/token`, Blueprint create, PATCH and deploy. Never add DELETE or undeploy.
-- Writing never deploys. Deploy needs a confirmation listing groups and device count, and a second one for a macOS allow list without `AlwaysAllowManagedApps` or the Apple-signed baseline. Removing groups from a deployed Blueprint needs an extra confirmation.
+- Writing never deploys. Deploy needs a confirmation listing groups and device count, and a second one for a macOS allow list without `AlwaysAllowManagedApps` or the Apple-signed baseline (an empty `AllowedBinaries` counts: it allows nothing). Removing groups from a deployed Blueprint needs an extra confirmation.
 - Edit Scope sends only the scope, after the same checks and backup, and verifies the steps are unchanged.
 
 ## Verified Jamf behavior
@@ -71,7 +71,7 @@ Extend JTKit instead of adding another copy. If something here would be useful t
 - App Store lookups are logged in the activity log as "App Store" and are not retried. Lookups never include Jamf data or credentials.
 - Keep README's Permissions and Network tables complete when adding an endpoint or host.
 - A connection or Demo Mode switch is applied by `AppModel` (it observes `connectionKey`: demo, the connection's ID, region, Environment ID and client ID; a rename isn't a switch), never by a view. Sheets store or link a result only while `connectionGeneration` is still theirs.
-- Menu commands (File: New, Open, Save, Import CSV; Blueprint: Write to Jamf, Reload, Edit Scope, Backups, Deploy) set `AppModel.editorCommand`/`blueprintCommand`; `ContentView` shows the section, which runs it with its own confirmations. Each sheet has its own `RequestWaits` (`AppModel.service(waits:)`). Sheets are made resizable with `resizableSheet(minWidth:minHeight:)`; a synthesized XCUI drag doesn't resize any window, so that isn't UI-tested.
+- Menu commands (File: New, Open, Save, Import CSV; Blueprint: Write to Jamf, Reload, Edit Scope, Backups, Deploy) set `AppModel.editorCommand`/`blueprintCommand`; `ContentView` shows the section, which runs it with its own confirmations. While Write to Jamf is open (`AppModel.isWritingToJamf`), New, Open and Import CSV are off, and the write links and marks saved only the rule set it wrote. Each sheet has its own `RequestWaits` (`AppModel.service(waits:)`). Sheets are made resizable with `resizableSheet(minWidth:minHeight:)`; a synthesized XCUI drag doesn't resize any window, so that isn't UI-tested.
 - Secrets are read with `readSecret`; a Keychain that refuses or is locked is `APIError.keychainUnreadable`, never "no complete connection".
 - The activity log records no Blueprint request or response bodies (JTKit's default; only error answers): other components can hold Wi-Fi passwords. Don't set `recordsBodies`.
 - Under the live-check switch (`LiveLaunch`) backups go to `LiveLaunch.appFilesFolder("Backups")`, the connection store holds only the release check's connections and the selection isn't saved.
@@ -82,7 +82,9 @@ What this app waits for from Apple, Jamf or Microsoft, or must recheck: see WATC
 
 ## Testing
 
-- **Unit tests** (Swift Testing, `AppSettings2BlueprintTests`): scheme `AppSettings2Blueprint`, ⌘U or `xcodebuild test -scheme AppSettings2Blueprint`. No real network: `Support/MockURLProtocol` and `JTKitTestSupport`.
+- **Unit tests** (Swift Testing, `AppSettings2BlueprintTests`): scheme `AppSettings2Blueprint`, ⌘U or `xcodebuild test -scheme AppSettings2Blueprint -only-testing:AppSettings2BlueprintTests`. No real network: `Support/MockURLProtocol` and `JTKitTestSupport`. Test settings live in the test process's temporary folder (`Support/TestSettings`), never in Preferences.
+- **Under tests** (`App/UnderTest`, JTKit's `TestRun`): the unit-test host and a sandbox launch (the UI tests) start with settings and secrets of their own (`AppModel.forLaunch()`: a throwaway domain or the sandbox suite, `SandboxSecretStore`, Demo Mode off, no App Store lookups, no update check), and Xcode previews use `AppModel.preview()`; no saved connection, Keychain item or real setting is read. A model still given the saved connections (`ProfileStore.holdsSavedConnections`) gets JTKit's refusing session: every request, sign-in included, is refused before it's sent and written to the attempt log (`AppSettings2Blueprint-under-test` in the temporary folder). The live checks record "no request to a saved connection under tests" before the live steps and as the last step, so any attempt fails the release check; `release-check.sh` empties the log first. Demo Mode is answered inside the app and never refused.
+- Ask Jordy before starting a release check or any UI test; once he says go, it may run unattended (start with `nohup`, then poll).
 - **UI tests** (`AppSettings2BlueprintUITests`, own scheme): never run the full suite or `Scripts/run-ui-tests.sh` without test names, unless Jordy asks for it by name (see "Testing" in JTKit's CLAUDE.md). For a single named test: `Scripts/run-ui-tests.sh Class/testName`. Use the script, not the Xcode MCP (Xcode crashed during UI test runs). They drive the Debug build and need no Jamf credentials.
   - On failure: UI tree in `/tmp/as2b-uidump.txt`, screenshots in `/tmp/as2b-uitest-attachments`.
   - The README screenshots are `WebsiteScreenshotUITests`' Demo Mode shots: `as2b-editor` → `docs/screenshot-ruleset.png`, `as2b-lookup` → `docs/screenshot-localapps.png` (exported to `/tmp/as2b-uitest-attachments`). `ScreenshotUITests` takes older ones without Demo Mode. Hands off the Mac while either runs.
@@ -90,14 +92,14 @@ What this app waits for from Apple, Jamf or Microsoft, or must recheck: see WATC
   - Launch arguments (`-sidebarSelection`, `-checksForUpdates NO`, `-NSNavLastRootDirectory`) override UserDefaults writes. So persisted app state is read once into `@State`, never bound with `@AppStorage`.
   - XCUI on macOS 27: SwiftUI `Text` exposes its string as `value` (label empty); a SwiftUI `Table` is an outline; TabView tabs are `.tab` elements; confirmation-dialog buttons need sheet/dialog scoping (otherwise the Touch Bar copy matches); undo needs editing to end first (a focused text field keeps its typing on the window's undo stack). A title with the heading trait exposes its string as the label: find it with `staticTexts["…"]`, not a predicate's `firstMatch`. A fresh test runner crashes (CGS_REQUIRE_INIT) when its first event is a key press, so `DemoSmokeUITests.didLaunch` clicks the title bar first.
   - Extend the `AppSettingsUITestCase` helpers instead of raw queries. Add accessibility identifiers or labels in the app when an element is hard to find.
-- **Release check**: `Scripts/release-check.sh` (scheme "AppSettings2Blueprint Release Check"; `--local-jtkit` before a JTKit version is tagged). Own-project build against the published JTKit and sign-in, unit tests, `DemoSmokeUITests` in demo mode (the only UI tests it runs), live checks on jamf-test-a over the Platform API, report. Claude may run it unattended (nohup, poll). Tenants come only from the local allow-list outside git. Never name a tenant in this repo.
+- **Release check**: `Scripts/release-check.sh` (scheme "AppSettings2Blueprint Release Check"; `--local-jtkit` before a JTKit version is tagged). Own-project build against the published JTKit and sign-in, unit tests, `DemoSmokeUITests` in demo mode (the only UI tests it runs), live checks on jamf-test-a over the Platform API, report. `--fault saved-connection-attempt` (with `--local-jtkit`) checks that a request to a saved connection under tests fails the run. Tenants come only from the local allow-list outside git. Never name a tenant in this repo.
   - Live checks (`LiveCheckTests.swift`, skipped on ⌘U): an empty **static** `JTKTEST AS …` computer group (checked for 0 members before scoping and again before deploying; never a smart group), a `JTKTEST` Blueprint with one app setting created and written by `BlueprintWriter` with the app's own client and allow-list, deployed, read back, then removed. Backups go to a temporary folder. Deleting test objects is done only by the test code through JTKit's guarded network; the app's own allow-list still never sends DELETE or undeploy.
   - Verified 2026-10-28: a deployed Blueprint can be deleted directly (no undeploy). Jamf removes it in the background; until then the group's DELETE answers 422 `HAS_DEPENDENCIES`, so the check waits and retries only that answer.
   - The fingerprint compares `connectionProfiles`, `selectedConnectionProfileID`, `demoMode`, `sidebarSelection`, `appStoreStorefront`, `includeUserApplicationsFolder`, `backupRetentionDays` (single settings: the preferences file also holds window frames), `Backups/` and the Keychain item names.
 
 ## Releasing
 
-1. Set the version (`MARKETING_VERSION`, now 1.3.1) and build number (`CURRENT_PROJECT_VERSION`) of the app target.
+1. Set the version (`MARKETING_VERSION`) and build number (`CURRENT_PROJECT_VERSION`) of the app target.
 2. CHANGELOG.md: move "Unreleased" under the new version; short, user-facing bullets. Update README.md if features, permissions or hosts changed. Release notes (CHANGELOG entries and GitHub release notes) are for the end user: professional and concise, saying what changed for them, and never mentioning the release check, reviews, tests, test targets, AI tools, JTKit step numbers or how a problem was found (decided by Jordy on 2026-11-01).
 3. Build from `AppSettings2Blueprint.xcodeproj` against the published JTKit. Hardened Runtime stays on; the app is not sandboxed.
 4. Jordy does the Developer ID signing and notarization himself; Claude never signs or notarizes (JTKit/CLAUDE.md, “Releasing an app”). Check the notarized app he supplies: `CFBundleShortVersionString` matches the tag, `codesign --verify --deep --strict`, `spctl -a`, `xcrun stapler validate`. Zip it with `ditto -c -k --keepParent`, unzip a copy elsewhere and check it again, and after Jordy approves the notes attach it to `gh release create`, tagged `vX.Y.Z`. The updater reads GitHub's latest release, so the tag must be a version (suffixes like `v1.2.1-hotfix` are understood).
