@@ -1,11 +1,11 @@
 # Changelog
 
-## 1.3.2 — 2026-11-27
+## 1.3.2 — 2026-11-28
 
-- **Write to Jamf** keeps the rule set it writes: while the sheet is open, File › New, Open and Import CSV, the View menu’s sections and the Blueprint menu’s commands are unavailable, so the editor can’t be replaced and the sheet can’t close in the middle of a write.
-- An empty **AllowedBinaries** or **AllowedApps** list in a Blueprint is now shown in the editor, with a Remove button, and pointed out when it’s loaded. An empty AllowedBinaries allows nothing, so deploying it asks for the extra confirmation, as for an allow list without the recommended baseline. Two declarations that combine an allow list with an empty one, which together allow nothing, are pointed out the same way.
-- **Write to Jamf** says when other Blueprints are still being checked for App Settings in the same device groups, or couldn’t be checked, instead of showing no overlap warning.
-- Two App Settings declarations combined into one no longer write a setting the app doesn’t edit twice; the first value is kept and the load note names it.
+- **Write to Jamf** keeps the rule set it writes: while the sheet is open, File › New, Open and Import CSV, the View menu's sections and the Blueprint menu's commands are unavailable, so the editor can't be replaced and the sheet can't close in the middle of a write.
+- An empty **AllowedBinaries** or **AllowedApps** list in a Blueprint is now shown in the editor, with a Remove button, and pointed out when it's loaded. An empty AllowedBinaries allows nothing, so deploying it asks for the extra confirmation, as for an allow list without the recommended baseline. Two declarations that combine an allow list with an empty one, which together allow nothing, are pointed out the same way.
+- **Write to Jamf** says when other Blueprints are still being checked for App Settings in the same device groups, or couldn't be checked, instead of showing no overlap warning.
+- Two App Settings declarations combined into one no longer write a setting the app doesn't edit twice; the first value is kept and the load note names it.
 - **Review Changes…** no longer writes another backup each time while the Blueprint is unchanged.
 - Connection and Keychain messages in the system log no longer show connection identifiers or error details.
 - Improved stability of loading Blueprint details and App Store searches.
