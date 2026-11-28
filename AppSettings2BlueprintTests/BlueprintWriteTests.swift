@@ -405,6 +405,24 @@ struct BackupStoreTests {
         #expect(try Data(contentsOf: second) == Data(appSettingsBlueprintJSON.utf8))
         #expect(first.deletingLastPathComponent().lastPathComponent == detail.id)
     }
+
+    @Test("The backup before a change isn't written again while the Blueprint is unchanged")
+    func unchangedBlueprintIsBackedUpOnce() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "as2b-backups-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let detail = try JamfPlatform.BlueprintDetail(data: Data(appSettingsBlueprintJSON.utf8))
+        let first = try BackupStore.backUp(detail, root: root)
+        let again = try BackupStore.backUp(detail, root: root)
+        #expect(again.lastPathComponent == first.lastPathComponent)
+        #expect(BackupStore.backups(for: detail.id, root: root).count == 1)
+
+        let changed = try JamfPlatform.BlueprintDetail(data: Data(appSettingsBlueprintJSON
+            .replacingOccurrences(of: "2026-10-02T09:30:00.222222Z", with: "2026-10-03T09:30:00.222222Z").utf8))
+        let next = try BackupStore.backUp(changed, root: root)
+        #expect(next.lastPathComponent != first.lastPathComponent)
+        #expect(BackupStore.backups(for: detail.id, root: root).count == 2)
+        #expect(try Data(contentsOf: next) == changed.rawData)
+    }
 }
 
 extension MockNetworkTests {
@@ -497,6 +515,29 @@ struct DeployModelTests {
         #expect(model.blockingReason != nil)
         model.acknowledgesAllowListRisk = true
         #expect(model.blockingReason == nil)
+    }
+
+    @Test("An empty AllowedBinaries allows nothing: it needs the second confirmation too")
+    func emptyAllowListNeedsASecondConfirmation() throws {
+        let model = DeployModel(app: TestApp.model(), detail: try detail(declarations: #"[{"kind":"CONFIGURATION","type":"com.apple.configuration.app.settings","payload":{"Allowed":{"AllowedBinaries":[]}},"channelType":"SYSTEM"}]"#))
+        #expect(model.allowListWarnings.count == 1)
+        model.isConfirmed = true
+        #expect(model.blockingReason != nil)
+    }
+
+    @Test("Two declarations, AllowedBinaries with the baseline and an empty one: together they allow nothing, so deploying warns")
+    func entriesAndEmptyAllowListWarns() throws {
+        let entries = #"{"kind":"CONFIGURATION","type":"com.apple.configuration.app.settings","payload":{"Allowed":{"AllowedBinaries":[{"TeamID":"*APPLE*","SigningState":"Apple"}],"AlwaysAllowManagedApps":true}},"channelType":"SYSTEM"}"#
+        let empty = #"{"kind":"CONFIGURATION","type":"com.apple.configuration.app.settings","payload":{"Allowed":{"AllowedBinaries":[]}},"channelType":"SYSTEM"}"#
+        let model = DeployModel(app: TestApp.model(), detail: try detail(declarations: "[\(entries),\(empty)]"))
+        #expect(model.allowListWarnings.count == 1)
+        #expect(model.allowListWarnings.first?.contains("allow no binary") == true)
+    }
+
+    @Test("Mixed iOS and macOS keys with an empty AllowedBinaries: deploying warns")
+    func mixedKeysEmptyAllowListWarns() throws {
+        let model = DeployModel(app: TestApp.model(), detail: try detail(declarations: #"[{"kind":"CONFIGURATION","type":"com.apple.configuration.app.settings","payload":{"Allowed":{"AllowedApps":["com.example.app"],"AllowedBinaries":[]}},"channelType":"SYSTEM"}]"#))
+        #expect(model.allowListWarnings.count == 1)
     }
 
     @Test func baselinePresentNeedsNoWarning() throws {

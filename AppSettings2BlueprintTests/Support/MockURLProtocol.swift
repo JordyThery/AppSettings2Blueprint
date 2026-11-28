@@ -44,21 +44,11 @@ final class SleepRecorder: @unchecked Sendable {
 /// the network a test passes in. Never the app's real preferences or Keychain.
 @MainActor
 enum TestApp {
-    private static var suiteNames: [String] = []
-
-    /// A fresh, empty settings suite of its own (tests run in parallel),
-    /// removed when the test host quits.
+    /// A fresh, empty settings domain of its own (tests run in parallel), in
+    /// the test process's temporary folder (`TestSettings`), never in
+    /// Preferences.
     static func defaults() -> UserDefaults {
-        let name = "be.jordythery.appsettings2blueprint.tests.\(UUID().uuidString)"
-        if suiteNames.isEmpty {
-            NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: nil) { _ in
-                MainActor.assumeIsolated {
-                    for name in suiteNames { UserDefaults.standard.removePersistentDomain(forName: name) }
-                }
-            }
-        }
-        suiteNames.append(name)
-        return UserDefaults(suiteName: name)!
+        TestSettings.makeDefaults("app").defaults
     }
 
     /// - Parameters:

@@ -9,20 +9,19 @@ import Testing
 @Suite("Saved connections", .serialized)
 final class ConnectionStorageTests {
     private let defaults: UserDefaults
-    /// One throwaway settings file for the whole suite, emptied around every test.
-    private let suiteName = "be.jordythery.appsettings2blueprint.tests.connections"
+    /// A throwaway settings domain of its own (`TestSettings`).
+    private let domain: String
     private let secrets = InMemorySecretStore()
 
     private let first = UUID(uuidString: "C0FFEE00-0000-4000-8000-000000000001")!
     private let second = UUID(uuidString: "42B1F00D-0000-4000-8000-000000000002")!
 
     init() {
-        defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
+        (domain, defaults) = TestSettings.makeDefaults("connections")
     }
 
     deinit {
-        defaults.removePersistentDomain(forName: suiteName)
+        defaults.removePersistentDomain(forName: domain)
     }
 
     /// The list as earlier versions saved it: `JSONEncoder()` with no options.

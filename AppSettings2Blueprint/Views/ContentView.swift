@@ -89,6 +89,11 @@ struct ContentView: View {
     }
 
     private func showSectionForCommand() {
+        // Write to Jamf stays open on the editor until it's closed.
+        if model.isWritingToJamf {
+            model.sectionRequest = nil
+            return
+        }
         if let section = model.sectionRequest {
             selection = section
             model.sectionRequest = nil
@@ -263,7 +268,8 @@ private struct FetchByIDSheet: View {
 }
 
 #Preview {
-    let model = AppModel()
+    // Never the saved connections or the Keychain.
+    let model = AppModel.preview()
     ContentView()
         .environment(model)
         .environment(model.updates)

@@ -66,6 +66,10 @@ final class AppModel {
     }
     var editorCommand: EditorCommand?
 
+    /// The Write to Jamf sheet is open: File › New, Open and Import CSV are
+    /// off, so the rule set it writes can't be replaced under it.
+    var isWritingToJamf = false
+
     /// A section chosen in the View menu (⌘1 to ⌘5); the window shows it and
     /// clears it. Works even when the sidebar can't be reached.
     var sectionRequest: SidebarItem?
@@ -86,9 +90,10 @@ final class AppModel {
     /// or the connection changes: it never runs for a different Blueprint.
     private(set) var blueprintCommand: BlueprintCommandRequest?
 
-    /// For the selected Blueprint; nothing when none is selected.
+    /// For the selected Blueprint; nothing when none is selected or while
+    /// Write to Jamf is open.
     func requestBlueprintCommand(_ command: BlueprintCommand) {
-        guard let id = selectedBlueprintID else { return }
+        guard let id = selectedBlueprintID, !isWritingToJamf else { return }
         blueprintCommand = BlueprintCommandRequest(command: command, blueprintID: id)
     }
 
@@ -120,7 +125,9 @@ final class AppModel {
     private var client: (credentials: PlatformCredentials, client: JamfPlatform.Client)?
     /// JTKit's client for demo mode, the same for the whole launch.
     @ObservationIgnored private var demoClient: JamfPlatform.Client?
-    /// The network for real connections; demo mode has its own.
+    /// The network for real connections; demo mode has its own. Under tests
+    /// it refuses every request when the connections are the saved ones
+    /// (`UnderTest`).
     @ObservationIgnored let session: URLSession
     private var listTask: Task<Void, Never>?
     /// Incremented on every connection or demo switch. Async work compares it
@@ -154,29 +161,42 @@ final class AppModel {
     ///   - profileStore: the saved connections; in-memory ones for a sandbox run.
     ///   - demo: the app passes its saved demo mode (`forLaunch()`). Previews
     ///     and tests start with it off, and save nothing.
-    ///   - session: the network for real connections.
+    ///   - session: the network for real connections. Under tests, with the
+    ///     saved connections, a refusing one is used instead (`UnderTest`).
     ///   - defaults: where the app's own settings are saved.
     ///   - backupRoot: where backups go outside demo mode; tests pass a
     ///     temporary folder.
+    ///   - underTestLog: where refused requests to the saved connections are
+    ///     written; tests pass one of their own.
+    ///   - blocksPublicLookups: no App Store lookups and no update check
+    ///     (Xcode previews); always so under tests.
     init(
         profileStore: ProfileStore = ProfileStore(),
         demo: DemoMode? = nil,
         session: URLSession = .shared,
         defaults: UserDefaults = .standard,
-        backupRoot: URL = BackupStore.rootURL
+        backupRoot: URL = BackupStore.rootURL,
+        underTestLog: TestRun.AttemptLog = .savedConnections,
+        blocksPublicLookups: Bool = false
     ) {
         self.profileStore = profileStore
+        refusesSavedConnections = UnderTest.isActive && profileStore.holdsSavedConnections
+        self.underTestLog = underTestLog
         self.demo = demo ?? DemoMode(key: Self.demoModeKey, arguments: [DemoMode.launchArgument, "NO"])
         demoChoice = DemoConnectionChoice(mode: self.demo, connections: [.demoJamfPlatform])
-        self.session = session
+        self.session = refusesSavedConnections ? UnderTest.refusingSession(log: underTestLog) : session
         self.defaults = defaults
         realBackupRoot = backupRoot
         let log = ActivityLog()
         activityLog = log
         localApps = LocalAppsModel(defaults: defaults)
-        // A sandbox run (UI tests) makes no public lookups: its App Store client
-        // reaches nothing but demo mode's empty network.
-        let lookups = self.demo.isSandbox ? DemoNetwork(servers: [:]).session : URLSession(configuration: .ephemeral)
+        // Under tests (the unit-test host, a sandbox run for the UI tests) and
+        // in previews the app makes no public lookups: its App Store client
+        // reaches nothing but demo mode's empty network, and the update
+        // checker never asks GitHub.
+        let noLookups = self.demo.isSandbox || UnderTest.isActive || blocksPublicLookups
+        checksForUpdates = !noLookups
+        let lookups = noLookups ? DemoNetwork(servers: [:]).session : URLSession(configuration: .ephemeral)
         appStore = AppStoreModel(client: AppStoreClient(session: lookups, log: log), defaults: defaults)
         let logger = Logger(subsystem: "be.jordythery.appsettings2blueprint", category: "updates")
         defer {
@@ -185,19 +205,71 @@ final class AppModel {
         }
         updates = UpdateChecker(
             configuration: UpdateConfiguration(owner: "JordyThery", repository: "AppSettings2Blueprint", appName: "AppSettings2Blueprint"),
-            activity: { logger.info("\($0, privacy: .public)") }
+            activity: { logger.info("\($0, privacy: .public)") },
+            // Its settings live with the app's own (a throwaway domain under tests).
+            defaults: defaults,
+            // A blocked checker counts as a sandbox one: neither the daily nor
+            // the manual check asks GitHub.
+            arguments: noLookups ? [DemoMode.sandboxArgument, "YES"] : ProcessInfo.processInfo.arguments
         )
     }
 
-    /// The model for this launch: the saved connections and demo mode, or, for
-    /// a sandbox run (`-JTKitSandbox YES`), connections and secrets in memory
-    /// and settings in the run's own suite.
+    /// The model for this launch: the saved connections and demo mode, or,
+    /// under tests, settings and secrets of the run's own, so no saved
+    /// connection, Keychain item or real setting is read or written:
+    /// - the host of the unit tests: a throwaway settings domain in the
+    ///   temporary folder, secrets in memory, Demo Mode off;
+    /// - a sandbox run (`-JTKitSandbox YES`, the UI tests): connections and
+    ///   secrets in memory and settings in the run's own suite.
     static func forLaunch() -> AppModel {
+        if TestRun.isUnitTestHost {
+            let defaults = UnderTest.throwawayDefaults(named: "unit-test-host")
+            return AppModel(profileStore: ProfileStore(defaults: defaults, secrets: SandboxSecretStore()),
+                            demo: DemoMode(key: demoModeKey, defaults: defaults, arguments: [DemoMode.launchArgument, "NO"]),
+                            defaults: defaults, backupRoot: FileManager.default.temporaryDirectory
+                                .appending(path: "AppSettings2Blueprint-unit-test-host-backups", directoryHint: .isDirectory))
+        }
         let demo = DemoMode(key: demoModeKey)
         guard demo.isSandbox else { return AppModel(demo: demo) }
         let defaults = DemoMode.sandboxDefaults()
         return AppModel(profileStore: ProfileStore(defaults: defaults, secrets: SandboxSecretStore()),
                         demo: demo, defaults: defaults)
+    }
+
+    /// For Xcode previews: no saved connection, Keychain item or real
+    /// setting, and a network that reaches nothing.
+    static func preview() -> AppModel {
+        let defaults = UnderTest.throwawayDefaults(named: "preview")
+        return AppModel(profileStore: ProfileStore(defaults: defaults, secrets: SandboxSecretStore()),
+                        demo: DemoMode(key: demoModeKey, defaults: defaults, arguments: [DemoMode.launchArgument, "NO"]),
+                        session: DemoNetwork(servers: [:]).session, defaults: defaults,
+                        backupRoot: FileManager.default.temporaryDirectory
+                            .appending(path: "AppSettings2Blueprint-preview-backups", directoryHint: .isDirectory),
+                        blocksPublicLookups: true)
+    }
+
+    /// Under tests (the unit-test host, a sandbox run) and in previews: no
+    /// update check.
+    @ObservationIgnored let checksForUpdates: Bool
+
+    /// Under tests with the saved connections: no Keychain read and no
+    /// request for them (`UnderTest`).
+    @ObservationIgnored let refusesSavedConnections: Bool
+    @ObservationIgnored private let underTestLog: TestRun.AttemptLog
+
+    /// What a sign-in to the saved connection needs. Under tests with the
+    /// saved connections, refused (and written down) before the Keychain is
+    /// read.
+    func savedCredentials(for profile: ConnectionProfile) throws -> PlatformCredentials {
+        try refuseSavedConnectionUnderTests("Keychain read for a saved connection")
+        return try profileStore.credentials(for: profile)
+    }
+
+    /// Throws (and records `what`) under tests with the saved connections.
+    func refuseSavedConnectionUnderTests(_ what: String) throws {
+        guard refusesSavedConnections else { return }
+        underTestLog.record(what)
+        throw TestRun.Refusal(UnderTest.refusal)
     }
 
     // MARK: Settings
@@ -234,7 +306,7 @@ final class AppModel {
             return made
         }
         guard let profile = profileStore.selectedProfile else { throw APIError.missingCredentials }
-        let credentials = try profileStore.credentials(for: profile)
+        let credentials = try savedCredentials(for: profile)
         if let client, client.credentials == credentials {
             return client.client
         }
@@ -257,7 +329,7 @@ final class AppModel {
                 log: activityLog, waits: waits))
         }
         guard let profile = profileStore.selectedProfile else { throw APIError.missingCredentials }
-        let credentials = try profileStore.credentials(for: profile)
+        let credentials = try savedCredentials(for: profile)
         return JamfPlatform.Blueprints(client: try PlatformAPIClient.make(
             credentials: credentials, session: session, log: activityLog, waits: waits))
     }
@@ -304,7 +376,7 @@ final class AppModel {
         let root = backupRoot
         let retention = backupRetention
         writer.backup = { detail in
-            let url = try BackupStore.write(detail, root: root)
+            let url = try BackupStore.backUp(detail, root: root)
             BackupStore.prune(retention, root: root)
             return url
         }
@@ -334,8 +406,7 @@ final class AppModel {
         connectionDidChange()
     }
 
-    /// Clears everything
-    /// loaded from the old tenant, including the rule set's link to one of
+    /// Clears everything loaded from the old tenant, including the rule set's link to one of
     /// its Blueprints (that ID means nothing on the new one).
     func connectionDidChange() {
         connectionGeneration += 1
@@ -395,9 +466,17 @@ final class AppModel {
     /// yet, so App Settings in other Blueprints can be found. A failure is kept
     /// in `detailErrors`; that Blueprint is tried again on the next call.
     func loadMissingDetails() async {
-        guard let service = try? currentService() else { return }
-        let generation = connectionGeneration
         let missing = overviews.map(\.id).filter { details[$0] == nil && !loadingDetailIDs.contains($0) }
+        let service: JamfPlatform.Blueprints
+        do {
+            service = try currentService()
+        } catch {
+            // e.g. a locked Keychain: each one is marked as not loaded, so
+            // nothing waits for it.
+            for id in missing { detailErrors[id] = error.localizedDescription }
+            return
+        }
+        let generation = connectionGeneration
         loadingDetailIDs.formUnion(missing)
         defer { if generation == connectionGeneration { loadingDetailIDs.subtract(missing) } }
         for id in missing { detailErrors[id] = nil }
@@ -406,11 +485,15 @@ final class AppModel {
             func enqueue() {
                 guard let id = pending.popFirst() else { return }
                 group.addTask {
+                    // One return, after the do/catch (swiftlang/swift#93208:
+                    // a child returning from both can misbehave in Release).
+                    var answer: (id: String, detail: JamfPlatform.BlueprintDetail?, error: String?) = (id, nil, nil)
                     do {
-                        return (id, try await service.detail(id: id), nil)
+                        answer.detail = try await service.detail(id: id)
                     } catch {
-                        return (id, nil, error.localizedDescription)
+                        answer.error = error.localizedDescription
                     }
+                    return answer
                 }
             }
             for _ in 0..<5 { enqueue() }

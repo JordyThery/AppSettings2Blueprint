@@ -103,6 +103,17 @@ private struct ChooseTargetView: View {
             if !model.overlappingBlueprints.isEmpty {
                 Banner(style: .warning, text: "Also scoped to these device groups with App Settings: \(model.overlappingBlueprints.map { "“\($0.overview.name)”" }.joined(separator: ", ")). Devices combine every App Settings declaration: AllowedApps and AllowedBinaries are intersected (only apps allowed by all of them run), DeniedApps and DeniedBinaries are combined. Check that they don’t conflict.")
             }
+            // The overlap check sees only loaded Blueprints: say what it can't see yet.
+            let unchecked = model.uncheckedForOverlap
+            if unchecked.loading > 0 {
+                Banner(style: .info, text: "Checking \(unchecked.loading) more Blueprint\(unchecked.loading == 1 ? "" : "s") for App Settings in the same device groups…") {
+                    ProgressView().controlSize(.small)
+                }
+                .accessibilityElement(children: .combine)
+            }
+            if unchecked.failed > 0 {
+                Banner(style: .warning, text: "\(unchecked.failed) Blueprint\(unchecked.failed == 1 ? "" : "s") couldn’t be checked for App Settings in the same device groups, so App Settings they hold for these groups aren’t listed above.")
+            }
 
             Spacer(minLength: 0)
             Divider()

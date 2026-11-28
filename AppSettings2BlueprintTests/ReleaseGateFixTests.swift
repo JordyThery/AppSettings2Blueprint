@@ -131,10 +131,9 @@ struct QuitPromptTests {
 struct SettingsStorageTests {
     @Test("Sidebar selection, storefront and the user Applications folder are saved to the model's settings, not the real preferences")
     func savedToModelDefaults() {
-        let standard = UserDefaults.standard
-        let before = [AppModel.sidebarSelectionKey, AppStoreModel.storefrontKey, LocalAppsModel.includeUserApplicationsKey]
-            .map { standard.object(forKey: $0) as? NSObject }
         let app = TestApp.model()
+        // The model's own domain, never the real preferences (not even read here).
+        #expect(app.defaults !== UserDefaults.standard)
         app.saveSidebarSelection(.localApps)
         app.appStore.storefront = "de"
         app.localApps.includesUserApplications = !app.localApps.includesUserApplications
@@ -143,9 +142,10 @@ struct SettingsStorageTests {
         #expect(app.savedSidebarSelection == .localApps)
         #expect(app.defaults.string(forKey: AppStoreModel.storefrontKey) == "de")
         #expect(app.defaults.object(forKey: LocalAppsModel.includeUserApplicationsKey) != nil)
-        let after = [AppModel.sidebarSelectionKey, AppStoreModel.storefrontKey, LocalAppsModel.includeUserApplicationsKey]
-            .map { standard.object(forKey: $0) as? NSObject }
-        #expect(before == after, "the real preferences are untouched")
+        // A second model on its own domain doesn't see them: they went to this one only.
+        let other = TestApp.model()
+        #expect(other.defaults.string(forKey: AppModel.sidebarSelectionKey) == nil)
+        #expect(other.defaults.string(forKey: AppStoreModel.storefrontKey) == nil)
     }
 }
 

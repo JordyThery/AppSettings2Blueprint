@@ -1,14 +1,16 @@
 #!/bin/zsh
-# AppSettings2Blueprint's release check. Claude runs
-# it unattended with nohup; the report lands in
+# AppSettings2Blueprint's release check. Claude asks Jordy first; once he
+# says go, it runs unattended with nohup; the report lands in
 # ~/Library/Application Support/JTKit Release Check/runs/.
 #
 #   Scripts/release-check.sh [--local-jtkit] [--tenants] [--stop-before-live]
-#   Scripts/release-check.sh --local-jtkit --fault break-build|fail-live-step|interrupt-live
+#   Scripts/release-check.sh --local-jtkit --fault break-build|fail-live-step|interrupt-live|saved-connection-attempt
 #     (tests the check itself; never part of a release check)
 #
 # Tenants are roles on the local allow-list (never named here): jamf-test-a
-# over the Jamf Platform API.
+# over the Jamf Platform API. Under tests (the unit-test host, the UI tests)
+# the app refuses every request to a saved connection, and any attempt fails
+# the run.
 cd "$(dirname "$0")/.." || exit 1
 
 APP_NAME="AppSettings2Blueprint"
@@ -35,6 +37,10 @@ FINGERPRINT_DEFAULTS=("$DOMAIN connectionProfiles" "$DOMAIN selectedConnectionPr
     "$DOMAIN sidebarSelection" "$DOMAIN appStoreStorefront" "$DOMAIN includeUserApplicationsFolder" "$DOMAIN backupRetentionDays")
 FINGERPRINT_PATHS=("$HOME/Library/Application Support/AppSettings2Blueprint/Backups")
 KEYCHAIN_PREFIXES=("AppSettings2Blueprint.")
+APP_FAULTS=(saved-connection-attempt)
+
+# Each run starts with no recorded attempts (requests to saved connections).
+rm -rf "$(getconf DARWIN_USER_TEMP_DIR)AppSettings2Blueprint-under-test"
 
 # The template comes from the JTKit under test: the local checkout with
 # --local-jtkit, otherwise the published version this project resolves.

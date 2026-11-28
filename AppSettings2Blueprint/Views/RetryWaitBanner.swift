@@ -2,7 +2,7 @@ import JTKit
 import SwiftUI
 
 /// The wait before a retry (JTKit's `RequestWaits`), e.g. "Jamf asked to wait
-/// 40 s", with Stop. Shown at the top of the write, scope and deploy sheets
+/// 40 s", with Stop. Shown at the top of the write, scope, restore and deploy sheets
 /// while a wait lasts; nothing otherwise.
 struct RetryWaitBanner: View {
     let waits: RequestWaits

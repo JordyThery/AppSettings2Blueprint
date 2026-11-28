@@ -72,6 +72,7 @@ extension AppModel {
     /// The saved secret for Test Connection and Load Environments; empty when
     /// none is saved. A Keychain that can't be read is reported as such.
     private func storedSecret(for profile: ConnectionProfile) throws -> String {
+        try refuseSavedConnectionUnderTests("Keychain read for a saved connection")
         do {
             return try profileStore.readSecret(for: profile) ?? ""
         } catch let error as SecretStoreError {

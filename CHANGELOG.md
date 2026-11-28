@@ -1,11 +1,21 @@
 # Changelog
 
-## 1.3.1 (2026-11-16)
+## 1.3.2 — 2026-11-27
+
+- **Write to Jamf** keeps the rule set it writes: while the sheet is open, File › New, Open and Import CSV, the View menu’s sections and the Blueprint menu’s commands are unavailable, so the editor can’t be replaced and the sheet can’t close in the middle of a write.
+- An empty **AllowedBinaries** or **AllowedApps** list in a Blueprint is now shown in the editor, with a Remove button, and pointed out when it’s loaded. An empty AllowedBinaries allows nothing, so deploying it asks for the extra confirmation, as for an allow list without the recommended baseline. Two declarations that combine an allow list with an empty one, which together allow nothing, are pointed out the same way.
+- **Write to Jamf** says when other Blueprints are still being checked for App Settings in the same device groups, or couldn’t be checked, instead of showing no overlap warning.
+- Two App Settings declarations combined into one no longer write a setting the app doesn’t edit twice; the first value is kept and the load note names it.
+- **Review Changes…** no longer writes another backup each time while the Blueprint is unchanged.
+- Connection and Keychain messages in the system log no longer show connection identifiers or error details.
+- Improved stability of loading Blueprint details and App Store searches.
+
+## 1.3.1 — 2026-11-16
 
 - **Apple Built-in Apps** no longer pushes the window’s content out of view. The sidebar and the list’s top bar stay visible, also when the app opens in that section.
 - The **View** menu switches sections: App Store (⌘1), Apple Built-in Apps (⌘2), Local Mac Apps (⌘3), Editor (⌘4) and Blueprints (⌘5).
 
-## 1.3.0 (2026-11-03)
+## 1.3.0 — 2026-11-03
 
 - **Waiting for Jamf is shown**: when Jamf asks the app to wait before trying again, the write, scope, restore and deploy sheets say how long, with **Stop**. A wait lasts at most 60 seconds.
 - A Keychain that is locked or refuses access is now reported as such, instead of as an incomplete connection.
@@ -25,7 +35,7 @@
 - Edit Scope checks that nobody changed the scope in Jamf since the sheet opened. After “changed in Jamf”, Back starts from the Blueprint as it is now.
 - Stop in a sheet ends only that sheet’s wait.
 
-## 1.2.0 (2026-10-31)
+## 1.2.0 — 2026-10-31
 
 - **Demo Mode**: try the app without a Jamf tenant. Turn it on in the connection picker or the Connection menu (or with **Try Demo Mode** when no connection is set up). It shows a sample organization’s Blueprints and device groups; writes, scope changes, restores and deployments work on the sample data only, and nothing is sent to Jamf. Window titles end in “— Demo” while it’s on. Backups made in Demo Mode go to a temporary folder, and your saved connections and Keychain items are never touched. App Store lookups and local app scans still work as usual.
 - **Load Environments** in **Settings › Connections** lists the environments an organization-scoped integration can see, so you can pick the Environment ID instead of copying it.
@@ -46,14 +56,14 @@
 - Text: American English throughout, “Blueprint” capitalized, “Try Again” and “Show in Finder” everywhere, and dates such as the built-in apps list’s shown as “September 11, 2026”.
 - Fixed: **Write to Jamf…** opened before the Blueprints list had loaded (for example, right after launch) showed every Blueprint as “Loading…”, so none could be chosen. Their details now load as soon as the list arrives.
 
-## 1.1
+## 1.1 — 2026-10-23
 
 - **Edit Scope** for Jamf Pro: change an existing Blueprint's device groups. Only the scope is sent, after a concurrency check and a backup, and the read-back is verified. Removing groups from a deployed Blueprint needs an extra confirmation. Also the way to scope an unscoped Blueprint before writing to it.
 - **Jamf School**: recognized automatically. Writing to existing Blueprints and deploying work as with Jamf Pro; because the Platform API does not list Jamf School device groups, new Blueprints and scope changes are left to Jamf School, and the deploy confirmation shows group IDs.
 - **Shared iPad**: an iOS rule set can be written to the user channel, as Apple requires on Shared iPad. Loading such a declaration from a Blueprint turns the option on.
 - The Blueprint header shows the scope.
 
-## 1.0
+## 1.0 — 2026-10-23
 
 First release.
 

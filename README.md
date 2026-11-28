@@ -7,6 +7,7 @@
 *Find app identifiers, build App Settings rules and deploy them as a Jamf Blueprint.*
 
 [![Latest release](https://img.shields.io/github/v/release/JordyThery/AppSettings2Blueprint?label=release)](https://github.com/JordyThery/AppSettings2Blueprint/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/JordyThery/AppSettings2Blueprint/total)](https://github.com/JordyThery/AppSettings2Blueprint/releases)
 ![macOS 15+](https://img.shields.io/badge/macOS-15%2B-blue)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
@@ -22,9 +23,15 @@ It isn’t a policy advisor: it shows what each identifier matches; you decide w
 
 ![The editor with a macOS rule set of allowed and denied binaries and the live JSON preview](docs/screenshot-ruleset.png)
 
+## Requirements
+
+- macOS 15 or later
+- A Jamf Platform API integration for Jamf Pro or Jamf School, with the permissions under [Permissions](#permissions)
+- Network access to the hosts under [Network](#network)
+
 ## Installation
 
-Download the latest notarized build from [Releases](https://github.com/JordyThery/AppSettings2Blueprint/releases/latest), unzip it, and move **AppSettings2Blueprint.app** to `/Applications`. Requires **macOS 15 or later**. The app checks for new releases once a day; **Check for Updates…** in the app menu checks right away.
+Download the latest notarized build from [Releases](https://github.com/JordyThery/AppSettings2Blueprint/releases/latest), unzip it, and move **AppSettings2Blueprint.app** to `/Applications`. The app checks for new releases once a day; **Check for Updates…** in the app menu checks right away.
 
 To look around first, choose **Demo Mode** in the connection picker or the Connection menu (or **Try Demo Mode** when no connection is set up). It shows a sample organization’s Blueprints and device groups; writes and deployments work on the sample data only, nothing is sent to Jamf, and window titles end in “— Demo”. App Store lookups still contact Apple, and backups made in Demo Mode go to a temporary folder. **Test Connection** always uses the real connection, even in Demo Mode. Choosing a saved connection, in the picker, the Connection menu or with **Use This Connection** in Settings, leaves Demo Mode.
 

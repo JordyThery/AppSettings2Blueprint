@@ -342,6 +342,21 @@ struct CSVTests {
         #expect(CSVExporter.export(document) == text)
     }
 
+    /// Excel's "CSV UTF-8" starts the file with a byte-order mark; reading the
+    /// file as Import CSV does (`String(contentsOf:encoding: .utf8)`) drops it.
+    @Test func byteOrderMarkIsIgnored() throws {
+        let url = FileManager.default.temporaryDirectory.appending(path: "as2b-bom-\(UUID().uuidString).csv")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try (Data([0xEF, 0xBB, 0xBF]) + Data(Self.bundleIDCSV.utf8)).write(to: url)
+        // Read as the Import CSV panel reads it.
+        let text = try String(contentsOf: url, encoding: .utf8)
+        guard case .bundleIDLookup(let rows) = try CSVImporter.importDocument(text) else {
+            Issue.record("Not read as a BundleID-Lookup CSV")
+            return
+        }
+        #expect(rows.first?.bundleID == "com.microsoft.Office.Outlook")
+    }
+
     @Test func parsesTypedValues() throws {
         guard case .bundleIDLookup(let rows) = try CSVImporter.importDocument(Self.bundleIDCSV) else {
             Issue.record("Expected a BundleID-Lookup file")

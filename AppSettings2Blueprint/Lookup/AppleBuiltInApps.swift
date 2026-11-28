@@ -18,7 +18,7 @@ nonisolated struct AppleBuiltInApps: Decodable, Sendable {
 
     var builtInApps: [App] { apps.filter(\.builtIn) }
 
-    /// The verification date as recorded, e.g. "11 September 2026".
+    /// The verification date as recorded, e.g. "September 11, 2026".
     var verifiedDisplay: String {
         // Parsed and formatted in GMT so the day never shifts with the local time zone.
         let parse = Date.ISO8601FormatStyle(timeZone: .gmt).year().month().day().dateSeparator(.dash)

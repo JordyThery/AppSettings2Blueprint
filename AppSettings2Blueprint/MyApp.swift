@@ -12,8 +12,8 @@ import SwiftUI
                 .environment(model.updates)
                 .frame(minWidth: 900, minHeight: 560)
                 .onAppear { appDelegate.model = model }
-                // A sandbox run (UI tests) makes no public lookups.
-                .task { if !model.demo.isSandbox { await model.updates.checkAutomatically() } }
+                // Under tests (unit-test host, UI tests) no public lookups.
+                .task { if model.checksForUpdates { await model.updates.checkAutomatically() } }
         }
         .environment(model.demo)
         .defaultSize(width: 1280, height: 800)
@@ -141,13 +141,17 @@ private struct AppCommands: Commands {
         }
         // The editor's header buttons, in the File menu.
         CommandGroup(replacing: .newItem) {
+            // Off while Write to Jamf is open: they'd replace the rule set it writes.
             Button("New macOS Rule Set") { editor(.new(.macOS)) }
                 .keyboardShortcut("n", modifiers: .command)
+                .disabled(model.isWritingToJamf)
             Button("New iOS / iPadOS Rule Set") { editor(.new(.iOS)) }
                 .keyboardShortcut("n", modifiers: [.command, .option])
+                .disabled(model.isWritingToJamf)
             Divider()
             Button("Open Rule Set…") { editor(.open) }
                 .keyboardShortcut("o", modifiers: .command)
+                .disabled(model.isWritingToJamf)
         }
         CommandGroup(replacing: .saveItem) {
             Button("Save Rule Set…") {
@@ -159,14 +163,17 @@ private struct AppCommands: Commands {
                 .disabled(model.ruleSet.hasErrors)
             Button("Import CSV…") { editor(.importCSV) }
                 .keyboardShortcut("i", modifiers: [.command, .shift])
+                .disabled(model.isWritingToJamf)
         }
         // Writing and the selected Blueprint's actions.
         CommandMenu("Blueprint") {
             Button("Write to Jamf…") { editor(.writeToJamf) }
                 .keyboardShortcut("j", modifiers: [.command, .shift])
-                .disabled(model.ruleSet.hasErrors || !model.hasActiveConnection)
+                .disabled(model.ruleSet.hasErrors || !model.hasActiveConnection || model.isWritingToJamf)
             Divider()
-            let detail = model.selectedDetail
+            // Off while Write to Jamf is open: they'd switch to Blueprints and
+            // close the sheet in the middle of a write.
+            let detail = model.isWritingToJamf ? nil : model.selectedDetail
             Button("Reload Blueprint") { blueprint(.reload) }
                 .keyboardShortcut("r", modifiers: [.command, .option])
                 .disabled(detail == nil)
@@ -187,6 +194,8 @@ private struct AppCommands: Commands {
                     model.sectionRequest = section
                 }
                 .keyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: .command)
+                // Switching sections would close Write to Jamf mid-write.
+                .disabled(model.isWritingToJamf)
             }
             Divider()
         }
@@ -199,7 +208,7 @@ private struct AppCommands: Commands {
                 openWindow(id: WindowID.main)
                 model.isShowingFetchByID = true
             }
-            .disabled(!model.hasActiveConnection)
+            .disabled(!model.hasActiveConnection || model.isWritingToJamf)
         }
     }
 }

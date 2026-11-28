@@ -84,7 +84,7 @@ nonisolated enum RuleValidator {
                 }
             }
         }
-        if ruleSet.alwaysAllowManagedApps == true && ruleSet.allowedBinaries.isEmpty {
+        if ruleSet.alwaysAllowManagedApps == true && ruleSet.allowedBinaries.isEmpty && !ruleSet.hasEmptyList("AllowedBinaries") {
             issues.append(.init(severity: .warning, area: .binaries, itemID: nil,
                                 message: "AlwaysAllowManagedApps only applies when AllowedBinaries is present."))
         }

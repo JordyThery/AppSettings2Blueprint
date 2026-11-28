@@ -15,6 +15,12 @@ final class ProfileStore {
 
     let connections: ConnectionStore<ConnectionProfile>
     @ObservationIgnored private let defaults: UserDefaults
+    /// Whether this is the real list: the app's settings or its Keychain
+    /// items. Under tests every request for it is refused
+    /// (`UnderTest.refusingSession`). Under the live-check switch JTKit's
+    /// store holds only the release check's connections, in memory, so the
+    /// saved ones are never reached.
+    @ObservationIgnored let holdsSavedConnections: Bool
 
     var selectedProfileID: UUID? {
         didSet {
@@ -28,13 +34,18 @@ final class ProfileStore {
     /// - Parameters:
     ///   - defaults: where the profiles and the active one are saved.
     ///   - secrets: where client secrets are kept; the app's Keychain items by default.
-    init(defaults: UserDefaults = .standard, secrets: any SecretStore = ProfileStore.keychain) {
+    ///   - countsAsSaved: tests only: treat this store as the saved connections.
+    init(defaults: UserDefaults = .standard, secrets: any SecretStore = ProfileStore.keychain,
+         countsAsSaved: Bool = false) {
         self.defaults = defaults
+        holdsSavedConnections = countsAsSaved || (!LiveLaunch.isSwitched
+            && (defaults === UserDefaults.standard || secrets is KeychainSecretStore))
         let logger = Self.logger
         connections = ConnectionStore(
             storage: UserDefaultsConnectionStorage(key: Self.profilesKey, defaults: defaults),
             secrets: [.main: SecretLocation(store: secrets)],
-            log: { logger.error("\($0, privacy: .public)") },
+            // Can name connections and Keychain accounts: private in the system log.
+            log: { logger.error("\($0, privacy: .private)") },
             liveRecord: ConnectionProfile.init(live:)
         )
         let storedSelection = LiveLaunch.isSwitched ? nil : defaults.string(forKey: Self.selectedKey).flatMap(UUID.init)
@@ -50,7 +61,7 @@ final class ProfileStore {
     nonisolated static let keychain = KeychainSecretStore(
         service: "AppSettings2Blueprint.client-secret",
         label: "AppSettings2Blueprint client secret",
-        log: { logger.error("\($0, privacy: .public)") }
+        log: { logger.error("\($0, privacy: .private)") }
     )
 
     private nonisolated static let logger = Logger(subsystem: "be.jordythery.appsettings2blueprint", category: "connections")

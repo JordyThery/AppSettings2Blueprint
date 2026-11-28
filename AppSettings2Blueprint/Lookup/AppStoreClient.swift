@@ -187,8 +187,15 @@ nonisolated struct AppStoreClient: Sendable {
         let outcomes = await withTaskGroup(of: (Int, Result<[AppStoreApp], Error>).self) { group in
             for (index, platform) in platforms.enumerated() {
                 group.addTask {
-                    do { return (index, .success(try await searchEntity(term: term, platform: platform, country: country))) }
-                    catch { return (index, .failure(error)) }
+                    // One return, after the do/catch (swiftlang/swift#93208:
+                    // a child returning from both can misbehave in Release).
+                    let result: Result<[AppStoreApp], Error>
+                    do {
+                        result = .success(try await searchEntity(term: term, platform: platform, country: country))
+                    } catch {
+                        result = .failure(error)
+                    }
+                    return (index, result)
                 }
             }
             var outcomes: [(Int, Result<[AppStoreApp], Error>)] = []

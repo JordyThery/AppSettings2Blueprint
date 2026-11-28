@@ -6,7 +6,7 @@ import Testing
 @testable import AppSettings2Blueprint
 
 /// A secret store that counts reads and writes: demo mode must do neither.
-private final class CountingSecretStore: SecretStore, @unchecked Sendable {
+final class CountingSecretStore: SecretStore, @unchecked Sendable {
     private let lock = NSLock()
     private var secrets: [String: String] = [:]
     private var reads = 0
@@ -41,32 +41,40 @@ private func declarations(of detail: JamfPlatform.BlueprintDetail) throws -> [Lo
 @MainActor
 @Suite("Demo mode", .serialized)
 final class DemoModeTests {
-    private let suiteName = "be.jordythery.appsettings2blueprint.tests.demo"
+    /// A throwaway settings domain of its own (`TestSettings`).
+    private let domain: String
     private let defaults: UserDefaults
     private let secrets = CountingSecretStore()
     private let profile = ConnectionProfile(name: "Production", region: .eu,
                                             environmentID: "12345678-1234-4123-8123-123456789abc", clientID: "client-1")
 
     init() {
-        defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
+        (domain, defaults) = TestSettings.makeDefaults("demo")
     }
 
     deinit {
-        defaults.removePersistentDomain(forName: suiteName)
+        defaults.removePersistentDomain(forName: domain)
     }
 
+    /// Where this suite's models back up outside demo mode: never the real
+    /// Backups folder.
+    private let backupRoot = TestApp.temporaryFolder()
+
     /// A model with one saved connection (in use, with its secret) and demo
-    /// mode on or off for this run only.
+    /// mode on or off for this run only. Its real network sends nothing
+    /// (never Jamf) unless a test passes another.
     private func makeModel(demo isOn: Bool = true, scenario: DemoScenario? = nil,
-                           session: URLSession = .shared) throws -> AppModel {
+                           session: URLSession? = nil) throws -> AppModel {
+        let session = session ?? TestRun.refusingSession(
+            log: TestRun.AttemptLog(fileURL: TestSettings.folder.appending(path: "demo-attempts-\(UUID().uuidString).jsonl")),
+            message: "No real network in the demo-mode tests.")
         let store = ProfileStore(defaults: defaults, secrets: secrets)
         try store.connections.save(profile, secrets: [.main: "real-secret"])
         store.selectedProfileID = profile.id
         var arguments = [DemoMode.launchArgument, isOn ? "YES" : "NO"]
         if let scenario { arguments += [DemoMode.scenarioArgument, scenario.rawValue] }
         return AppModel(profileStore: store, demo: DemoMode(key: AppModel.demoModeKey, defaults: defaults, arguments: arguments),
-                        session: session, defaults: defaults)
+                        session: session, defaults: defaults, backupRoot: backupRoot)
     }
 
     @Test("Demo mode lists Contoso's Blueprints and groups without reading or writing a saved connection or secret")
@@ -190,10 +198,10 @@ final class DemoModeTests {
         #expect(selection.wrappedValue == profile.id)
     }
 
-    @Test("Outside demo mode the saved connection and the real Backups folder are used")
+    @Test("Outside demo mode the saved connection and the usual Backups folder are used")
     func realOutsideDemo() throws {
         let model = try makeModel(demo: false)
-        #expect(model.backupRoot == BackupStore.rootURL)
+        #expect(model.backupRoot == backupRoot)
         #expect(model.hasActiveConnection)
         _ = try model.currentClient()
         #expect(secrets.readCount > 0, "the saved secret is read for a real connection")

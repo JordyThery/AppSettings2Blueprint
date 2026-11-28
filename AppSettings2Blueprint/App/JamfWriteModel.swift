@@ -100,6 +100,11 @@ final class JamfWriteModel {
 
     var declarations: [LosslessJSON] { DeclarationEncoder.declarations(for: app.ruleSet.ruleSet) }
 
+    /// The rule set the last prepare or create wrote from. The editor is
+    /// linked to the Blueprint and marked saved only while it still holds
+    /// exactly this rule set.
+    private var writtenRuleSet: RuleSet?
+
     var selectedDetail: JamfPlatform.BlueprintDetail? { selectedBlueprintID.flatMap { app.details[$0] } }
 
     var predicate: String? {
@@ -167,7 +172,7 @@ final class JamfWriteModel {
     static let stoppedText = "You stopped waiting for Jamf, so nothing was written."
 
     /// JTKit's sentence for a division-assigned Blueprint.
-    static let divisionText = "This Blueprint is assigned to a division and can’t be changed through the API."
+    static let divisionText = JamfPlatform.APIError.divisionLocked
 
     /// The same sentence wherever a Blueprint without scope is refused.
     static func noScopeText(isJamfSchool: Bool) -> String {
@@ -190,6 +195,21 @@ final class JamfWriteModel {
             .sorted { $0.overview.name < $1.overview.name }
     }
 
+    /// The listed Blueprints the overlap check can't see yet: their details
+    /// are being loaded, or aren't (they failed, or nothing is loading them).
+    /// Zero while the target has no device groups (there's nothing to overlap
+    /// with).
+    var uncheckedForOverlap: (loading: Int, failed: Int) {
+        let hasGroups = switch mode {
+        case .existing: !(selectedDetail?.scopeDeviceGroups.isEmpty ?? true)
+        case .new: !selectedGroupIDs.isEmpty
+        }
+        guard hasGroups else { return (0, 0) }
+        let missing = app.overviews.map(\.id).filter { $0 != selectedBlueprintID && app.details[$0] == nil }
+        let loading = missing.filter { app.loadingDetailIDs.contains($0) }.count
+        return (loading, missing.count - loading)
+    }
+
     // MARK: Actions
 
     /// For an existing Blueprint: concurrency check, backup and the new steps,
@@ -204,6 +224,9 @@ final class JamfWriteModel {
     func performPrepare() async {
         let createPath: [LosslessJSON.PathComponent] = [.key("steps"), .index(0), .key("components"), .index(0)]
         let name = newName.trimmingCharacters(in: .whitespaces)
+        let ruleSet = app.ruleSet.ruleSet
+        writtenRuleSet = ruleSet
+        let declarations = DeclarationEncoder.declarations(for: ruleSet)
         do {
             let writer = try makeWriter()
             switch mode {
@@ -274,8 +297,12 @@ final class JamfWriteModel {
     }
 
     /// The rule set now lives in this Blueprint: later writes go to the same
-    /// component, and it counts as saved.
+    /// component, and it counts as saved. Only when the editor still holds the
+    /// rule set that was written; the sheet shows the Blueprint either way.
     private func link(id: String, name: String, componentPath: [LosslessJSON.PathComponent]) {
+        mode = .existing
+        selectedBlueprintID = id
+        guard let writtenRuleSet, app.ruleSet.ruleSet == writtenRuleSet else { return }
         var stepIndex: Int?
         var componentIndex: Int?
         if componentPath.count >= 4,
@@ -286,8 +313,6 @@ final class JamfWriteModel {
         }
         app.ruleSet.linkedBlueprint = LinkedBlueprint(id: id, name: name, stepIndex: stepIndex, componentIndex: componentIndex)
         app.ruleSet.markSaved()
-        mode = .existing
-        selectedBlueprintID = id
     }
 
     private func fail(_ error: Error, componentPath: [LosslessJSON.PathComponent]?) {

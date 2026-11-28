@@ -48,6 +48,18 @@ nonisolated enum BackupStore {
         try store(root: root).write(detail.rawData, for: detail.id, date: date)
     }
 
+    /// The backup before a change (`AppModel.makeWriter`): as `write`, but
+    /// when the Blueprint's newest backup already holds exactly these bytes
+    /// (Back and Review Changes… again, or a review that was canceled), that
+    /// one is returned instead of writing another copy.
+    static func backUp(_ detail: JamfPlatform.BlueprintDetail, root: URL = rootURL) throws -> URL {
+        if let newest = backups(for: detail.id, root: root).first,
+           let bytes = try? Data(contentsOf: newest.url), bytes == detail.rawData {
+            return newest.url
+        }
+        return try write(detail, root: root)
+    }
+
     /// Backups for one Blueprint, newest first.
     static func backups(for blueprintID: String, root: URL = rootURL) -> [BlueprintBackup] {
         store(root: root).backups(for: blueprintID)
